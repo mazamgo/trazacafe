@@ -58,6 +58,27 @@ La dirección Ethereum de la clave se deriva de su clave pública (lo hará el w
 
 Falta un paso manual: en la [consola de Firebase](https://console.firebase.google.com/project/trazacafe-dev/authentication/providers) activa **Authentication → Método de acceso → Correo electrónico/contraseña**.
 
+### Restricciones de las API keys (ya aplicadas)
+
+Las claves de `firebase_options.dart` son públicas (el repo es público), así que están limitadas:
+
+| Key | Solo funciona desde | Servicios permitidos |
+|---|---|---|
+| Android | paquete `com.goproduction.trazacafe` firmado con el certificado de depuración (SHA-1 `A5:F0:24:…:CF:83`) | Identity Toolkit, Secure Token, Firebase Installations, Firebase Storage |
+| Navegador | `trazacafe-dev.web.app`, `trazacafe-dev.firebaseapp.com`, `localhost:5000` | los mismos |
+
+- **Al publicar en Play Console** Google firma la app con otro certificado. Copia su SHA-1 de *Play Console → Configuración → Integridad de la app* y agrégalo; si no, el login falla en la app publicada:
+
+  ```powershell
+  gcloud services api-keys update 0a30f3fc-8ed7-4465-89a8-ec1ea000d323 --project=trazacafe-dev --append `
+    '--allowed-application=sha1_fingerprint=<SHA1_SIN_DOS_PUNTOS>,package_name=com.goproduction.trazacafe'
+  firebase apps:android:sha:create 1:85528878949:android:15e87427c4ad8ad5b68b8c <SHA1> --project trazacafe-dev
+  ```
+
+- **Otra computadora de desarrollo** tiene otro certificado de depuración: agrega su SHA-1 igual que arriba.
+- **Web en desarrollo**: corre el verificador en el puerto permitido con `flutter run -d chrome --web-port 5000`.
+- Si se usa un servicio nuevo de Firebase (por ejemplo Firestore), hay que agregarlo con `--api-target`.
+
 ### Dar de alta a un técnico
 
 La app no permite registrarse sola: cada técnico se crea con su cooperativa asignada.
