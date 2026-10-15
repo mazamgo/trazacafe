@@ -95,6 +95,8 @@ Cualquier cuenta de Google puede abrir la app, pero solo los correos invitados r
 | `admin` | Invitar y quitar personas (pantalla **Equipo**), todo lo del técnico |
 | `tecnico` | Registrar productores, fincas, fotos y sincronizar |
 
+Organización de prueba ya creada: **GoProduction (pruebas)**, con `mauricio.zambrana.g@gmail.com` invitado como administrador.
+
 Para una organización nueva (cooperativa, exportadora o beneficio de café o cacao), se crea con su primer administrador:
 
 ```powershell
@@ -104,19 +106,39 @@ npm run crear-organizacion -- --nombre "Cooperativa Ejemplo R.L." --admin gerent
 
 El administrador entra con "Entrar con Google" usando ese correo y desde **Equipo** invita a sus técnicos. Quitar a alguien le borra los permisos y cierra sus sesiones al instante (la API verifica tokens revocados). Necesita la base de datos (paso 2).
 
-## 5. Backend en Cloud Run
+## 5. Backend en Cloud Run (ya hecho)
+
+**URL de la API:** https://trazacafe-api-85528878949.us-east4.run.app
+
+| Dato | Valor |
+|---|---|
+| Servicio | `trazacafe-api` en us-east4, de 0 a 2 instancias, 512 MB (sin uso no cobra) |
+| Cuenta de servicio | `trazacafe-api@trazacafe-dev.iam.gserviceaccount.com` con solo `cloudsql.client`, `cloudsql.instanceUser` y `firebaseauth.admin` |
+| Usuario de la base | `trazacafe-api@trazacafe-dev.iam` (IAM, rol `trazacafe_app`: solo datos) |
+| Imágenes | Artifact Registry `us-east4-docker.pkg.dev/trazacafe-dev/trazacafe/backend` |
+
+La URL es pública (`allUsers` como invocador) porque la app la llama directamente; la API exige el token de Firebase en cada `/v1/*`. `.gcloudignore` limita lo que se sube a Cloud Build a `package*.json`, `schemas/` y `backend/`.
+
+Para publicar una versión nueva del backend (desde la raíz del repo):
 
 ```powershell
-gcloud artifacts repositories create trazacafe --repository-format=docker --location=$REGION
-$IMAGEN = "$REGION-docker.pkg.dev/$PROYECTO/trazacafe/backend"
-gcloud builds submit --tag $IMAGEN --file backend/Dockerfile .
-gcloud run deploy trazacafe-api --image=$IMAGEN --region=$REGION `
-  --add-cloudsql-instances="${PROYECTO}:${REGION}:${SQL}" `
-  --set-env-vars="FIREBASE_PROJECT_ID=$PROYECTO" `
-  --set-secrets="DATABASE_URL=database-url:latest" --allow-unauthenticated
+$IMAGEN = "us-east4-docker.pkg.dev/$PROYECTO/trazacafe/backend:$(git rev-parse --short HEAD)"
+gcloud builds submit . --config backend/cloudbuild.yaml --substitutions="_IMAGEN=$IMAGEN" --region=$REGION --project=$PROYECTO
+gcloud run deploy trazacafe-api --image=$IMAGEN --region=$REGION --project=$PROYECTO
 ```
 
-`--allow-unauthenticated` deja la URL accesible; la API exige el token de Firebase en cada petición de `/v1/*`. Guarda `DATABASE_URL` en Secret Manager antes (`gcloud secrets create database-url --data-file=-`). En Cloud Run la conexión va por socket: `postgres://trazacafe:CLAVE@/trazacafe?host=/cloudsql/PROYECTO:REGION:trazacafe-db`.
+`gcloud run deploy` conserva la cuenta de servicio, las variables y los límites de la primera vez. Si hay migraciones nuevas, aplícalas antes con `npm run migrate`.
+
+Ver errores: `gcloud run services logs read trazacafe-api --region=$REGION --project=$PROYECTO --limit=50`
+
+### App apuntando a la API
+
+```powershell
+cd app
+flutter build apk --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
+```
+
+El APK release va firmado con el certificado de depuración (el SHA-1 registrado). Para Play Console hace falta un certificado de subida propio y agregar el SHA-1 de Play App Signing (sección 4).
 
 ## 6. Verificador en Firebase Hosting
 

@@ -1,0 +1,12 @@
+# Lo que NO se sube a Cloud Build: solo hacen falta package*.json, schemas/ y backend/.
+.git/
+.gitignore
+.claude/
+node_modules/
+**/node_modules/
+app/
+docs/
+infra/
+**/.env
+**/.env.*
+!**/.env.example

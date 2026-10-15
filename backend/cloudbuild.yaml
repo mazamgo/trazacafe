@@ -1,0 +1,10 @@
+# Construye la imagen del backend desde la raíz del repo (necesita el paquete
+# de esquemas del monorepo):
+#   gcloud builds submit . --config backend/cloudbuild.yaml --substitutions=_IMAGEN=<imagen>
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_IMAGEN}", "-f", "backend/Dockerfile", "."]
+images:
+  - "${_IMAGEN}"
+options:
+  logging: CLOUD_LOGGING_ONLY

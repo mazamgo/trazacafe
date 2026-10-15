@@ -37,8 +37,9 @@ class ApiClient {
   Future<Map<String, dynamic>> sync(Map<String, dynamic> payload) =>
       _pedir('POST', '/v1/sync', payload);
 
-  /// Activa la invitación del correo con el que se inició sesión.
-  Future<void> activar() => _pedir('POST', '/v1/activar');
+  /// Activa la invitación del correo con el que se inició sesión. Lleva `{}`
+  /// porque el frontal de Cloud Run rechaza POST sin cuerpo (411).
+  Future<void> activar() => _pedir('POST', '/v1/activar', const <String, dynamic>{});
 
   Future<List<Invitacion>> invitaciones() async {
     final r = await _pedir('GET', '/v1/invitaciones');
