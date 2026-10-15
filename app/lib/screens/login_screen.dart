@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -11,57 +12,28 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _correo = TextEditingController();
-  final _clave = TextEditingController();
   bool _cargando = false;
-  String? _error;
 
-  @override
-  void dispose() {
-    _correo.dispose();
-    _clave.dispose();
-    super.dispose();
-  }
-
-  Future<void> _ejecutar(Future<void> Function() accion) async {
-    setState(() {
-      _cargando = true;
-      _error = null;
-    });
+  /// Después de Google, la app pasa sola a la pantalla de activación.
+  Future<void> _entrar() async {
+    final aviso = ref.read(avisoAccesoProvider.notifier);
+    setState(() => _cargando = true);
+    aviso.mostrar(null);
     try {
-      await accion();
+      await ref.read(authServiceProvider).entrarConGoogle();
+    } on AuthCancelado {
+      // La persona cerró el selector de cuentas.
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      aviso.mostrar(e.toString());
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
   }
 
-  void _entrar() {
-    if (_correo.text.trim().isEmpty || _clave.text.isEmpty) {
-      setState(() => _error = 'Escribe tu correo y contraseña.');
-      return;
-    }
-    _ejecutar(() => ref.read(authServiceProvider).iniciarSesion(_correo.text.trim(), _clave.text));
-  }
-
-  void _recuperar() {
-    if (_correo.text.trim().isEmpty) {
-      setState(() => _error = 'Escribe tu correo para enviarte el enlace.');
-      return;
-    }
-    _ejecutar(() async {
-      await ref.read(authServiceProvider).recuperarClave(_correo.text.trim());
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Te enviamos un enlace para cambiar la contraseña.')),
-        );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final error = ref.watch(avisoAccesoProvider);
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -77,36 +49,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 4),
-                const Text('Acceso para técnicos de campo', textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _correo,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  decoration: const InputDecoration(labelText: 'Correo'),
-                ),
-                TextField(
-                  controller: _clave,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.password],
-                  decoration: const InputDecoration(labelText: 'Contraseña'),
-                  onSubmitted: (_) => _entrar(),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ],
-                const SizedBox(height: 20),
-                FilledButton(
+                const Text('Acceso para técnicos y administradores', textAlign: TextAlign.center),
+                const SizedBox(height: 32),
+                FilledButton.icon(
                   onPressed: _cargando ? null : _entrar,
-                  child: _cargando
+                  icon: _cargando
                       ? const SizedBox.square(
                           dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Entrar'),
+                      : const Icon(Icons.account_circle),
+                  label: const Text('Entrar con Google'),
                 ),
-                TextButton(
-                  onPressed: _cargando ? null : _recuperar,
-                  child: const Text('Olvidé mi contraseña'),
+                if (error != null) ...[
+                  const SizedBox(height: 16),
+                  Text(error,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ],
+                const SizedBox(height: 24),
+                Text(
+                  'Usa la cuenta de Google con la que te invitó tu organización.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),

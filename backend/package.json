@@ -8,8 +8,7 @@
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
     "start": "node --import tsx src/server.ts",
     "migrate": "node --env-file-if-exists=.env --import tsx scripts/migrate.ts",
-    "crear-cooperativa": "node --env-file-if-exists=.env --import tsx scripts/crear-cooperativa.ts",
-    "crear-tecnico": "node --env-file-if-exists=.env --import tsx scripts/crear-tecnico.ts",
+    "crear-organizacion": "node --env-file-if-exists=.env --import tsx scripts/crear-organizacion.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

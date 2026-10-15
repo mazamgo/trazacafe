@@ -17,17 +17,32 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 
 final authServiceProvider = Provider<AuthService>((ref) => FirebaseAuthService());
 
-/// Correo del técnico con sesión iniciada, o `null`.
-final usuarioProvider = StreamProvider<String?>(
-  (ref) => ref.watch(authServiceProvider).observarUsuario(),
+/// Sesión actual, o `null` si nadie ha iniciado sesión.
+final sesionProvider = StreamProvider<Sesion?>(
+  (ref) => ref.watch(authServiceProvider).observarSesion(),
 );
+
+/// Mensaje para la pantalla de login, por ejemplo "tu cuenta no está
+/// autorizada" después de que la activación cerró la sesión.
+final avisoAccesoProvider = NotifierProvider<AvisoAcceso, String?>(AvisoAcceso.new);
+
+class AvisoAcceso extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void mostrar(String? mensaje) => state = mensaje;
+}
+
+final apiProvider = Provider<ApiClient>((ref) {
+  final auth = ref.watch(authServiceProvider);
+  return ApiClient(token: auth.token);
+});
 
 final fotosServiceProvider = Provider<FotosService>((ref) => FotosService());
 
-final syncServiceProvider = Provider<SyncService>((ref) {
-  final auth = ref.watch(authServiceProvider);
-  return SyncService(ref.watch(databaseProvider), ApiClient(token: auth.token));
-});
+final syncServiceProvider = Provider<SyncService>(
+  (ref) => SyncService(ref.watch(databaseProvider), ref.watch(apiProvider)),
+);
 
 final productoresProvider = StreamProvider<List<ProductorConFincas>>(
   (ref) => ref.watch(databaseProvider).observarProductores(),
@@ -39,6 +54,11 @@ final fincasDeProductorProvider = StreamProvider.family<List<Finca>, String>(
 
 final pendientesProvider = StreamProvider<int>(
   (ref) => ref.watch(databaseProvider).observarTotalPendientes(),
+);
+
+/// Equipo de la organización (solo administradores; requiere señal).
+final invitacionesProvider = FutureProvider.autoDispose<List<Invitacion>>(
+  (ref) => ref.watch(apiProvider).invitaciones(),
 );
 
 /// Sincroniza solo cada vez que vuelve la señal. Los errores se ignoran

@@ -12,15 +12,36 @@
           "package_name": "com.goproduction.trazacafe"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "85528878949-tmfj0ic5cr6r2a4660pb08fdvkc6vm6f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.goproduction.trazacafe",
+            "certificate_hash": "a5f0249a42cb1d027841058e797690accc82cf83"
+          }
+        },
+        {
+          "client_id": "85528878949-ui35bc8b4tvpgab6jhfom8nc99oc4p7d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBo-G_vEiQyk8EbIPWneh8Xesq7n73743o"
+        },
+        {
+          "current_key": "AIzaSyBYZsVe8VuEtGJUFVKMutingu454jQRB8c"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "85528878949-ui35bc8b4tvpgab6jhfom8nc99oc4p7d.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     },
@@ -31,15 +52,28 @@
           "package_name": "com.nicarobotica.trazacafe"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "85528878949-ui35bc8b4tvpgab6jhfom8nc99oc4p7d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBo-G_vEiQyk8EbIPWneh8Xesq7n73743o"
+        },
+        {
+          "current_key": "AIzaSyBYZsVe8VuEtGJUFVKMutingu454jQRB8c"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "85528878949-ui35bc8b4tvpgab6jhfom8nc99oc4p7d.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

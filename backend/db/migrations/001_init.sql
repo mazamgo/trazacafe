@@ -2,9 +2,12 @@
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
-CREATE TABLE cooperativas (
+-- Cooperativa, exportadora o beneficio de café o cacao
+CREATE TABLE organizaciones (
   id              uuid PRIMARY KEY,
   nombre          text NOT NULL,
+  tipo            text NOT NULL DEFAULT 'cooperativa'
+                    CHECK (tipo IN ('cooperativa', 'exportadora', 'beneficio', 'otra')),
   -- Dirección que firma sus attestations (clave en Cloud KMS o Safe)
   atestador       text,
   creado_en       timestamptz NOT NULL DEFAULT now()
@@ -13,11 +16,13 @@ CREATE TABLE cooperativas (
 -- Datos personales: NUNCA salen a la blockchain (Ley 787)
 CREATE TABLE productores (
   id                     uuid PRIMARY KEY,
-  cooperativa_id         uuid NOT NULL REFERENCES cooperativas(id),
+  organizacion_id        uuid NOT NULL REFERENCES organizaciones(id),
   nombre                 text NOT NULL,
   cedula                 text,
   comunidad              text,
   consentimiento_firmado boolean NOT NULL DEFAULT false,
+  -- uid de Firebase del técnico que lo registró (auditoría)
+  creado_por             text NOT NULL,
   creado_en              timestamptz NOT NULL DEFAULT now()
 );
 
@@ -33,6 +38,7 @@ CREATE TABLE fincas (
   geo_hash              text NOT NULL,
   deforestacion         estado_deforestacion NOT NULL DEFAULT 'pendiente',
   attestation_uid       text,
+  creado_por            text NOT NULL,
   creado_en             timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT punto_solo_menor_4ha
     CHECK (GeometryType(geom) <> 'POINT' OR area_ha < 4)
@@ -45,12 +51,13 @@ CREATE TABLE entregas (
   kg               numeric(10, 2) NOT NULL CHECK (kg > 0),
   estado           text NOT NULL CHECK (estado IN ('uva', 'pergamino')),
   fecha            timestamptz NOT NULL,
-  attestation_uid  text
+  attestation_uid  text,
+  creado_por       text NOT NULL
 );
 
 CREATE TABLE lotes (
   id               uuid PRIMARY KEY,
-  cooperativa_id   uuid NOT NULL REFERENCES cooperativas(id),
+  organizacion_id   uuid NOT NULL REFERENCES organizaciones(id),
   kg               numeric(10, 2) NOT NULL,
   beneficio        text NOT NULL,
   proceso          text NOT NULL,
@@ -66,7 +73,7 @@ CREATE TABLE lote_entregas (
 
 CREATE TABLE exportaciones (
   id               uuid PRIMARY KEY,
-  cooperativa_id   uuid NOT NULL REFERENCES cooperativas(id),
+  organizacion_id   uuid NOT NULL REFERENCES organizaciones(id),
   contenedor       text NOT NULL,
   destino          text NOT NULL,
   dds_ref          text,

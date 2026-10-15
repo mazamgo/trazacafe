@@ -6,6 +6,12 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
+/// Cliente OAuth "Web" que Firebase crea al activar el proveedor Google.
+/// En Android, Google Sign-In lo necesita para emitir el idToken que
+/// Firebase Auth acepta.
+const googleWebClientId =
+    '85528878949-ui35bc8b4tvpgab6jhfom8nc99oc4p7d.apps.googleusercontent.com';
+
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) return web;

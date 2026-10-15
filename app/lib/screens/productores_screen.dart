@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
+import 'equipo_screen.dart';
 import 'nuevo_productor_screen.dart';
 import 'productor_screen.dart';
 
@@ -13,6 +14,7 @@ class ProductoresScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(autoSyncProvider);
     final productores = ref.watch(productoresProvider);
+    final sesion = ref.watch(sesionProvider).value;
 
     return Scaffold(
       appBar: AppBar(
@@ -21,6 +23,18 @@ class ProductoresScreen extends ConsumerWidget {
           const BotonSincronizar(),
           PopupMenuButton<void>(
             itemBuilder: (_) => [
+              if (sesion != null)
+                PopupMenuItem(
+                  enabled: false,
+                  child: Text('${sesion.email}\n${sesion.esAdmin ? 'Administrador' : 'Técnico'}'),
+                ),
+              if (sesion?.esAdmin ?? false)
+                PopupMenuItem(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const EquipoScreen()),
+                  ),
+                  child: const Text('Equipo'),
+                ),
               PopupMenuItem(
                 onTap: () => ref.read(authServiceProvider).cerrarSesion(),
                 child: const Text('Cerrar sesión'),

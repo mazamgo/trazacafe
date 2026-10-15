@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
 import 'providers.dart';
+import 'screens/activacion_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/productores_screen.dart';
 import 'screens/verificador_screen.dart';
+import 'services/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,16 +48,20 @@ class TrazaCafeApp extends StatelessWidget {
   }
 }
 
-/// Muestra el login o la app según haya sesión.
+/// Login → activación de la invitación → app.
 class _Inicio extends ConsumerWidget {
   const _Inicio();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watch(usuarioProvider).when(
+    return ref.watch(sesionProvider).when(
           loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
           error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
-          data: (usuario) => usuario == null ? const LoginScreen() : const ProductoresScreen(),
+          data: (sesion) => switch (sesion) {
+            null => const LoginScreen(),
+            Sesion(activa: false) => ActivacionScreen(email: sesion.email),
+            _ => const ProductoresScreen(),
+          },
         );
   }
 }

@@ -4,12 +4,13 @@
 
 CREATE TABLE fotos (
   id              uuid PRIMARY KEY,
-  cooperativa_id  uuid NOT NULL REFERENCES cooperativas(id),
+  organizacion_id uuid NOT NULL REFERENCES organizaciones(id),
   entidad_tipo    text NOT NULL CHECK (entidad_tipo IN ('productor', 'finca')),
   entidad_id      uuid NOT NULL,
   tipo            text NOT NULL CHECK (tipo IN ('consentimiento', 'finca', 'documento')),
   sha256          text NOT NULL,
   storage_path    text,
+  creado_por      text NOT NULL,
   creado_en       timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX fotos_entidad_idx ON fotos (entidad_tipo, entidad_id);

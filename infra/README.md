@@ -56,7 +56,7 @@ La dirección Ethereum de la clave se deriva de su clave pública (lo hará el w
 
 **Ya hecho:** el proyecto `trazacafe-dev` existe y la app tiene sus apps Android y Web registradas (`app/lib/firebase_options.dart`, `app/android/app/google-services.json`).
 
-Falta un paso manual: en la [consola de Firebase](https://console.firebase.google.com/project/trazacafe-dev/authentication/providers) activa **Authentication → Método de acceso → Correo electrónico/contraseña**.
+**Inicio de sesión: solo con Google.** El proveedor Google está activado; Firebase creó el cliente OAuth web (su ID está en `googleWebClientId` de `firebase_options.dart`) y el de Android (paquete + SHA-1). El proveedor de correo/contraseña sigue activado en la consola pero la app no lo usa; se puede desactivar.
 
 ### Restricciones de las API keys (ya aplicadas)
 
@@ -79,18 +79,23 @@ Las claves de `firebase_options.dart` son públicas (el repo es público), así 
 - **Web en desarrollo**: corre el verificador en el puerto permitido con `flutter run -d chrome --web-port 5000`.
 - Si se usa un servicio nuevo de Firebase (por ejemplo Firestore), hay que agregarlo con `--api-target`.
 
-### Dar de alta a un técnico
+### Acceso por invitación
 
-La app no permite registrarse sola: cada técnico se crea con su cooperativa asignada.
+Cualquier cuenta de Google puede abrir la app, pero solo los correos invitados reciben una organización y un rol (custom claims `organizacionId` y `rol`). Sin invitación la app muestra "Tu cuenta no está autorizada" y la API responde 403.
+
+| Rol | Puede |
+|---|---|
+| `admin` | Invitar y quitar personas (pantalla **Equipo**), todo lo del técnico |
+| `tecnico` | Registrar productores, fincas, fotos y sincronizar |
+
+Para una organización nueva (cooperativa, exportadora o beneficio de café o cacao), se crea con su primer administrador:
 
 ```powershell
-gcloud auth application-default login          # una vez, credenciales de admin
 cd backend
-npm run crear-cooperativa -- --nombre "Cooperativa Ejemplo R.L."   # imprime el UUID
-npm run crear-tecnico -- --email tecnico@coop.org --cooperativa <UUID>
+npm run crear-organizacion -- --nombre "Cooperativa Ejemplo R.L." --admin gerente@gmail.com
 ```
 
-`crear-tecnico` imprime un enlace para que el técnico elija su contraseña. `crear-cooperativa` necesita la base de datos (paso 2).
+El administrador entra con "Entrar con Google" usando ese correo y desde **Equipo** invita a sus técnicos. Quitar a alguien le borra los permisos y cierra sus sesiones al instante (la API verifica tokens revocados). Necesita la base de datos (paso 2).
 
 ## 5. Backend en Cloud Run
 
