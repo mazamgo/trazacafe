@@ -1,0 +1,24 @@
+# Node
+node_modules/
+dist/
+*.log
+
+# Secretos: nunca subir claves ni credenciales
+.env
+.env.*
+!.env.example
+*.pem
+*-key.json
+service-account*.json
+
+# Firebase
+.firebase/
+
+# Editor / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Configuración local de Claude Code
+.claude/settings.local.json

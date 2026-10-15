@@ -1,0 +1,12 @@
+{
+  "name": "trazacafe",
+  "private": true,
+  "workspaces": [
+    "schemas",
+    "backend"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  }
+}

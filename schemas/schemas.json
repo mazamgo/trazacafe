@@ -1,0 +1,22 @@
+{
+  "Finca": {
+    "descripcion": "Parcela de café: hash de la geolocalización y resultado del chequeo de deforestación (EUDR).",
+    "schema": "bytes32 fincaId,bytes32 geoHash,uint32 areaHaX100,bool deforestacionOK,string fuenteChequeo,bytes32 docsHash",
+    "revocable": true
+  },
+  "Entrega": {
+    "descripcion": "Entrega de café de una finca al beneficio húmedo. refUID = attestation de la Finca.",
+    "schema": "bytes32 entregaId,bytes32 fincaUID,uint32 kg,uint64 fecha,string estado",
+    "revocable": true
+  },
+  "Lote": {
+    "descripcion": "Lote de pergamino u oro formado por varias entregas.",
+    "schema": "bytes32 loteId,bytes32[] entregasUIDs,uint32 kg,string beneficio,string proceso",
+    "revocable": true
+  },
+  "Exportacion": {
+    "descripcion": "Contenedor de exportación con sus lotes y la referencia de la DDS en TRACES.",
+    "schema": "bytes32 exportacionId,bytes32[] lotesUIDs,string contenedor,string destino,string ddsRef",
+    "revocable": true
+  }
+}
