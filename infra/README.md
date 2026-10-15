@@ -1,43 +1,50 @@
 # Infraestructura en Google Cloud
 
-Comandos para montar el entorno del MVP. **Crean recursos que cobran**: Cloud SQL cuesta unos US$10–30 al mes aunque no se use. Ejecútalos en orden y revisa cada uno.
-
-Variables usadas abajo (PowerShell):
+Estado y comandos del entorno del MVP. Los pasos marcados **ya hecho** existen en el proyecto `trazacafe-dev`; los demás crean recursos que pueden cobrar.
 
 ```powershell
-$PROYECTO = "trazacafe-dev"        # ID único en Google Cloud
-$REGION   = "us-central1"          # o us-east1; la más cercana con buen precio
-$SQL      = "trazacafe-db"
+$PROYECTO = "trazacafe-dev"
+$REGION   = "us-east4"                      # Virginia, la más cercana a Nicaragua
+$SQL      = "trazacafe-dev-instance"
 ```
 
-## 1. Proyecto y APIs
+## 1. Proyecto, facturación y presupuesto (ya hecho)
+
+- Proyecto `trazacafe-dev` en el **plan Blaze** (pago por uso), vinculado a la cuenta de facturación "Firebase Payment". Mientras el uso no pase las cuotas gratis, no se cobra.
+- **Alerta de presupuesto de US$5 al mes** con avisos por correo al 50 %, 90 % y 100 %. Ojo: las alertas **avisan, no cortan** el servicio.
+
+APIs que se irán activando según se usen:
 
 ```powershell
-gcloud projects create $PROYECTO --name="TrazaCafe"
-gcloud config set project $PROYECTO
-# Vincula la facturación en la consola: https://console.cloud.google.com/billing
-gcloud services enable sqladmin.googleapis.com run.googleapis.com cloudkms.googleapis.com `
-  cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com `
-  cloudtasks.googleapis.com cloudscheduler.googleapis.com storage.googleapis.com
+gcloud services enable run.googleapis.com cloudkms.googleapis.com cloudbuild.googleapis.com `
+  artifactregistry.googleapis.com secretmanager.googleapis.com cloudtasks.googleapis.com `
+  cloudscheduler.googleapis.com --project=$PROYECTO
 ```
 
-## 2. Cloud SQL (PostgreSQL + PostGIS)
+## 2. Cloud SQL (PostgreSQL 18 + PostGIS) (ya hecho)
+
+Creada desde **Firebase SQL Connect** (antes Data Connect) para usar la **prueba gratis de 3 meses**. Al terminar la prueba se cobra la tarifa normal de Cloud SQL (desde ~US$9–10 al mes); la consola de Firebase muestra la fecha.
+
+| Dato | Valor |
+|---|---|
+| Instancia | `trazacafe-dev:us-east4:trazacafe-dev-instance` (db-f1-micro, 10 GB) |
+| Base de datos | `trazacafe-dev-database` |
+| Autenticación | **IAM de Google, sin contraseñas** (`cloudsql.iam_authentication=on`) |
+
+El backend se conecta con el conector oficial (`@google-cloud/cloud-sql-connector`) usando la identidad de Google del proceso: tu correo en desarrollo y la cuenta de servicio en Cloud Run. Configúralo en `backend/.env` (ver `.env.example`) y, una vez por computadora:
 
 ```powershell
-gcloud sql instances create $SQL --database-version=POSTGRES_16 --region=$REGION `
-  --edition=ENTERPRISE --tier=db-f1-micro --storage-size=10GB
-gcloud sql databases create trazacafe --instance=$SQL
-gcloud sql users create trazacafe --instance=$SQL --prompt-for-password
+gcloud auth application-default login
+cd backend; npm run migrate        # aplica db/migrations y activa PostGIS
 ```
 
-PostGIS se activa con la primera migración (`CREATE EXTENSION postgis`).
-
-Para desarrollo local, conecta con el [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) y aplica las migraciones:
+Para dar acceso a otra persona del equipo de desarrollo:
 
 ```powershell
-cloud-sql-proxy "${PROYECTO}:${REGION}:${SQL}" --port 5432
-# en otra terminal, con DATABASE_URL en backend/.env:
-cd backend; npm run migrate
+gcloud sql users create persona@gmail.com --instance=$SQL --type=cloud_iam_user --project=$PROYECTO
+gcloud projects add-iam-policy-binding $PROYECTO --member=user:persona@gmail.com --role=roles/cloudsql.instanceUser
+gcloud projects add-iam-policy-binding $PROYECTO --member=user:persona@gmail.com --role=roles/cloudsql.client
+# y dentro de la base: GRANT trazacafe_app TO "persona@gmail.com";
 ```
 
 ## 3. Clave de firma en Cloud KMS (secp256k1)

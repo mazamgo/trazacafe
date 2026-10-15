@@ -8,7 +8,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
-import pg from "pg";
+import { crearPool } from "../src/db.ts";
 
 const TIPOS = ["cooperativa", "exportadora", "beneficio", "otra"];
 
@@ -33,9 +33,10 @@ if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(admin)) {
   process.exit(1);
 }
 
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
-await client.connect();
+const { pool, cerrar } = await crearPool();
+const client = await pool.connect();
 const id = randomUUID();
+let duplicado = false;
 try {
   await client.query("BEGIN");
   await client.query("INSERT INTO organizaciones (id, nombre, tipo) VALUES ($1, $2, $3)", [id, values.nombre, values.tipo]);
@@ -46,13 +47,15 @@ try {
   await client.query("COMMIT");
 } catch (e) {
   await client.query("ROLLBACK");
-  if ((e as { code?: string }).code === "23505") {
-    console.error(`${admin} ya tiene una invitación en otra organización.`);
-    process.exit(1);
-  }
-  throw e;
+  if ((e as { code?: string }).code !== "23505") throw e;
+  duplicado = true;
 } finally {
-  await client.end();
+  client.release();
+  await cerrar();
+}
+if (duplicado) {
+  console.error(`${admin} ya tiene una invitación en otra organización.`);
+  process.exit(1);
 }
 
 console.log(`Organización creada: ${values.nombre} (${values.tipo})`);
