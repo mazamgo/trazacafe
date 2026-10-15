@@ -54,13 +54,22 @@ La dirección Ethereum de la clave se deriva de su clave pública (lo hará el w
 
 ## 4. Firebase (login y hosting del verificador)
 
+**Ya hecho:** el proyecto `trazacafe-dev` existe y la app tiene sus apps Android y Web registradas (`app/lib/firebase_options.dart`, `app/android/app/google-services.json`).
+
+Falta un paso manual: en la [consola de Firebase](https://console.firebase.google.com/project/trazacafe-dev/authentication/providers) activa **Authentication → Método de acceso → Correo electrónico/contraseña**.
+
+### Dar de alta a un técnico
+
+La app no permite registrarse sola: cada técnico se crea con su cooperativa asignada.
+
 ```powershell
-firebase projects:addfirebase $PROYECTO
-cd app
-flutterfire configure --project=$PROYECTO --platforms=android,web
+gcloud auth application-default login          # una vez, credenciales de admin
+cd backend
+npm run crear-cooperativa -- --nombre "Cooperativa Ejemplo R.L."   # imprime el UUID
+npm run crear-tecnico -- --email tecnico@coop.org --cooperativa <UUID>
 ```
 
-En la consola de Firebase activa **Authentication → Correo/contraseña**.
+`crear-tecnico` imprime un enlace para que el técnico elija su contraseña. `crear-cooperativa` necesita la base de datos (paso 2).
 
 ## 5. Backend en Cloud Run
 

@@ -38,11 +38,22 @@ export const fincaSchema = z
     }
   });
 
+/** Por ahora solo llega el hash; el archivo se subirá a Cloud Storage. */
+export const fotoSchema = z.object({
+  id: z.uuid(),
+  entidadTipo: z.enum(["productor", "finca"]),
+  entidadId: z.uuid(),
+  tipo: z.enum(["consentimiento", "finca", "documento"]),
+  sha256: z.string().regex(/^0x[0-9a-f]{64}$/),
+});
+
 export const syncSchema = z.object({
   productores: z.array(productorSchema).default([]),
   fincas: z.array(fincaSchema).default([]),
+  fotos: z.array(fotoSchema).default([]),
 });
 
 export type Productor = z.infer<typeof productorSchema>;
 export type FincaSync = z.infer<typeof fincaSchema>;
+export type FotoSync = z.infer<typeof fotoSchema>;
 export type LoteSync = z.infer<typeof syncSchema>;

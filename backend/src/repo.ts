@@ -11,7 +11,7 @@ export interface Repo {
 export class PgRepo implements Repo {
   constructor(private readonly pool: pg.Pool) {}
 
-  async guardarSync(cooperativaId: string, { productores, fincas }: LoteSync): Promise<void> {
+  async guardarSync(cooperativaId: string, { productores, fincas, fotos }: LoteSync): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -43,6 +43,24 @@ export class PgRepo implements Repo {
           `INSERT INTO attestations_pendientes (esquema, entidad_id) VALUES ('Finca', $1)
            ON CONFLICT DO NOTHING`,
           [f.id],
+        );
+      }
+      for (const foto of fotos) {
+        const propia = await client.query(
+          foto.entidadTipo === "productor"
+            ? "SELECT 1 FROM productores WHERE id = $1 AND cooperativa_id = $2"
+            : `SELECT 1 FROM fincas f JOIN productores p ON p.id = f.productor_id
+               WHERE f.id = $1 AND p.cooperativa_id = $2`,
+          [foto.entidadId, cooperativaId],
+        );
+        if (propia.rowCount === 0) {
+          throw new AccesoDenegado(`${foto.entidadTipo} ${foto.entidadId} no pertenece a la cooperativa`);
+        }
+        await client.query(
+          `INSERT INTO fotos (id, cooperativa_id, entidad_tipo, entidad_id, tipo, sha256)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO NOTHING`,
+          [foto.id, cooperativaId, foto.entidadTipo, foto.entidadId, foto.tipo, foto.sha256],
         );
       }
       await client.query("COMMIT");

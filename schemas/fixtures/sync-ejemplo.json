@@ -1,0 +1,35 @@
+{
+  "productores": [
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "nombre": "Productora de prueba",
+      "cedula": null,
+      "comunidad": "San Rafael del Norte",
+      "consentimientoFirmado": true
+    }
+  ],
+  "fincas": [
+    {
+      "id": "3f2b8c1e-9a4d-4e7f-8b21-0c5d6e7f8a90",
+      "productorId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "nombre": "La Esperanza",
+      "coordenadas": [
+        [-86.0023, 13.091],
+        [-86.0013, 13.091],
+        [-86.0013, 13.092],
+        [-86.0023, 13.092]
+      ],
+      "areaHa": 1.2043,
+      "geoHash": "0x2f95794d89008adc55fc3797ed22992bb737b4049d5a73383f7a02d79a2cdfe4"
+    }
+  ],
+  "fotos": [
+    {
+      "id": "9b2e1f4a-6c3d-4f8e-a1b2-3c4d5e6f7a8b",
+      "entidadTipo": "productor",
+      "entidadId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "tipo": "consentimiento",
+      "sha256": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+    }
+  ]
+}

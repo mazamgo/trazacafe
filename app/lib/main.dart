@@ -1,11 +1,17 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'screens/fincas_screen.dart';
+import 'firebase_options.dart';
+import 'providers.dart';
+import 'screens/login_screen.dart';
+import 'screens/productores_screen.dart';
 import 'screens/verificador_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const ProviderScope(child: TrazaCafeApp()));
 }
 
@@ -32,11 +38,24 @@ class TrazaCafeApp extends StatelessWidget {
         }
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => kIsWeb
-              ? const VerificadorScreen(uid: null)
-              : const FincasScreen(),
+          builder: (_) =>
+              kIsWeb ? const VerificadorScreen(uid: null) : const _Inicio(),
         );
       },
     );
+  }
+}
+
+/// Muestra el login o la app según haya sesión.
+class _Inicio extends ConsumerWidget {
+  const _Inicio();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(usuarioProvider).when(
+          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+          data: (usuario) => usuario == null ? const LoginScreen() : const ProductoresScreen(),
+        );
   }
 }

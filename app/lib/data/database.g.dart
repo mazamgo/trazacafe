@@ -4,7 +4,7 @@ part of 'database.dart';
 
 // ignore_for_file: type=lint
 class $ProductoresTable extends Productores
-    with TableInfo<$ProductoresTable, Productore> {
+    with TableInfo<$ProductoresTable, Productor> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -106,7 +106,7 @@ class $ProductoresTable extends Productores
   static const String $name = 'productores';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Productore> instance, {
+    Insertable<Productor> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -166,9 +166,9 @@ class $ProductoresTable extends Productores
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Productore map(Map<String, dynamic> data, {String? tablePrefix}) {
+  Productor map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Productore(
+    return Productor(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -206,7 +206,7 @@ class $ProductoresTable extends Productores
   }
 }
 
-class Productore extends DataClass implements Insertable<Productore> {
+class Productor extends DataClass implements Insertable<Productor> {
   final String id;
   final String nombre;
   final String? cedula;
@@ -214,7 +214,7 @@ class Productore extends DataClass implements Insertable<Productore> {
   final bool consentimientoFirmado;
   final DateTime creadoEn;
   final bool sincronizado;
-  const Productore({
+  const Productor({
     required this.id,
     required this.nombre,
     this.cedula,
@@ -256,12 +256,12 @@ class Productore extends DataClass implements Insertable<Productore> {
     );
   }
 
-  factory Productore.fromJson(
+  factory Productor.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Productore(
+    return Productor(
       id: serializer.fromJson<String>(json['id']),
       nombre: serializer.fromJson<String>(json['nombre']),
       cedula: serializer.fromJson<String?>(json['cedula']),
@@ -287,7 +287,7 @@ class Productore extends DataClass implements Insertable<Productore> {
     };
   }
 
-  Productore copyWith({
+  Productor copyWith({
     String? id,
     String? nombre,
     Value<String?> cedula = const Value.absent(),
@@ -295,7 +295,7 @@ class Productore extends DataClass implements Insertable<Productore> {
     bool? consentimientoFirmado,
     DateTime? creadoEn,
     bool? sincronizado,
-  }) => Productore(
+  }) => Productor(
     id: id ?? this.id,
     nombre: nombre ?? this.nombre,
     cedula: cedula.present ? cedula.value : this.cedula,
@@ -304,8 +304,8 @@ class Productore extends DataClass implements Insertable<Productore> {
     creadoEn: creadoEn ?? this.creadoEn,
     sincronizado: sincronizado ?? this.sincronizado,
   );
-  Productore copyWithCompanion(ProductoresCompanion data) {
-    return Productore(
+  Productor copyWithCompanion(ProductoresCompanion data) {
+    return Productor(
       id: data.id.present ? data.id.value : this.id,
       nombre: data.nombre.present ? data.nombre.value : this.nombre,
       cedula: data.cedula.present ? data.cedula.value : this.cedula,
@@ -322,7 +322,7 @@ class Productore extends DataClass implements Insertable<Productore> {
 
   @override
   String toString() {
-    return (StringBuffer('Productore(')
+    return (StringBuffer('Productor(')
           ..write('id: $id, ')
           ..write('nombre: $nombre, ')
           ..write('cedula: $cedula, ')
@@ -347,7 +347,7 @@ class Productore extends DataClass implements Insertable<Productore> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Productore &&
+      (other is Productor &&
           other.id == this.id &&
           other.nombre == this.nombre &&
           other.cedula == this.cedula &&
@@ -357,7 +357,7 @@ class Productore extends DataClass implements Insertable<Productore> {
           other.sincronizado == this.sincronizado);
 }
 
-class ProductoresCompanion extends UpdateCompanion<Productore> {
+class ProductoresCompanion extends UpdateCompanion<Productor> {
   final Value<String> id;
   final Value<String> nombre;
   final Value<String?> cedula;
@@ -387,7 +387,7 @@ class ProductoresCompanion extends UpdateCompanion<Productore> {
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        nombre = Value(nombre);
-  static Insertable<Productore> custom({
+  static Insertable<Productor> custom({
     Expression<String>? id,
     Expression<String>? nombre,
     Expression<String>? cedula,
@@ -746,14 +746,14 @@ class Finca extends DataClass implements Insertable<Finca> {
   final String nombre;
 
   /// Coordenadas en GeoJSON: `[[lon, lat], ...]`. Un solo punto si la finca
-  /// mide menos de 4 ha; polígono cerrado si mide 4 ha o más (regla EUDR).
+  /// mide menos de 4 ha; polÃ­gono cerrado si mide 4 ha o mÃ¡s (regla EUDR).
   final String coordenadasJson;
   final double areaHa;
 
-  /// Hash SHA-256 de las coordenadas canónicas; es lo que va a la blockchain.
+  /// Hash SHA-256 de las coordenadas canÃ³nicas; es lo que va a la blockchain.
   final String geoHash;
 
-  /// UID de la attestation en EAS, cuando el backend ya la firmó.
+  /// UID de la attestation en EAS, cuando el backend ya la firmÃ³.
   final String? attestationUid;
   final DateTime creadoEn;
   final bool sincronizado;
@@ -1274,7 +1274,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   final String fincaId;
   final double kg;
 
-  /// `uva` (café maduro) o `pergamino`.
+  /// `uva` (cafÃ© maduro) o `pergamino`.
   final String estado;
   final DateTime fecha;
   final String? attestationUid;
@@ -1534,12 +1534,531 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
   }
 }
 
+class $FotosTable extends Fotos with TableInfo<$FotosTable, Foto> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FotosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entidadTipoMeta = const VerificationMeta(
+    'entidadTipo',
+  );
+  @override
+  late final GeneratedColumn<String> entidadTipo = GeneratedColumn<String>(
+    'entidad_tipo',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entidadIdMeta = const VerificationMeta(
+    'entidadId',
+  );
+  @override
+  late final GeneratedColumn<String> entidadId = GeneratedColumn<String>(
+    'entidad_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tipoMeta = const VerificationMeta('tipo');
+  @override
+  late final GeneratedColumn<String> tipo = GeneratedColumn<String>(
+    'tipo',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rutaMeta = const VerificationMeta('ruta');
+  @override
+  late final GeneratedColumn<String> ruta = GeneratedColumn<String>(
+    'ruta',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sha256Meta = const VerificationMeta('sha256');
+  @override
+  late final GeneratedColumn<String> sha256 = GeneratedColumn<String>(
+    'sha256',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _creadoEnMeta = const VerificationMeta(
+    'creadoEn',
+  );
+  @override
+  late final GeneratedColumn<DateTime> creadoEn = GeneratedColumn<DateTime>(
+    'creado_en',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _sincronizadoMeta = const VerificationMeta(
+    'sincronizado',
+  );
+  @override
+  late final GeneratedColumn<bool> sincronizado = GeneratedColumn<bool>(
+    'sincronizado',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sincronizado" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    entidadTipo,
+    entidadId,
+    tipo,
+    ruta,
+    sha256,
+    creadoEn,
+    sincronizado,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fotos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Foto> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('entidad_tipo')) {
+      context.handle(
+        _entidadTipoMeta,
+        entidadTipo.isAcceptableOrUnknown(
+          data['entidad_tipo']!,
+          _entidadTipoMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_entidadTipoMeta);
+    }
+    if (data.containsKey('entidad_id')) {
+      context.handle(
+        _entidadIdMeta,
+        entidadId.isAcceptableOrUnknown(data['entidad_id']!, _entidadIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entidadIdMeta);
+    }
+    if (data.containsKey('tipo')) {
+      context.handle(
+        _tipoMeta,
+        tipo.isAcceptableOrUnknown(data['tipo']!, _tipoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tipoMeta);
+    }
+    if (data.containsKey('ruta')) {
+      context.handle(
+        _rutaMeta,
+        ruta.isAcceptableOrUnknown(data['ruta']!, _rutaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rutaMeta);
+    }
+    if (data.containsKey('sha256')) {
+      context.handle(
+        _sha256Meta,
+        sha256.isAcceptableOrUnknown(data['sha256']!, _sha256Meta),
+      );
+    } else if (isInserting) {
+      context.missing(_sha256Meta);
+    }
+    if (data.containsKey('creado_en')) {
+      context.handle(
+        _creadoEnMeta,
+        creadoEn.isAcceptableOrUnknown(data['creado_en']!, _creadoEnMeta),
+      );
+    }
+    if (data.containsKey('sincronizado')) {
+      context.handle(
+        _sincronizadoMeta,
+        sincronizado.isAcceptableOrUnknown(
+          data['sincronizado']!,
+          _sincronizadoMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Foto map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Foto(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      entidadTipo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entidad_tipo'],
+      )!,
+      entidadId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entidad_id'],
+      )!,
+      tipo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tipo'],
+      )!,
+      ruta: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ruta'],
+      )!,
+      sha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sha256'],
+      )!,
+      creadoEn: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}creado_en'],
+      )!,
+      sincronizado: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sincronizado'],
+      )!,
+    );
+  }
+
+  @override
+  $FotosTable createAlias(String alias) {
+    return $FotosTable(attachedDatabase, alias);
+  }
+}
+
+class Foto extends DataClass implements Insertable<Foto> {
+  final String id;
+
+  /// `productor` o `finca`.
+  final String entidadTipo;
+  final String entidadId;
+
+  /// `consentimiento`, `finca` o `documento`.
+  final String tipo;
+  final String ruta;
+  final String sha256;
+  final DateTime creadoEn;
+  final bool sincronizado;
+  const Foto({
+    required this.id,
+    required this.entidadTipo,
+    required this.entidadId,
+    required this.tipo,
+    required this.ruta,
+    required this.sha256,
+    required this.creadoEn,
+    required this.sincronizado,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['entidad_tipo'] = Variable<String>(entidadTipo);
+    map['entidad_id'] = Variable<String>(entidadId);
+    map['tipo'] = Variable<String>(tipo);
+    map['ruta'] = Variable<String>(ruta);
+    map['sha256'] = Variable<String>(sha256);
+    map['creado_en'] = Variable<DateTime>(creadoEn);
+    map['sincronizado'] = Variable<bool>(sincronizado);
+    return map;
+  }
+
+  FotosCompanion toCompanion(bool nullToAbsent) {
+    return FotosCompanion(
+      id: Value(id),
+      entidadTipo: Value(entidadTipo),
+      entidadId: Value(entidadId),
+      tipo: Value(tipo),
+      ruta: Value(ruta),
+      sha256: Value(sha256),
+      creadoEn: Value(creadoEn),
+      sincronizado: Value(sincronizado),
+    );
+  }
+
+  factory Foto.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Foto(
+      id: serializer.fromJson<String>(json['id']),
+      entidadTipo: serializer.fromJson<String>(json['entidadTipo']),
+      entidadId: serializer.fromJson<String>(json['entidadId']),
+      tipo: serializer.fromJson<String>(json['tipo']),
+      ruta: serializer.fromJson<String>(json['ruta']),
+      sha256: serializer.fromJson<String>(json['sha256']),
+      creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
+      sincronizado: serializer.fromJson<bool>(json['sincronizado']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'entidadTipo': serializer.toJson<String>(entidadTipo),
+      'entidadId': serializer.toJson<String>(entidadId),
+      'tipo': serializer.toJson<String>(tipo),
+      'ruta': serializer.toJson<String>(ruta),
+      'sha256': serializer.toJson<String>(sha256),
+      'creadoEn': serializer.toJson<DateTime>(creadoEn),
+      'sincronizado': serializer.toJson<bool>(sincronizado),
+    };
+  }
+
+  Foto copyWith({
+    String? id,
+    String? entidadTipo,
+    String? entidadId,
+    String? tipo,
+    String? ruta,
+    String? sha256,
+    DateTime? creadoEn,
+    bool? sincronizado,
+  }) => Foto(
+    id: id ?? this.id,
+    entidadTipo: entidadTipo ?? this.entidadTipo,
+    entidadId: entidadId ?? this.entidadId,
+    tipo: tipo ?? this.tipo,
+    ruta: ruta ?? this.ruta,
+    sha256: sha256 ?? this.sha256,
+    creadoEn: creadoEn ?? this.creadoEn,
+    sincronizado: sincronizado ?? this.sincronizado,
+  );
+  Foto copyWithCompanion(FotosCompanion data) {
+    return Foto(
+      id: data.id.present ? data.id.value : this.id,
+      entidadTipo: data.entidadTipo.present
+          ? data.entidadTipo.value
+          : this.entidadTipo,
+      entidadId: data.entidadId.present ? data.entidadId.value : this.entidadId,
+      tipo: data.tipo.present ? data.tipo.value : this.tipo,
+      ruta: data.ruta.present ? data.ruta.value : this.ruta,
+      sha256: data.sha256.present ? data.sha256.value : this.sha256,
+      creadoEn: data.creadoEn.present ? data.creadoEn.value : this.creadoEn,
+      sincronizado: data.sincronizado.present
+          ? data.sincronizado.value
+          : this.sincronizado,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Foto(')
+          ..write('id: $id, ')
+          ..write('entidadTipo: $entidadTipo, ')
+          ..write('entidadId: $entidadId, ')
+          ..write('tipo: $tipo, ')
+          ..write('ruta: $ruta, ')
+          ..write('sha256: $sha256, ')
+          ..write('creadoEn: $creadoEn, ')
+          ..write('sincronizado: $sincronizado')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    entidadTipo,
+    entidadId,
+    tipo,
+    ruta,
+    sha256,
+    creadoEn,
+    sincronizado,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Foto &&
+          other.id == this.id &&
+          other.entidadTipo == this.entidadTipo &&
+          other.entidadId == this.entidadId &&
+          other.tipo == this.tipo &&
+          other.ruta == this.ruta &&
+          other.sha256 == this.sha256 &&
+          other.creadoEn == this.creadoEn &&
+          other.sincronizado == this.sincronizado);
+}
+
+class FotosCompanion extends UpdateCompanion<Foto> {
+  final Value<String> id;
+  final Value<String> entidadTipo;
+  final Value<String> entidadId;
+  final Value<String> tipo;
+  final Value<String> ruta;
+  final Value<String> sha256;
+  final Value<DateTime> creadoEn;
+  final Value<bool> sincronizado;
+  final Value<int> rowid;
+  const FotosCompanion({
+    this.id = const Value.absent(),
+    this.entidadTipo = const Value.absent(),
+    this.entidadId = const Value.absent(),
+    this.tipo = const Value.absent(),
+    this.ruta = const Value.absent(),
+    this.sha256 = const Value.absent(),
+    this.creadoEn = const Value.absent(),
+    this.sincronizado = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FotosCompanion.insert({
+    required String id,
+    required String entidadTipo,
+    required String entidadId,
+    required String tipo,
+    required String ruta,
+    required String sha256,
+    this.creadoEn = const Value.absent(),
+    this.sincronizado = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       entidadTipo = Value(entidadTipo),
+       entidadId = Value(entidadId),
+       tipo = Value(tipo),
+       ruta = Value(ruta),
+       sha256 = Value(sha256);
+  static Insertable<Foto> custom({
+    Expression<String>? id,
+    Expression<String>? entidadTipo,
+    Expression<String>? entidadId,
+    Expression<String>? tipo,
+    Expression<String>? ruta,
+    Expression<String>? sha256,
+    Expression<DateTime>? creadoEn,
+    Expression<bool>? sincronizado,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (entidadTipo != null) 'entidad_tipo': entidadTipo,
+      if (entidadId != null) 'entidad_id': entidadId,
+      if (tipo != null) 'tipo': tipo,
+      if (ruta != null) 'ruta': ruta,
+      if (sha256 != null) 'sha256': sha256,
+      if (creadoEn != null) 'creado_en': creadoEn,
+      if (sincronizado != null) 'sincronizado': sincronizado,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FotosCompanion copyWith({
+    Value<String>? id,
+    Value<String>? entidadTipo,
+    Value<String>? entidadId,
+    Value<String>? tipo,
+    Value<String>? ruta,
+    Value<String>? sha256,
+    Value<DateTime>? creadoEn,
+    Value<bool>? sincronizado,
+    Value<int>? rowid,
+  }) {
+    return FotosCompanion(
+      id: id ?? this.id,
+      entidadTipo: entidadTipo ?? this.entidadTipo,
+      entidadId: entidadId ?? this.entidadId,
+      tipo: tipo ?? this.tipo,
+      ruta: ruta ?? this.ruta,
+      sha256: sha256 ?? this.sha256,
+      creadoEn: creadoEn ?? this.creadoEn,
+      sincronizado: sincronizado ?? this.sincronizado,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (entidadTipo.present) {
+      map['entidad_tipo'] = Variable<String>(entidadTipo.value);
+    }
+    if (entidadId.present) {
+      map['entidad_id'] = Variable<String>(entidadId.value);
+    }
+    if (tipo.present) {
+      map['tipo'] = Variable<String>(tipo.value);
+    }
+    if (ruta.present) {
+      map['ruta'] = Variable<String>(ruta.value);
+    }
+    if (sha256.present) {
+      map['sha256'] = Variable<String>(sha256.value);
+    }
+    if (creadoEn.present) {
+      map['creado_en'] = Variable<DateTime>(creadoEn.value);
+    }
+    if (sincronizado.present) {
+      map['sincronizado'] = Variable<bool>(sincronizado.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FotosCompanion(')
+          ..write('id: $id, ')
+          ..write('entidadTipo: $entidadTipo, ')
+          ..write('entidadId: $entidadId, ')
+          ..write('tipo: $tipo, ')
+          ..write('ruta: $ruta, ')
+          ..write('sha256: $sha256, ')
+          ..write('creadoEn: $creadoEn, ')
+          ..write('sincronizado: $sincronizado, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ProductoresTable productores = $ProductoresTable(this);
   late final $FincasTable fincas = $FincasTable(this);
   late final $EntregasTable entregas = $EntregasTable(this);
+  late final $FotosTable fotos = $FotosTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1548,6 +2067,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     productores,
     fincas,
     entregas,
+    fotos,
   ];
 }
 
@@ -1575,7 +2095,7 @@ typedef $$ProductoresTableUpdateCompanionBuilder =
     });
 
 final class $$ProductoresTableReferences
-    extends BaseReferences<_$AppDatabase, $ProductoresTable, Productore> {
+    extends BaseReferences<_$AppDatabase, $ProductoresTable, Productor> {
   $$ProductoresTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static MultiTypedResultKey<$FincasTable, List<Finca>> _fincasRefsTable(
@@ -1778,14 +2298,14 @@ class $$ProductoresTableTableManager
         RootTableManager<
           _$AppDatabase,
           $ProductoresTable,
-          Productore,
+          Productor,
           $$ProductoresTableFilterComposer,
           $$ProductoresTableOrderingComposer,
           $$ProductoresTableAnnotationComposer,
           $$ProductoresTableCreateCompanionBuilder,
           $$ProductoresTableUpdateCompanionBuilder,
-          (Productore, $$ProductoresTableReferences),
-          Productore,
+          (Productor, $$ProductoresTableReferences),
+          Productor,
           PrefetchHooks Function({bool fincasRefs})
         > {
   $$ProductoresTableTableManager(_$AppDatabase db, $ProductoresTable table)
@@ -1842,7 +2362,7 @@ class $$ProductoresTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable<$ProductoresTable, Productore>(table),
+                  e.readTable<$ProductoresTable, Productor>(table),
                   $$ProductoresTableReferences(db, table, e),
                 ),
               )
@@ -1856,7 +2376,7 @@ class $$ProductoresTableTableManager
                 return [
                   if (fincasRefs)
                     await $_getPrefetchedData<
-                      Productore,
+                      Productor,
                       $ProductoresTable,
                       Finca
                     >(
@@ -1887,14 +2407,14 @@ typedef $$ProductoresTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
       $ProductoresTable,
-      Productore,
+      Productor,
       $$ProductoresTableFilterComposer,
       $$ProductoresTableOrderingComposer,
       $$ProductoresTableAnnotationComposer,
       $$ProductoresTableCreateCompanionBuilder,
       $$ProductoresTableUpdateCompanionBuilder,
-      (Productore, $$ProductoresTableReferences),
-      Productore,
+      (Productor, $$ProductoresTableReferences),
+      Productor,
       PrefetchHooks Function({bool fincasRefs})
     >;
 typedef $$FincasTableCreateCompanionBuilder = FincasCompanion Function({
@@ -2728,6 +3248,267 @@ typedef $$EntregasTableProcessedTableManager =
       Entrega,
       PrefetchHooks Function({bool fincaId})
     >;
+typedef $$FotosTableCreateCompanionBuilder = FotosCompanion Function({
+  required String id,
+  required String entidadTipo,
+  required String entidadId,
+  required String tipo,
+  required String ruta,
+  required String sha256,
+  Value<DateTime> creadoEn,
+  Value<bool> sincronizado,
+  Value<int> rowid,
+});
+typedef $$FotosTableUpdateCompanionBuilder = FotosCompanion Function({
+  Value<String> id,
+  Value<String> entidadTipo,
+  Value<String> entidadId,
+  Value<String> tipo,
+  Value<String> ruta,
+  Value<String> sha256,
+  Value<DateTime> creadoEn,
+  Value<bool> sincronizado,
+  Value<int> rowid,
+});
+
+class $$FotosTableFilterComposer extends Composer<_$AppDatabase, $FotosTable> {
+  $$FotosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entidadTipo => $composableBuilder(
+    column: $table.entidadTipo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entidadId => $composableBuilder(
+    column: $table.entidadId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tipo => $composableBuilder(
+    column: $table.tipo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ruta => $composableBuilder(
+    column: $table.ruta,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sha256 => $composableBuilder(
+    column: $table.sha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get creadoEn => $composableBuilder(
+    column: $table.creadoEn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FotosTableOrderingComposer
+    extends Composer<_$AppDatabase, $FotosTable> {
+  $$FotosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entidadTipo => $composableBuilder(
+    column: $table.entidadTipo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entidadId => $composableBuilder(
+    column: $table.entidadId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tipo => $composableBuilder(
+    column: $table.tipo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ruta => $composableBuilder(
+    column: $table.ruta,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sha256 => $composableBuilder(
+    column: $table.sha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get creadoEn => $composableBuilder(
+    column: $table.creadoEn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FotosTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FotosTable> {
+  $$FotosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get entidadTipo => $composableBuilder(
+    column: $table.entidadTipo,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get entidadId =>
+      $composableBuilder(column: $table.entidadId, builder: (column) => column);
+
+  GeneratedColumn<String> get tipo =>
+      $composableBuilder(column: $table.tipo, builder: (column) => column);
+
+  GeneratedColumn<String> get ruta =>
+      $composableBuilder(column: $table.ruta, builder: (column) => column);
+
+  GeneratedColumn<String> get sha256 =>
+      $composableBuilder(column: $table.sha256, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get creadoEn =>
+      $composableBuilder(column: $table.creadoEn, builder: (column) => column);
+
+  GeneratedColumn<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => column,
+  );
+}
+
+class $$FotosTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FotosTable,
+          Foto,
+          $$FotosTableFilterComposer,
+          $$FotosTableOrderingComposer,
+          $$FotosTableAnnotationComposer,
+          $$FotosTableCreateCompanionBuilder,
+          $$FotosTableUpdateCompanionBuilder,
+          (Foto, BaseReferences<_$AppDatabase, $FotosTable, Foto>),
+          Foto,
+          PrefetchHooks Function()
+        > {
+  $$FotosTableTableManager(_$AppDatabase db, $FotosTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FotosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FotosTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FotosTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> entidadTipo = const Value.absent(),
+                Value<String> entidadId = const Value.absent(),
+                Value<String> tipo = const Value.absent(),
+                Value<String> ruta = const Value.absent(),
+                Value<String> sha256 = const Value.absent(),
+                Value<DateTime> creadoEn = const Value.absent(),
+                Value<bool> sincronizado = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FotosCompanion(
+                id: id,
+                entidadTipo: entidadTipo,
+                entidadId: entidadId,
+                tipo: tipo,
+                ruta: ruta,
+                sha256: sha256,
+                creadoEn: creadoEn,
+                sincronizado: sincronizado,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String entidadTipo,
+                required String entidadId,
+                required String tipo,
+                required String ruta,
+                required String sha256,
+                Value<DateTime> creadoEn = const Value.absent(),
+                Value<bool> sincronizado = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FotosCompanion.insert(
+                id: id,
+                entidadTipo: entidadTipo,
+                entidadId: entidadId,
+                tipo: tipo,
+                ruta: ruta,
+                sha256: sha256,
+                creadoEn: creadoEn,
+                sincronizado: sincronizado,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FotosTable, Foto>(table),
+                  BaseReferences<_$AppDatabase, $FotosTable, Foto>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FotosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FotosTable,
+      Foto,
+      $$FotosTableFilterComposer,
+      $$FotosTableOrderingComposer,
+      $$FotosTableAnnotationComposer,
+      $$FotosTableCreateCompanionBuilder,
+      $$FotosTableUpdateCompanionBuilder,
+      (Foto, BaseReferences<_$AppDatabase, $FotosTable, Foto>),
+      Foto,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2738,4 +3519,6 @@ class $AppDatabaseManager {
       $$FincasTableTableManager(_db, _db.fincas);
   $$EntregasTableTableManager get entregas =>
       $$EntregasTableTableManager(_db, _db.entregas);
+  $$FotosTableTableManager get fotos =>
+      $$FotosTableTableManager(_db, _db.fotos);
 }

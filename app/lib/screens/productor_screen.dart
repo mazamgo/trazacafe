@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/database.dart';
 import '../providers.dart';
 import 'nueva_finca_screen.dart';
 
-class FincasScreen extends ConsumerWidget {
-  const FincasScreen({super.key});
+/// Fincas de un productor.
+class ProductorScreen extends ConsumerWidget {
+  const ProductorScreen({super.key, required this.productor});
+
+  final Productor productor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fincas = ref.watch(fincasProvider);
+    final fincas = ref.watch(fincasDeProductorProvider(productor.id));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Fincas registradas')),
+      appBar: AppBar(title: Text(productor.nombre)),
       body: fincas.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (lista) => lista.isEmpty
-            ? const Center(child: Text('Aún no hay fincas. Toca + para agregar.'))
+            ? const Center(child: Text('Sin fincas. Toca + para registrar una.'))
             : ListView.separated(
                 itemCount: lista.length,
                 separatorBuilder: (_, _) => const Divider(height: 1),
@@ -37,10 +41,10 @@ class FincasScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Nueva finca',
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const NuevaFincaScreen()),
-        ),
-        child: const Icon(Icons.add),
+        onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => NuevaFincaScreen(productorId: productor.id),
+        )),
+        child: const Icon(Icons.add_location_alt),
       ),
     );
   }

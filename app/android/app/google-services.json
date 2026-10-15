@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "85528878949",
+    "project_id": "trazacafe-dev",
+    "storage_bucket": "trazacafe-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:85528878949:android:d614971be0e70903b68b8c",
+        "android_client_info": {
+          "package_name": "com.nicarobotica.trazacafe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBo-G_vEiQyk8EbIPWneh8Xesq7n73743o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -76,6 +76,32 @@ describe("POST /v1/sync", () => {
     expect((await sync(app, { fincas: [finca] })).statusCode).toBe(403);
   });
 
+  it("acepta fotos con hash válido", async () => {
+    const { app, guardados } = crearApp();
+    const foto = {
+      id: "9b2e1f4a-6c3d-4f8e-a1b2-3c4d5e6f7a8b",
+      entidadTipo: "productor",
+      entidadId: productor.id,
+      tipo: "consentimiento",
+      sha256: `0x${"cd".repeat(32)}`,
+    };
+    const res = await sync(app, { productores: [productor], fotos: [foto] });
+    expect(res.statusCode).toBe(200);
+    expect(guardados[0].datos.fotos).toHaveLength(1);
+  });
+
+  it("rechaza fotos con hash mal formado", async () => {
+    const { app } = crearApp();
+    const foto = {
+      id: "9b2e1f4a-6c3d-4f8e-a1b2-3c4d5e6f7a8b",
+      entidadTipo: "finca",
+      entidadId: finca.id,
+      tipo: "finca",
+      sha256: "abc",
+    };
+    expect((await sync(app, { fotos: [foto] })).statusCode).toBe(422);
+  });
+
   it("rechaza productores sin consentimiento", async () => {
     const { app } = crearApp();
     const res = await sync(app, { productores: [{ ...productor, consentimientoFirmado: false }] });

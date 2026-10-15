@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,11 +8,14 @@ import 'package:uuid/uuid.dart';
 import '../data/database.dart';
 import '../domain/geo.dart';
 import '../providers.dart';
+import '../services/fotos_service.dart';
 
 /// Registro de una finca: el técnico marca los vértices tocando el mapa o
 /// caminando el lindero con "Agregar mi ubicación".
 class NuevaFincaScreen extends ConsumerStatefulWidget {
-  const NuevaFincaScreen({super.key});
+  const NuevaFincaScreen({super.key, required this.productorId});
+
+  final String productorId;
 
   @override
   ConsumerState<NuevaFincaScreen> createState() => _NuevaFincaScreenState();
@@ -23,11 +25,10 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
   // Centro inicial: Jinotega.
   static const _centroInicial = LatLng(13.0910, -86.0023);
 
-  final _productorCtrl = TextEditingController();
   final _fincaCtrl = TextEditingController();
   final _mapCtrl = MapController();
   final _puntos = <LatLng>[];
-  bool _consentimiento = false;
+  final _fotos = <FotoTomada>[];
   bool _guardando = false;
 
   final _areaDeclaradaCtrl = TextEditingController();
@@ -39,7 +40,6 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
 
   @override
   void dispose() {
-    _productorCtrl.dispose();
     _fincaCtrl.dispose();
     _areaDeclaradaCtrl.dispose();
     super.dispose();
@@ -63,13 +63,14 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     _mapCtrl.move(punto, 17);
   }
 
+  Future<void> _tomarFoto() async {
+    final foto = await ref.read(fotosServiceProvider).tomar();
+    if (foto != null) setState(() => _fotos.add(foto));
+  }
+
   Future<void> _guardar() async {
-    if (_productorCtrl.text.trim().isEmpty || _fincaCtrl.text.trim().isEmpty) {
-      _aviso('Escribe el nombre del productor y de la finca.');
-      return;
-    }
-    if (!_consentimiento) {
-      _aviso('Falta el consentimiento firmado del productor (Ley 787).');
+    if (_fincaCtrl.text.trim().isEmpty) {
+      _aviso('Escribe el nombre de la finca.');
       return;
     }
     if (_puntos.isEmpty || _puntos.length == 2) {
@@ -88,23 +89,25 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
 
     setState(() => _guardando = true);
     final db = ref.read(databaseProvider);
-    const uuid = Uuid();
-    final productorId = uuid.v4();
+    final fincaId = const Uuid().v4();
 
     await db.transaction(() async {
-      await db.into(db.productores).insert(ProductoresCompanion.insert(
-            id: productorId,
-            nombre: _productorCtrl.text.trim(),
-            consentimientoFirmado: const Value(true),
-          ));
       await db.into(db.fincas).insert(FincasCompanion.insert(
-            id: uuid.v4(),
-            productorId: productorId,
+            id: fincaId,
+            productorId: widget.productorId,
             nombre: _fincaCtrl.text.trim(),
             coordenadasJson: aGeoJsonCoords(_puntos),
             areaHa: area,
             geoHash: geoHash(_puntos),
           ));
+      for (final foto in _fotos) {
+        await db.into(db.fotos).insert(FotosService.registro(
+              foto,
+              entidadTipo: 'finca',
+              entidadId: fincaId,
+              tipo: 'finca',
+            ));
+      }
     });
 
     if (mounted) Navigator.of(context).pop();
@@ -123,20 +126,22 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Column(children: [
-              TextField(
-                controller: _productorCtrl,
-                decoration: const InputDecoration(labelText: 'Productor'),
+            child: Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _fincaCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(labelText: 'Nombre de la finca'),
+                ),
               ),
-              TextField(
-                controller: _fincaCtrl,
-                decoration: const InputDecoration(labelText: 'Nombre de la finca'),
-              ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _consentimiento,
-                onChanged: (v) => setState(() => _consentimiento = v ?? false),
-                title: const Text('El productor firmó el consentimiento de datos'),
+              IconButton(
+                tooltip: 'Foto de la finca',
+                onPressed: _tomarFoto,
+                icon: Badge(
+                  isLabelVisible: _fotos.isNotEmpty,
+                  label: Text('${_fotos.length}'),
+                  child: const Icon(Icons.photo_camera),
+                ),
               ),
             ]),
           ),
