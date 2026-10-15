@@ -15,7 +15,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBo-G_vEiQyk8EbIPWneh8Xesq7n73743o',
-    appId: '1:85528878949:android:d614971be0e70903b68b8c',
+    appId: '1:85528878949:android:15e87427c4ad8ad5b68b8c',
     messagingSenderId: '85528878949',
     projectId: 'trazacafe-dev',
     storageBucket: 'trazacafe-dev.firebasestorage.app',

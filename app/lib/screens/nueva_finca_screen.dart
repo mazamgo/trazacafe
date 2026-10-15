@@ -156,7 +156,7 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.nicarobotica.trazacafe',
+                  userAgentPackageName: 'com.goproduction.trazacafe',
                 ),
                 if (esPoligono)
                   PolygonLayer(polygons: [

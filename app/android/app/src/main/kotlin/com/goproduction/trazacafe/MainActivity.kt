@@ -1,4 +1,4 @@
-package com.nicarobotica.trazacafe
+package com.goproduction.trazacafe
 
 import io.flutter.embedding.android.FlutterActivity
 
