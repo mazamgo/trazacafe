@@ -6,6 +6,7 @@ import {
   coordenadasCanonicas,
   esquemas,
   geoHash,
+  problemaPoligono,
   schemaUid,
   uuidABytes32,
   type Coordenada,
@@ -49,12 +50,13 @@ describe("codificarFinca", () => {
   });
 });
 
-describe("geoHash", () => {
+describe("geoHash y validez del polígono", () => {
   for (const v of vectores) {
     it(v.nombre, () => {
       const coords = v.coords as Coordenada[];
       expect(coordenadasCanonicas(coords)).toBe(v.canonico);
       expect(geoHash(coords)).toBe(v.geoHash);
+      expect(problemaPoligono(coords)).toBe(v.problema);
     });
   }
 });

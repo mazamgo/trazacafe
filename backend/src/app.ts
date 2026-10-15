@@ -86,6 +86,23 @@ export function buildApp({
     return { recibidos: { productores: productores.length, fincas: fincas.length, fotos: fotos.length } };
   });
 
+  /** Corrige un error de campo: borra una finca que aún no se atestó. */
+  app.delete<{ Params: { id: string } }>("/v1/fincas/:id", async (req, reply) => {
+    const usuario = await activo(req, reply);
+    if (!usuario) return;
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrada" });
+
+    const r = await repo.eliminarFinca(usuario.organizacionId, req.params.id);
+    if (r === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
+    if (r === "atestada") {
+      return reply.code(409).send({
+        error: "atestada",
+        mensaje: "Esta finca ya está registrada en la blockchain; hay que revocar su attestation.",
+      });
+    }
+    return reply.code(204).send();
+  });
+
   app.get("/v1/invitaciones", async (req, reply) => {
     const admin = await activo(req, reply, true);
     if (!admin) return;

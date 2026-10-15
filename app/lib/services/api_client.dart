@@ -41,6 +41,16 @@ class ApiClient {
   /// porque el frontal de Cloud Run rechaza POST sin cuerpo (411).
   Future<void> activar() => _pedir('POST', '/v1/activar', const <String, dynamic>{});
 
+  /// Borra en la API una finca que aún no se atestó. Si ya no existe allá, no
+  /// es error: el objetivo es que desaparezca.
+  Future<void> eliminarFinca(String id) async {
+    try {
+      await _pedir('DELETE', '/v1/fincas/${Uri.encodeComponent(id)}');
+    } on ApiError catch (e) {
+      if (e.status != 404) rethrow;
+    }
+  }
+
   Future<List<Invitacion>> invitaciones() async {
     final r = await _pedir('GET', '/v1/invitaciones');
     return [

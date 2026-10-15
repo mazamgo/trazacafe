@@ -26,6 +26,10 @@ void main() {
       test('área igual a Turf.js', () {
         expect(areaHectareas(puntos), closeTo((v['areaHa'] as num).toDouble(), 1e-4));
       });
+
+      test('misma validez del polígono que el backend', () {
+        expect(problemaPoligono(puntos)?.codigo, v['problema']);
+      });
     });
   }
 

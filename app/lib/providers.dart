@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/database.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
+import 'services/fincas_service.dart';
 import 'services/fotos_service.dart';
 import 'services/sync_service.dart';
 
@@ -42,6 +43,10 @@ final fotosServiceProvider = Provider<FotosService>((ref) => FotosService());
 
 final syncServiceProvider = Provider<SyncService>(
   (ref) => SyncService(ref.watch(databaseProvider), ref.watch(apiProvider)),
+);
+
+final fincasServiceProvider = Provider<FincasService>(
+  (ref) => FincasService(ref.watch(databaseProvider), ref.watch(apiProvider)),
 );
 
 final productoresProvider = StreamProvider<List<ProductorConFincas>>(

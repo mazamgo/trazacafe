@@ -23,6 +23,12 @@ export interface Repo {
   aceptarInvitacion(email: string, uid: string): Promise<void>;
   /** `false` si el correo ya tiene una invitación (en cualquier organización). */
   crearInvitacion(inv: Pick<Invitacion, "email" | "organizacionId" | "rol" | "invitadoPor">): Promise<boolean>;
+  /**
+   * Borra una finca de la organización si todavía no se atestó, con sus
+   * fotos y su attestation pendiente. Una finca atestada no se borra: hay
+   * que revocar su attestation (semana 4).
+   */
+  eliminarFinca(organizacionId: string, fincaId: string): Promise<"eliminada" | "no_encontrada" | "atestada">;
   listarInvitaciones(organizacionId: string): Promise<Invitacion[]>;
   /** Devuelve la invitación borrada, o `null` si no existía en esa organización. */
   eliminarInvitacion(organizacionId: string, email: string): Promise<Invitacion | null>;
@@ -119,6 +125,36 @@ export class PgRepo implements Repo {
       [inv.email.toLowerCase(), inv.organizacionId, inv.rol, inv.invitadoPor],
     );
     return r.rowCount === 1;
+  }
+
+  async eliminarFinca(organizacionId: string, fincaId: string): Promise<"eliminada" | "no_encontrada" | "atestada"> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query<{ attestation_uid: string | null }>(
+        `SELECT f.attestation_uid FROM fincas f JOIN productores p ON p.id = f.productor_id
+         WHERE f.id = $1 AND p.organizacion_id = $2 FOR UPDATE OF f`,
+        [fincaId, organizacionId],
+      );
+      if (rows.length === 0) {
+        await client.query("ROLLBACK");
+        return "no_encontrada";
+      }
+      if (rows[0].attestation_uid) {
+        await client.query("ROLLBACK");
+        return "atestada";
+      }
+      await client.query("DELETE FROM attestations_pendientes WHERE esquema = 'Finca' AND entidad_id = $1", [fincaId]);
+      await client.query("DELETE FROM fotos WHERE entidad_tipo = 'finca' AND entidad_id = $1", [fincaId]);
+      await client.query("DELETE FROM fincas WHERE id = $1", [fincaId]);
+      await client.query("COMMIT");
+      return "eliminada";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   async listarInvitaciones(organizacionId: string): Promise<Invitacion[]> {

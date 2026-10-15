@@ -156,6 +156,20 @@ class AppDatabase extends _$AppDatabase {
         readsFrom: {productores, fincas, fotos},
       ).watchSingle().map((fila) => fila.read<int>('total'));
 
+  /// Borra la finca y sus fotos del celular. Devuelve las rutas de los
+  /// archivos de foto para borrarlos también.
+  Future<List<String>> eliminarFincaLocal(String fincaId) => transaction(() async {
+        final fotosFinca = await (select(fotos)
+              ..where((f) => f.entidadTipo.equals('finca') & f.entidadId.equals(fincaId)))
+            .get();
+        await (delete(fotos)
+              ..where((f) => f.entidadTipo.equals('finca') & f.entidadId.equals(fincaId)))
+            .go();
+        await (delete(entregas)..where((e) => e.fincaId.equals(fincaId))).go();
+        await (delete(fincas)..where((f) => f.id.equals(fincaId))).go();
+        return [for (final f in fotosFinca) f.ruta];
+      });
+
   /// Marca como enviados exactamente los registros que viajaron en [enviados].
   Future<void> marcarSincronizados(Pendientes enviados) => transaction(() async {
         const hecho = Value(true);

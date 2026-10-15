@@ -85,3 +85,67 @@ export function coordenadasCanonicas(coords: Coordenada[]): string {
 export function geoHash(coords: Coordenada[]): Hex {
   return `0x${createHash("sha256").update(coordenadasCanonicas(coords), "utf8").digest("hex")}`;
 }
+
+export type ProblemaPoligono = "pocos_puntos" | "puntos_repetidos" | "se_cruza";
+
+/**
+ * Por qué un polígono no es válido para el EUDR (TRACES rechaza geometrías
+ * inválidas), o `null` si es válido. Recibe el anillo abierto, sin repetir el
+ * primer punto al final. Mismo algoritmo que `problemaPoligono` de la app
+ * (app/lib/domain/geo.dart); ambos se prueban con test-vectors.json.
+ */
+export function problemaPoligono(coords: Coordenada[]): ProblemaPoligono | null {
+  const n = coords.length;
+  if (n < 3) return "pocos_puntos";
+  const p = (i: number) => coords[i % n];
+
+  for (let i = 0; i < n; i++) {
+    if (p(i)[0] === p(i + 1)[0] && p(i)[1] === p(i + 1)[1]) return "puntos_repetidos";
+  }
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const [a, b, c, d] = [p(i), p(i + 1), p(j), p(j + 1)];
+      if (j === i + 1) {
+        // Lados seguidos comparten b: solo fallan si el segundo "regresa" sobre el primero.
+        if (seDevuelve(a, b, d)) return "se_cruza";
+      } else if (i === 0 && j === n - 1) {
+        // El último lado termina en el primer punto (a).
+        if (seDevuelve(b, a, c)) return "se_cruza";
+      } else if (segmentosSeTocan(a, b, c, d)) {
+        return "se_cruza";
+      }
+    }
+  }
+  return null;
+}
+
+function orientacion(p: Coordenada, q: Coordenada, r: Coordenada): number {
+  return Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+}
+
+function dentroDelRectangulo(p: Coordenada, q: Coordenada, r: Coordenada): boolean {
+  return (
+    Math.min(p[0], q[0]) <= r[0] && r[0] <= Math.max(p[0], q[0]) &&
+    Math.min(p[1], q[1]) <= r[1] && r[1] <= Math.max(p[1], q[1])
+  );
+}
+
+function segmentosSeTocan(a: Coordenada, b: Coordenada, c: Coordenada, d: Coordenada): boolean {
+  const o1 = orientacion(a, b, c);
+  const o2 = orientacion(a, b, d);
+  const o3 = orientacion(c, d, a);
+  const o4 = orientacion(c, d, b);
+  if (o1 !== o2 && o3 !== o4) return true;
+  return (
+    (o1 === 0 && dentroDelRectangulo(a, b, c)) ||
+    (o2 === 0 && dentroDelRectangulo(a, b, d)) ||
+    (o3 === 0 && dentroDelRectangulo(c, d, a)) ||
+    (o4 === 0 && dentroDelRectangulo(c, d, b))
+  );
+}
+
+/** Los lados p→s y s→q van en línea recta pero de regreso (forman una "espina"). */
+function seDevuelve(p: Coordenada, s: Coordenada, q: Coordenada): boolean {
+  if (orientacion(p, s, q) !== 0) return false;
+  return (p[0] - s[0]) * (q[0] - s[0]) + (p[1] - s[1]) * (q[1] - s[1]) > 0;
+}

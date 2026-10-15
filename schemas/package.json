@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@turf/area": "^7.0.0",
+    "@turf/kinks": "^7.4.0",
     "@types/node": "^24.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.6.0",

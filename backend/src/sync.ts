@@ -1,7 +1,13 @@
-import { geoHash, type Coordenada } from "@trazacafe/eudr-eas-schemas";
+import { geoHash, problemaPoligono, type Coordenada, type ProblemaPoligono } from "@trazacafe/eudr-eas-schemas";
 import { z } from "zod";
 
 const UMBRAL_POLIGONO_HA = 4;
+
+const MENSAJES_POLIGONO: Record<ProblemaPoligono, string> = {
+  pocos_puntos: "El polígono necesita al menos 3 puntos",
+  puntos_repetidos: "El polígono tiene dos puntos seguidos repetidos",
+  se_cruza: "Los linderos del polígono se cruzan (TRACES rechaza polígonos inválidos)",
+};
 
 const coordenada = z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]);
 
@@ -27,6 +33,12 @@ export const fincaSchema = z
   .superRefine((f, ctx) => {
     if (f.coordenadas.length === 2) {
       ctx.addIssue({ code: "custom", message: "Use 1 punto o un polígono de al menos 3 vértices" });
+    }
+    if (f.coordenadas.length >= 3) {
+      const problema = problemaPoligono(f.coordenadas as Coordenada[]);
+      if (problema) {
+        ctx.addIssue({ code: "custom", path: ["coordenadas"], message: MENSAJES_POLIGONO[problema] });
+      }
     }
     if (f.coordenadas.length === 1 && f.areaHa >= UMBRAL_POLIGONO_HA) {
       ctx.addIssue({ code: "custom", message: "Fincas de 4 ha o más necesitan polígono (EUDR)" });

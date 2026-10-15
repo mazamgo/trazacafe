@@ -59,9 +59,20 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
     );
     final punto = LatLng(pos.latitude, pos.longitude);
+    // Sin moverse, el GPS igual "salta" unos metros: no se agrega ese punto.
+    if (_puntos.isNotEmpty &&
+        distanciaMetros(_puntos.last, punto) < distanciaMinimaGpsMetros) {
+      _aviso('Estás en el mismo punto que el anterior. Camina hasta la '
+          'siguiente esquina del lindero.');
+      return;
+    }
     setState(() => _puntos.add(punto));
     _mapCtrl.move(punto, 17);
   }
+
+  /// Problema del polígono marcado, o `null` si es válido o todavía es un punto.
+  ProblemaPoligono? get _problema =>
+      _puntos.length >= 3 ? problemaPoligono(_puntos) : null;
 
   Future<void> _tomarFoto() async {
     final foto = await ref.read(fotosServiceProvider).tomar();
@@ -75,6 +86,11 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     }
     if (_puntos.isEmpty || _puntos.length == 2) {
       _aviso('Marca 1 punto (finca < 4 ha) o al menos 3 para el polígono.');
+      return;
+    }
+    final problema = _problema;
+    if (problema != null) {
+      _aviso(problema.mensaje);
       return;
     }
     final area = _area;
@@ -119,6 +135,8 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
   @override
   Widget build(BuildContext context) {
     final esPoligono = _puntos.length >= 3;
+    final problema = _problema;
+    final colorBorde = problema == null ? Colors.green.shade800 : Colors.red.shade700;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva finca')),
@@ -162,22 +180,29 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                   PolygonLayer(polygons: [
                     Polygon(
                       points: _puntos,
-                      color: Colors.green.withValues(alpha: 0.3),
-                      borderColor: Colors.green.shade800,
+                      color: colorBorde.withValues(alpha: 0.25),
+                      borderColor: colorBorde,
                       borderStrokeWidth: 2,
                     ),
                   ]),
+                // Puntos numerados en el orden marcado: así se ve dónde se
+                // cruzan los linderos.
                 MarkerLayer(
                   markers: [
-                    for (final p in _puntos)
+                    for (final (i, p) in _puntos.indexed)
                       Marker(
                         point: p,
-                        width: 14,
-                        height: 14,
-                        child: const DecoratedBox(
+                        width: 22,
+                        height: 22,
+                        child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: Colors.brown,
+                            color: i == 0 ? Colors.blue.shade700 : Colors.brown,
                             shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: Center(
+                            child: Text('${i + 1}',
+                                style: const TextStyle(color: Colors.white, fontSize: 10)),
                           ),
                         ),
                       ),
@@ -189,7 +214,11 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(children: [
-              if (esPoligono)
+              if (problema != null)
+                Text(problema.mensaje,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error))
+              else if (esPoligono)
                 Text('Área: ${_area.toStringAsFixed(2)} ha')
               else
                 TextField(
@@ -224,7 +253,7 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _guardando ? null : _guardar,
+                  onPressed: _guardando || problema != null ? null : _guardar,
                   child: const Text('Guardar finca'),
                 ),
               ),

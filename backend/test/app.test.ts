@@ -52,6 +52,14 @@ class RepoMemoria implements Repo {
     this.invitaciones.set(inv.email, { ...inv, usuarioUid: null, creadoEn: "ahora", aceptadaEn: null });
     return true;
   }
+  fincas = new Map<string, { organizacionId: string; atestada: boolean }>();
+  async eliminarFinca(organizacionId: string, fincaId: string) {
+    const f = this.fincas.get(fincaId);
+    if (!f || f.organizacionId !== organizacionId) return "no_encontrada" as const;
+    if (f.atestada) return "atestada" as const;
+    this.fincas.delete(fincaId);
+    return "eliminada" as const;
+  }
   async listarInvitaciones(organizacionId: string) {
     return [...this.invitaciones.values()].filter((i) => i.organizacionId === organizacionId);
   }
@@ -119,6 +127,17 @@ describe("POST /v1/sync", () => {
     const { app, repo } = crearApp();
     const alterada = { ...finca, coordenadas: [...coords.slice(0, 3), [-86.003, 13.093]] };
     expect((await pedir(app, "POST", "/v1/sync", "tecnico", { fincas: [alterada] })).statusCode).toBe(422);
+    expect(repo.sync).toHaveLength(0);
+  });
+
+  it("rechaza un polígono cuyos linderos se cruzan", async () => {
+    const { app, repo } = crearApp();
+    const mono: Coordenada[] = [coords[0], coords[2], coords[1], coords[3]];
+    const res = await pedir(app, "POST", "/v1/sync", "tecnico", {
+      fincas: [{ ...finca, coordenadas: mono, geoHash: geoHash(mono) }],
+    });
+    expect(res.statusCode).toBe(422);
+    expect(JSON.stringify(res.json().detalles)).toContain("se cruzan");
     expect(repo.sync).toHaveLength(0);
   });
 
@@ -240,6 +259,36 @@ describe("/v1/invitaciones", () => {
     const { app } = crearApp();
     expect((await pedir(app, "POST", "/v1/invitaciones", "admin", { email: "no-es-correo", rol: "tecnico" })).statusCode).toBe(422);
     expect((await pedir(app, "POST", "/v1/invitaciones", "admin", { email: "x@gmail.com", rol: "dueño" })).statusCode).toBe(422);
+  });
+});
+
+describe("DELETE /v1/fincas/:id", () => {
+  it("borra una finca de la organización que aún no se atestó", async () => {
+    const { app, repo } = crearApp();
+    repo.fincas.set(finca.id, { organizacionId: ORG, atestada: false });
+    expect((await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "tecnico")).statusCode).toBe(204);
+    expect(repo.fincas.has(finca.id)).toBe(false);
+  });
+
+  it("no borra fincas ya atestadas", async () => {
+    const { app, repo } = crearApp();
+    repo.fincas.set(finca.id, { organizacionId: ORG, atestada: true });
+    const res = await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "tecnico");
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("atestada");
+  });
+
+  it("no borra fincas de otra organización", async () => {
+    const { app, repo } = crearApp();
+    repo.fincas.set(finca.id, { organizacionId: OTRA_ORG, atestada: false });
+    expect((await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "tecnico")).statusCode).toBe(404);
+    expect(repo.fincas.has(finca.id)).toBe(true);
+  });
+
+  it("exige acceso activo y un id válido", async () => {
+    const { app } = crearApp();
+    expect((await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "nuevo")).statusCode).toBe(403);
+    expect((await pedir(app, "DELETE", "/v1/fincas/no-es-uuid", "tecnico")).statusCode).toBe(404);
   });
 });
 
