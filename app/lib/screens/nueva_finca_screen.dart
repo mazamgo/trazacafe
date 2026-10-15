@@ -62,8 +62,10 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     // Sin moverse, el GPS igual "salta" unos metros: no se agrega ese punto.
     if (_puntos.isNotEmpty &&
         distanciaMetros(_puntos.last, punto) < distanciaMinimaGpsMetros) {
-      _aviso('Estás en el mismo punto que el anterior. Camina hasta la '
-          'siguiente esquina del lindero.');
+      _aviso(
+        'Estás en el mismo punto que el anterior. Camina hasta la '
+        'siguiente esquina del lindero.',
+      );
       return;
     }
     setState(() => _puntos.add(punto));
@@ -108,35 +110,46 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     final fincaId = const Uuid().v4();
 
     await db.transaction(() async {
-      await db.into(db.fincas).insert(FincasCompanion.insert(
-            id: fincaId,
-            productorId: widget.productorId,
-            nombre: _fincaCtrl.text.trim(),
-            coordenadasJson: aGeoJsonCoords(_puntos),
-            areaHa: area,
-            geoHash: geoHash(_puntos),
-          ));
+      await db
+          .into(db.fincas)
+          .insert(
+            FincasCompanion.insert(
+              id: fincaId,
+              productorId: widget.productorId,
+              nombre: _fincaCtrl.text.trim(),
+              coordenadasJson: aGeoJsonCoords(_puntos),
+              areaHa: area,
+              geoHash: geoHash(_puntos),
+            ),
+          );
       for (final foto in _fotos) {
-        await db.into(db.fotos).insert(FotosService.registro(
-              foto,
-              entidadTipo: 'finca',
-              entidadId: fincaId,
-              tipo: 'finca',
-            ));
+        await db
+            .into(db.fotos)
+            .insert(
+              FotosService.registro(
+                foto,
+                entidadTipo: 'finca',
+                entidadId: fincaId,
+                tipo: 'finca',
+              ),
+            );
       }
     });
 
     if (mounted) Navigator.of(context).pop();
   }
 
-  void _aviso(String texto) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(texto)));
+  void _aviso(String texto) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(texto)));
 
   @override
   Widget build(BuildContext context) {
     final esPoligono = _puntos.length >= 3;
     final problema = _problema;
-    final colorBorde = problema == null ? Colors.green.shade800 : Colors.red.shade700;
+    final colorBorde = problema == null
+        ? Colors.green.shade800
+        : Colors.red.shade700;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva finca')),
@@ -144,24 +157,28 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _fincaCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(labelText: 'Nombre de la finca'),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _fincaCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de la finca',
+                    ),
+                  ),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Foto de la finca',
-                onPressed: _tomarFoto,
-                icon: Badge(
-                  isLabelVisible: _fotos.isNotEmpty,
-                  label: Text('${_fotos.length}'),
-                  child: const Icon(Icons.photo_camera),
+                IconButton(
+                  tooltip: 'Foto de la finca',
+                  onPressed: _tomarFoto,
+                  icon: Badge(
+                    isLabelVisible: _fotos.isNotEmpty,
+                    label: Text('${_fotos.length}'),
+                    child: const Icon(Icons.photo_camera),
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
           ),
           Expanded(
             child: FlutterMap(
@@ -177,14 +194,16 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                   userAgentPackageName: 'com.goproduction.trazacafe',
                 ),
                 if (esPoligono)
-                  PolygonLayer(polygons: [
-                    Polygon(
-                      points: _puntos,
-                      color: colorBorde.withValues(alpha: 0.25),
-                      borderColor: colorBorde,
-                      borderStrokeWidth: 2,
-                    ),
-                  ]),
+                  PolygonLayer(
+                    polygons: [
+                      Polygon(
+                        points: _puntos,
+                        color: colorBorde.withValues(alpha: 0.25),
+                        borderColor: colorBorde,
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
                 // Puntos numerados en el orden marcado: así se ve dónde se
                 // cruzan los linderos.
                 MarkerLayer(
@@ -201,8 +220,13 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                             border: Border.all(color: Colors.white, width: 1.5),
                           ),
                           child: Center(
-                            child: Text('${i + 1}',
-                                style: const TextStyle(color: Colors.white, fontSize: 10)),
+                            child: Text(
+                              '${i + 1}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -211,53 +235,70 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(children: [
-              if (problema != null)
-                Text(problema.mensaje,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error))
-              else if (esPoligono)
-                Text('Área: ${_area.toStringAsFixed(2)} ha')
-              else
-                TextField(
-                  controller: _areaDeclaradaCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Área declarada (ha)',
-                    helperText: 'Puntos: ${_puntos.length}. Un solo punto '
-                        'solo se permite si la finca mide menos de 4 ha.',
+          // Android 15+ dibuja la app detrás de la barra de navegación del
+          // sistema; SafeArea deja el panel (y el botón Guardar) por encima.
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  if (problema != null)
+                    Text(
+                      problema.mensaje,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    )
+                  else if (esPoligono)
+                    Text('Área: ${_area.toStringAsFixed(2)} ha')
+                  else
+                    TextField(
+                      controller: _areaDeclaradaCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Área declarada (ha)',
+                        helperText:
+                            'Puntos: ${_puntos.length}. Un solo punto '
+                            'solo se permite si la finca mide menos de 4 ha.',
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _agregarMiUbicacion,
+                          icon: const Icon(Icons.my_location),
+                          label: const Text('Agregar mi ubicación'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Quitar último punto',
+                        onPressed: _puntos.isEmpty
+                            ? null
+                            : () => setState(_puntos.removeLast),
+                        icon: const Icon(Icons.undo),
+                      ),
+                    ],
                   ),
-                ),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _agregarMiUbicacion,
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('Agregar mi ubicación'),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _guardando || problema != null
+                          ? null
+                          : _guardar,
+                      child: const Text('Guardar finca'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: 'Quitar último punto',
-                  onPressed: _puntos.isEmpty
-                      ? null
-                      : () => setState(_puntos.removeLast),
-                  icon: const Icon(Icons.undo),
-                ),
-              ]),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _guardando || problema != null ? null : _guardar,
-                  child: const Text('Guardar finca'),
-                ),
+                ],
               ),
-            ]),
+            ),
           ),
         ],
       ),
