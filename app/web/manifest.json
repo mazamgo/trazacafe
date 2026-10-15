@@ -1,11 +1,11 @@
 {
-    "name": "trazacafe",
-    "short_name": "trazacafe",
+    "name": "TrazaCafé",
+    "short_name": "TrazaCafé",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Trazabilidad de cafe para EUDR con EAS en OP Mainnet",
+    "background_color": "#2F6B45",
+    "theme_color": "#2F6B45",
+    "description": "Trazabilidad de café para el EUDR con EAS en OP Mainnet",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

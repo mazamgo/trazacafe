@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Frente del ícono adaptativo de Android: el fondo verde lo pone el
+       sistema. El dibujo cabe en el círculo seguro (66 % del lienzo). -->
+  <g transform="translate(512 512) scale(0.78) translate(-512 -520)">
+    <path d="M512 860 C440 760 262 610 262 430 A250 250 0 1 1 762 430 C762 610 584 760 512 860 Z" fill="#F7EFE2"/>
+    <g transform="rotate(-32 512 430)">
+      <ellipse cx="512" cy="430" rx="128" ry="172" fill="#6F4E37"/>
+      <path d="M512 272 C462 360 562 500 512 588" fill="none" stroke="#F7EFE2" stroke-width="30" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

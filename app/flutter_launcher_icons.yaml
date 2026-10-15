@@ -1,0 +1,18 @@
+# Íconos de la app. Fuente en assets/icon/*.svg; los PNG se generan desde ahí.
+# Para regenerar después de cambiar un SVG:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/icon/icono.png"
+  android: "ic_launcher"
+  min_sdk_android: 21
+  adaptive_icon_background: "#2F6B45"
+  adaptive_icon_foreground: "assets/icon/icono_frente.png"
+  adaptive_icon_monochrome: "assets/icon/icono_monocromo.png"
+  # El SVG ya trae el margen de la zona segura; sin esto se agregaría 16 % más.
+  adaptive_icon_foreground_inset: 0
+  ios: false
+  web:
+    generate: true
+    image_path: "assets/icon/icono.png"
+    background_color: "#2F6B45"
+    theme_color: "#2F6B45"

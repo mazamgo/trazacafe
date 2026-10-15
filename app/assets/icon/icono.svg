@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- TrazaCafé: pin de mapa (origen) con un grano de café, sobre verde de finca -->
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A7A50"/>
+      <stop offset="1" stop-color="#245539"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#fondo)"/>
+  <g transform="translate(512 512) scale(0.86) translate(-512 -520)">
+    <!-- sombra suave del pin -->
+    <ellipse cx="512" cy="872" rx="120" ry="26" fill="#000" opacity="0.18"/>
+    <!-- pin -->
+    <path d="M512 860 C440 760 262 610 262 430 A250 250 0 1 1 762 430 C762 610 584 760 512 860 Z" fill="#F7EFE2"/>
+    <!-- grano de café -->
+    <g transform="rotate(-32 512 430)">
+      <ellipse cx="512" cy="430" rx="128" ry="172" fill="#6F4E37"/>
+      <path d="M512 272 C462 360 562 500 512 588" fill="none" stroke="#F7EFE2" stroke-width="30" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

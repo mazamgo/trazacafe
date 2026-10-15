@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Ícono temático de Android 13+: solo cuenta la silueta (canal alfa).
+       El grano queda como hueco dentro del pin. -->
+  <defs>
+    <mask id="grano">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <g transform="rotate(-32 512 430)">
+        <ellipse cx="512" cy="430" rx="128" ry="172" fill="#000"/>
+        <path d="M512 272 C462 360 562 500 512 588" fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round"/>
+      </g>
+    </mask>
+  </defs>
+  <g transform="translate(512 512) scale(0.78) translate(-512 -520)">
+    <path d="M512 860 C440 760 262 610 262 430 A250 250 0 1 1 762 430 C762 610 584 760 512 860 Z" fill="#fff" mask="url(#grano)"/>
+  </g>
+</svg>
