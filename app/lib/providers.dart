@@ -19,7 +19,9 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return db;
 });
 
-final authServiceProvider = Provider<AuthService>((ref) => FirebaseAuthService());
+final authServiceProvider = Provider<AuthService>(
+  (ref) => FirebaseAuthService(),
+);
 
 /// Sesión actual, o `null` si nadie ha iniciado sesión.
 final sesionProvider = StreamProvider<Sesion?>(
@@ -28,7 +30,9 @@ final sesionProvider = StreamProvider<Sesion?>(
 
 /// Mensaje para la pantalla de login, por ejemplo "tu cuenta no está
 /// autorizada" después de que la activación cerró la sesión.
-final avisoAccesoProvider = NotifierProvider<AvisoAcceso, String?>(AvisoAcceso.new);
+final avisoAccesoProvider = NotifierProvider<AvisoAcceso, String?>(
+  AvisoAcceso.new,
+);
 
 class AvisoAcceso extends Notifier<String?> {
   @override
@@ -75,7 +79,8 @@ final productoresProvider = StreamProvider<List<ProductorConFincas>>(
 );
 
 final fincasDeProductorProvider = StreamProvider.family<List<Finca>, String>(
-  (ref, productorId) => ref.watch(databaseProvider).observarFincas(productorId: productorId),
+  (ref, productorId) =>
+      ref.watch(databaseProvider).observarFincas(productorId: productorId),
 );
 
 final mapasServiceProvider = Provider<MapasService>((ref) => MapasService());
@@ -91,8 +96,30 @@ final fincaProvider = StreamProvider.family<Finca?, String>(
 
 /// Fotos de un productor o una finca: `(entidadTipo, entidadId)`.
 final fotosProvider = StreamProvider.family<List<Foto>, (String, String)>(
-  (ref, entidad) => ref.watch(databaseProvider).observarFotos(entidad.$1, entidad.$2),
+  (ref, entidad) =>
+      ref.watch(databaseProvider).observarFotos(entidad.$1, entidad.$2),
 );
+
+/// Temporadas de la organización, de la más reciente a la más antigua.
+final temporadasProvider = StreamProvider<List<Temporada>>(
+  (ref) => ref.watch(databaseProvider).observarTemporadas(),
+);
+
+/// Temporada que contiene hoy, o `null` si la organización no la ha creado.
+final temporadaActualProvider = Provider<Temporada?>((ref) {
+  final hoy = DateTime.now();
+  final dia = DateTime(hoy.year, hoy.month, hoy.day);
+  for (final t in ref.watch(temporadasProvider).value ?? const <Temporada>[]) {
+    if (!dia.isBefore(t.inicio) && !dia.isAfter(t.fin)) return t;
+  }
+  return null;
+});
+
+final verificacionesProvider =
+    StreamProvider.family<List<Verificacion>, String>(
+      (ref, fincaId) =>
+          ref.watch(databaseProvider).observarVerificaciones(fincaId),
+    );
 
 final entregasProvider = StreamProvider.family<List<Entrega>, String>(
   (ref, fincaId) => ref.watch(databaseProvider).observarEntregas(fincaId),

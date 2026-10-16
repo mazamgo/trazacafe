@@ -16,7 +16,9 @@ class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) return web;
     if (defaultTargetPlatform == TargetPlatform.android) return android;
-    throw UnsupportedError('TrazaCafé solo está configurado para Android y Web.');
+    throw UnsupportedError(
+      'TrazaCafé solo está configurado para Android y Web.',
+    );
   }
 
   static const FirebaseOptions android = FirebaseOptions(

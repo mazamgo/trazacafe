@@ -6,8 +6,10 @@ import 'package:uuid/uuid.dart';
 import '../data/database.dart';
 import '../providers.dart';
 import '../widgets/seccion_fotos.dart';
+import 'verificacion_screen.dart';
 
-/// Detalle de una finca y sus entregas de café al beneficio.
+/// Detalle de una finca: estado satelital, visita de verificación de la
+/// temporada, fotos y entregas agrupadas por temporada.
 class FincaScreen extends ConsumerWidget {
   const FincaScreen({super.key, required this.fincaId});
 
@@ -15,7 +17,55 @@ class FincaScreen extends ConsumerWidget {
 
   static const estados = {'uva': 'Uva (café maduro)', 'pergamino': 'Pergamino'};
 
-  Future<void> _nuevaEntrega(BuildContext context, WidgetRef ref) async {
+  Future<void> _nuevaEntrega(
+    BuildContext context,
+    WidgetRef ref,
+    Finca finca,
+  ) async {
+    final actual = ref.read(temporadaActualProvider);
+    final visitas =
+        ref.read(verificacionesProvider(fincaId)).value ??
+        const <Verificacion>[];
+    final verificada =
+        actual != null && visitas.any((v) => v.temporadaId == actual.id);
+    final aviso = finca.deforestacion == 'rojo'
+        ? 'El satélite detectó pérdida de bosque en esta finca después de 2020. '
+              'Sus entregas no podrán ir en un lote de exportación hasta revisarla.'
+        : !verificada
+        ? 'Esta finca no tiene la visita de verificación de '
+              '${actual?.nombre ?? 'la temporada actual'}. La entrega se guarda, '
+              'pero la finca no podrá ir en un lote de exportación hasta verificarla.'
+        : null;
+    if (aviso != null) {
+      final seguir = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          icon: Icon(
+            Icons.warning_amber_rounded,
+            color: finca.deforestacion == 'rojo' ? Colors.red : Colors.orange,
+          ),
+          title: const Text('Antes de registrar'),
+          content: Text(aviso),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: Text(verificada ? 'Cancelar' : 'Hacer la visita primero'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Registrar de todos modos'),
+            ),
+          ],
+        ),
+      );
+      if (seguir != true) {
+        if (seguir == false && !verificada && context.mounted) {
+          _abrirVisita(context, finca);
+        }
+        return;
+      }
+    }
+    if (!context.mounted) return;
     final entrega = await showModalBottomSheet<EntregasCompanion>(
       context: context,
       isScrollControlled: true,
@@ -23,7 +73,10 @@ class FincaScreen extends ConsumerWidget {
     );
     if (entrega == null) return;
     final db = ref.read(databaseProvider);
-    await db.into(db.entregas).insert(entrega);
+    final temporada = await db.temporadaDe(entrega.fecha.value);
+    await db
+        .into(db.entregas)
+        .insert(entrega.copyWith(temporadaId: Value(temporada?.id)));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -33,89 +86,179 @@ class FincaScreen extends ConsumerWidget {
     }
   }
 
+  void _abrirVisita(BuildContext context, Finca finca) => Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => VerificacionScreen(finca: finca)));
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final finca = ref.watch(fincaProvider(fincaId)).value;
-    final entregas = ref.watch(entregasProvider(fincaId));
+    final entregas =
+        ref.watch(entregasProvider(fincaId)).value ?? const <Entrega>[];
+    final visitas =
+        ref.watch(verificacionesProvider(fincaId)).value ??
+        const <Verificacion>[];
+    final temporadas =
+        ref.watch(temporadasProvider).value ?? const <Temporada>[];
+    final actual = ref.watch(temporadaActualProvider);
+    final esAdmin = ref.watch(sesionProvider).value?.esAdmin ?? false;
+
+    // Entregas por temporada, en el orden de las temporadas (más reciente primero).
+    final nombres = {for (final t in temporadas) t.id: t.nombre};
+    final grupos = <String?, List<Entrega>>{};
+    for (final e in entregas) {
+      grupos
+          .putIfAbsent(
+            nombres.containsKey(e.temporadaId) ? e.temporadaId : null,
+            () => [],
+          )
+          .add(e);
+    }
+    final orden = [
+      for (final t in temporadas)
+        if (grupos.containsKey(t.id)) t.id,
+      if (grupos.containsKey(null)) null,
+    ];
 
     return Scaffold(
       appBar: AppBar(title: Text(finca?.nombre ?? 'Finca')),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (finca != null) _Resumen(finca: finca),
-          SeccionFotos(
-            titulo: 'Fotos de la finca',
-            entidadTipo: 'finca',
-            entidadId: fincaId,
-            tipo: 'finca',
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text(
-              'Entregas al beneficio',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: entregas.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (lista) => lista.isEmpty
-                  ? const Center(
-                      child: Text('Sin entregas. Toca + para registrar una.'),
-                    )
-                  : ListView.separated(
-                      itemCount: lista.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (_, i) {
-                        final e = lista[i];
-                        return ListTile(
-                          leading: const Icon(Icons.local_shipping_outlined),
-                          title: Text(
-                            '${_kg(e.kg)} kg · ${estados[e.estado] ?? e.estado}',
-                          ),
-                          subtitle: Text(_fecha(e.fecha)),
-                          trailing: Icon(
-                            e.sincronizado
-                                ? Icons.cloud_done
-                                : Icons.cloud_upload,
-                            color: e.sincronizado
-                                ? Colors.green
-                                : Colors.orange,
-                          ),
-                        );
-                      },
+      body: finca == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: EdgeInsets.only(
+                bottom: 96 + MediaQuery.paddingOf(context).bottom,
+              ),
+              children: [
+                _Resumen(finca: finca, esAdmin: esAdmin),
+                _TarjetaVerificacion(
+                  temporada: actual,
+                  visitas: visitas,
+                  onVisita: () => _abrirVisita(context, finca),
+                ),
+                SeccionFotos(
+                  titulo: 'Fotos de la finca',
+                  entidadTipo: 'finca',
+                  entidadId: fincaId,
+                  tipo: 'finca',
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  child: Text(
+                    'Entregas al beneficio',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (entregas.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Sin entregas. Toca "Entrega" para registrar una.',
                     ),
+                  ),
+                for (final id in orden) ...[
+                  _EncabezadoTemporada(
+                    nombre: id == null ? 'Sin temporada' : nombres[id]!,
+                    entregas: grupos[id]!,
+                  ),
+                  for (final e in grupos[id]!)
+                    ListTile(
+                      leading: const Icon(Icons.local_shipping_outlined),
+                      title: Text(
+                        '${_kg(e.kg)} kg · ${estados[e.estado] ?? e.estado}',
+                      ),
+                      subtitle: Text(fechaHora(e.fecha)),
+                      trailing: Icon(
+                        e.sincronizado ? Icons.cloud_done : Icons.cloud_upload,
+                        color: e.sincronizado ? Colors.green : Colors.orange,
+                      ),
+                    ),
+                ],
+              ],
             ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _nuevaEntrega(context, ref),
-        icon: const Icon(Icons.add),
-        label: const Text('Entrega'),
-      ),
+      floatingActionButton: finca == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _nuevaEntrega(context, ref, finca),
+              icon: const Icon(Icons.add),
+              label: const Text('Entrega'),
+            ),
     );
   }
 
   static String _kg(double kg) =>
       kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toStringAsFixed(1);
-
-  static String _fecha(DateTime f) {
-    String dos(int n) => n.toString().padLeft(2, '0');
-    return '${dos(f.day)}/${dos(f.month)}/${f.year} ${dos(f.hour)}:${dos(f.minute)}';
-  }
 }
 
-class _Resumen extends StatelessWidget {
-  const _Resumen({required this.finca});
+String _dos(int n) => n.toString().padLeft(2, '0');
+String fecha(DateTime f) => '${_dos(f.day)}/${_dos(f.month)}/${f.year}';
+String fechaHora(DateTime f) => '${fecha(f)} ${_dos(f.hour)}:${_dos(f.minute)}';
 
-  final Finca finca;
+class _EncabezadoTemporada extends StatelessWidget {
+  const _EncabezadoTemporada({required this.nombre, required this.entregas});
+
+  final String nombre;
+  final List<Entrega> entregas;
 
   @override
   Widget build(BuildContext context) {
+    final kg = entregas.fold<double>(0, (s, e) => s + e.kg);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '$nombre · ${entregas.length} ${entregas.length == 1 ? 'entrega' : 'entregas'} · '
+        '${FincaScreen._kg(kg)} kg',
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+class _Resumen extends ConsumerWidget {
+  const _Resumen({required this.finca, required this.esAdmin});
+
+  final Finca finca;
+  final bool esAdmin;
+
+  static const _satelite = {
+    'verde': (
+      Colors.green,
+      Icons.check_circle,
+      'Sin deforestación detectada después de 2020',
+    ),
+    'amarillo': (
+      Colors.orange,
+      Icons.error,
+      'Posible pérdida de bosque pequeña: requiere revisión',
+    ),
+    'rojo': (
+      Colors.red,
+      Icons.dangerous,
+      'Pérdida de bosque después de 2020: no apta para exportar',
+    ),
+  };
+
+  Future<void> _revisarAhora(BuildContext context, WidgetRef ref) async {
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      final r = await ref.read(apiProvider).chequearFinca(finca.id);
+      await ref.read(syncServiceProvider).sincronizar();
+      mensajero.showSnackBar(
+        SnackBar(content: Text('Revisión satelital: ${r['resultado']}.')),
+      );
+    } catch (e) {
+      mensajero.showSnackBar(SnackBar(content: Text('No se pudo revisar: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final oficial = finca.areaOficialHa;
+    final sat = _satelite[finca.deforestacion];
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Padding(
@@ -129,16 +272,116 @@ class _Resumen extends StatelessWidget {
                   : '${finca.areaHa.toStringAsFixed(2)} ha (calculada en el celular)',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 4),
             Text(
-              oficial != null
-                  ? 'Calculada por el servidor; es la que va al paquete EUDR.'
-                  : 'El área oficial llega al sincronizar.',
+              'Lindero versión ${finca.version}'
+              '${oficial == null ? ' · el área oficial llega al sincronizar' : ''}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (finca.attestationUid != null) ...[
-              const SizedBox(height: 4),
+            const Divider(height: 20),
+            Row(
+              children: [
+                Icon(
+                  sat?.$2 ?? Icons.satellite_alt_outlined,
+                  color: sat?.$1 ?? Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    sat == null
+                        ? 'Sin revisión satelital todavía'
+                        : '${sat.$3}${finca.ultimoChequeo != null ? ' (${fecha(finca.ultimoChequeo!)})' : ''}',
+                  ),
+                ),
+              ],
+            ),
+            if (esAdmin)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: finca.sincronizado
+                      ? () => _revisarAhora(context, ref)
+                      : null,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Revisar por satélite'),
+                ),
+              ),
+            if (finca.attestationUid != null)
               const Text('Registrada en la blockchain ✓'),
-            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TarjetaVerificacion extends StatelessWidget {
+  const _TarjetaVerificacion({
+    required this.temporada,
+    required this.visitas,
+    required this.onVisita,
+  });
+
+  final Temporada? temporada;
+  final List<Verificacion> visitas;
+  final VoidCallback onVisita;
+
+  @override
+  Widget build(BuildContext context) {
+    final deEsta = temporada == null
+        ? null
+        : visitas.where((v) => v.temporadaId == temporada!.id).firstOrNull;
+    final (color, icono, texto) = switch ((temporada, deEsta)) {
+      (null, _) => (
+        Colors.grey,
+        Icons.event_busy,
+        'La organización aún no creó la temporada actual.',
+      ),
+      (_, null) => (
+        Colors.orange,
+        Icons.pending_actions,
+        'Visita de ${temporada!.nombre}: pendiente',
+      ),
+      (_, final v?) => (
+        Colors.green,
+        Icons.verified,
+        'Visita de ${temporada!.nombre}: hecha el ${fecha(v.fecha)}'
+            '${v.linderoCambio ? ' (lindero actualizado)' : ''}',
+      ),
+    };
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icono, color: color),
+                const SizedBox(width: 8),
+                Expanded(child: Text(texto)),
+              ],
+            ),
+            if (visitas.length > (deEsta == null ? 0 : 1))
+              Padding(
+                padding: const EdgeInsets.only(left: 32, top: 4),
+                child: Text(
+                  'Visitas anteriores: ${visitas.where((v) => v != deEsta).map((v) => fecha(v.fecha)).join(', ')}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onVisita,
+                icon: const Icon(Icons.fact_check_outlined),
+                label: Text(
+                  deEsta == null
+                      ? 'Hacer visita de verificación'
+                      : 'Otra visita',
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -257,7 +500,7 @@ class _FormularioEntregaState extends State<_FormularioEntrega> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.event),
-            title: Text(FincaScreen._fecha(_fecha)),
+            title: Text(fechaHora(_fecha)),
             subtitle: const Text('Fecha de la entrega'),
             onTap: _elegirFecha,
           ),

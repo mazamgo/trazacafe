@@ -36,12 +36,15 @@ class MapasService {
   Future<SesionMapa?> sesion() async {
     final prefs = await SharedPreferences.getInstance();
     final guardada = _leer(prefs);
-    if (guardada != null && guardada.vence.isAfter(DateTime.now().add(const Duration(days: 1)))) {
+    if (guardada != null &&
+        guardada.vence.isAfter(DateTime.now().add(const Duration(days: 1)))) {
       return guardada;
     }
     try {
       final res = await _cliente.post(
-        Uri.parse('https://tile.googleapis.com/v1/createSession?key=$googleMapsKey'),
+        Uri.parse(
+          'https://tile.googleapis.com/v1/createSession?key=$googleMapsKey',
+        ),
         headers: {...encabezados, 'Content-Type': 'application/json'},
         body: jsonEncode({
           'mapType': 'satellite',
@@ -65,23 +68,32 @@ class MapasService {
   }
 
   /// Texto de atribución de las imágenes visibles (lo exige Google).
-  Future<String?> atribucion(SesionMapa s, {required int zoom, required double norte,
-      required double sur, required double este, required double oeste}) async {
+  Future<String?> atribucion(
+    SesionMapa s, {
+    required int zoom,
+    required double norte,
+    required double sur,
+    required double este,
+    required double oeste,
+  }) async {
     try {
       final res = await _cliente.get(
-        Uri.parse('https://tile.googleapis.com/tile/v1/viewport').replace(queryParameters: {
-          'session': s.token,
-          'key': googleMapsKey,
-          'zoom': '$zoom',
-          'north': '$norte',
-          'south': '$sur',
-          'east': '$este',
-          'west': '$oeste',
-        }),
+        Uri.parse('https://tile.googleapis.com/tile/v1/viewport').replace(
+          queryParameters: {
+            'session': s.token,
+            'key': googleMapsKey,
+            'zoom': '$zoom',
+            'north': '$norte',
+            'south': '$sur',
+            'east': '$este',
+            'west': '$oeste',
+          },
+        ),
         headers: encabezados,
       );
       if (res.statusCode != 200) return null;
-      return (jsonDecode(res.body) as Map<String, dynamic>)['copyright'] as String?;
+      return (jsonDecode(res.body) as Map<String, dynamic>)['copyright']
+          as String?;
     } catch (_) {
       return null;
     }

@@ -34,7 +34,9 @@ class FotosService {
 
     final bytes = await x.readAsBytes();
     final id = const Uuid().v4();
-    final dir = Directory(p.join((await getApplicationDocumentsDirectory()).path, 'fotos'));
+    final dir = Directory(
+      p.join((await getApplicationDocumentsDirectory()).path, 'fotos'),
+    );
     await dir.create(recursive: true);
     final destino = File(p.join(dir.path, '$id.jpg'));
     await destino.writeAsBytes(bytes, flush: true);
@@ -46,13 +48,12 @@ class FotosService {
     required String entidadTipo,
     required String entidadId,
     required String tipo,
-  }) =>
-      FotosCompanion.insert(
-        id: foto.id,
-        entidadTipo: entidadTipo,
-        entidadId: entidadId,
-        tipo: tipo,
-        ruta: foto.ruta,
-        sha256: foto.sha256,
-      );
+  }) => FotosCompanion.insert(
+    id: foto.id,
+    entidadTipo: entidadTipo,
+    entidadId: entidadId,
+    tipo: tipo,
+    ruta: foto.ruta,
+    sha256: foto.sha256,
+  );
 }

@@ -4,16 +4,19 @@ import 'package:http/http.dart' as http;
 
 /// URL de la API. En el emulador de Android, 10.0.2.2 es el localhost de la
 /// computadora. Para Cloud Run: `flutter run --dart-define=API_URL=https://...`
-const apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:8080');
+const apiUrl = String.fromEnvironment(
+  'API_URL',
+  defaultValue: 'http://10.0.2.2:8080',
+);
 
 class Invitacion {
   Invitacion({required this.email, required this.rol, required this.activa});
 
   factory Invitacion.desdeJson(Map<String, dynamic> j) => Invitacion(
-        email: j['email'] as String,
-        rol: j['rol'] as String,
-        activa: j['usuarioUid'] != null,
-      );
+    email: j['email'] as String,
+    rol: j['rol'] as String,
+    activa: j['usuarioUid'] != null,
+  );
 
   final String email;
 
@@ -25,9 +28,12 @@ class Invitacion {
 }
 
 class ApiClient {
-  ApiClient({required this.token, http.Client? cliente, String baseUrl = apiUrl})
-      : _cliente = cliente ?? http.Client(),
-        _base = Uri.parse(baseUrl);
+  ApiClient({
+    required this.token,
+    http.Client? cliente,
+    String baseUrl = apiUrl,
+  }) : _cliente = cliente ?? http.Client(),
+       _base = Uri.parse(baseUrl);
 
   final Future<String?> Function() token;
   final http.Client _cliente;
@@ -37,16 +43,35 @@ class ApiClient {
   Future<Map<String, dynamic>> sync(Map<String, dynamic> payload) =>
       _pedir('POST', '/v1/sync', payload);
 
+  /// Crea una temporada de cosecha (solo administradores). Fechas `AAAA-MM-DD`.
+  Future<void> crearTemporada(String nombre, String inicio, String fin) =>
+      _pedir('POST', '/v1/temporadas', {
+        'nombre': nombre,
+        'inicio': inicio,
+        'fin': fin,
+      });
+
+  /// Revisa la finca por satélite ahora mismo (solo administradores).
+  Future<Map<String, dynamic>> chequearFinca(String fincaId) => _pedir(
+    'POST',
+    '/v1/fincas/${Uri.encodeComponent(fincaId)}/chequeo',
+    const <String, dynamic>{},
+  );
+
   /// Productores, fincas y entregas de toda la organización.
   Future<Map<String, dynamic>> datos() => _pedir('GET', '/v1/datos');
 
   /// Pide a la API que compruebe el archivo de la foto ya subido a Storage.
   Future<void> confirmarFoto(String fotoId) => _pedir(
-      'POST', '/v1/fotos/${Uri.encodeComponent(fotoId)}/subida', const <String, dynamic>{});
+    'POST',
+    '/v1/fotos/${Uri.encodeComponent(fotoId)}/subida',
+    const <String, dynamic>{},
+  );
 
   /// Activa la invitación del correo con el que se inició sesión. Lleva `{}`
   /// porque el frontal de Cloud Run rechaza POST sin cuerpo (411).
-  Future<void> activar() => _pedir('POST', '/v1/activar', const <String, dynamic>{});
+  Future<void> activar() =>
+      _pedir('POST', '/v1/activar', const <String, dynamic>{});
 
   /// Borra en la API una finca que aún no se atestó. Si ya no existe allá, no
   /// es error: el objetivo es que desaparezca.
@@ -61,7 +86,8 @@ class ApiClient {
   Future<List<Invitacion>> invitaciones() async {
     final r = await _pedir('GET', '/v1/invitaciones');
     return [
-      for (final i in r['invitaciones'] as List) Invitacion.desdeJson(i as Map<String, dynamic>),
+      for (final i in r['invitaciones'] as List)
+        Invitacion.desdeJson(i as Map<String, dynamic>),
     ];
   }
 
@@ -71,18 +97,27 @@ class ApiClient {
   Future<void> quitarAcceso(String email) =>
       _pedir('DELETE', '/v1/invitaciones/${Uri.encodeComponent(email)}');
 
-  Future<Map<String, dynamic>> _pedir(String metodo, String ruta, [Object? cuerpo]) async {
+  Future<Map<String, dynamic>> _pedir(
+    String metodo,
+    String ruta, [
+    Object? cuerpo,
+  ]) async {
     final t = await token();
     if (t == null) throw ApiError(401, 'Inicia sesión para continuar.');
 
-    final req = http.Request(metodo, _base.resolve(ruta))..headers['Authorization'] = 'Bearer $t';
+    final req = http.Request(metodo, _base.resolve(ruta))
+      ..headers['Authorization'] = 'Bearer $t';
     if (cuerpo != null) {
       req.headers['Content-Type'] = 'application/json';
       req.body = jsonEncode(cuerpo);
     }
     final res = await http.Response.fromStream(await _cliente.send(req));
-    final json = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body) as Map<String, dynamic>;
-    if (res.statusCode >= 300) throw ApiError(res.statusCode, _mensaje(res.statusCode, json));
+    final json = res.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode >= 300) {
+      throw ApiError(res.statusCode, _mensaje(res.statusCode, json));
+    }
     return json;
   }
 

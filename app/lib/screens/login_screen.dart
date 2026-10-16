@@ -45,25 +45,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const Icon(Icons.coffee, size: 56),
                 const SizedBox(height: 8),
-                Text('TrazaCafé',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium),
+                Text(
+                  'TrazaCafé',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
                 const SizedBox(height: 4),
-                const Text('Acceso para técnicos y administradores', textAlign: TextAlign.center),
+                const Text(
+                  'Acceso para técnicos y administradores',
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 32),
                 FilledButton.icon(
                   onPressed: _cargando ? null : _entrar,
                   icon: _cargando
                       ? const SizedBox.square(
-                          dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.account_circle),
                   label: const Text('Entrar con Google'),
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 16),
-                  Text(error,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  Text(
+                    error,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 24),
                 Text(

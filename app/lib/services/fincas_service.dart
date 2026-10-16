@@ -18,7 +18,9 @@ class FincasService {
   /// celular para no dejar ambos lados distintos.
   Future<void> eliminar(Finca f) async {
     if (!sePuedeEliminar(f)) {
-      throw StateError('La finca ya está atestada; hay que revocar su attestation.');
+      throw StateError(
+        'La finca ya está atestada; hay que revocar su attestation.',
+      );
     }
     if (f.sincronizado) await _api.eliminarFinca(f.id);
     final rutas = await _db.eliminarFincaLocal(f.id);

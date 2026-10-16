@@ -598,6 +598,42 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _deforestacionMeta = const VerificationMeta(
+    'deforestacion',
+  );
+  @override
+  late final GeneratedColumn<String> deforestacion = GeneratedColumn<String>(
+    'deforestacion',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pendiente'),
+  );
+  static const VerificationMeta _ultimoChequeoMeta = const VerificationMeta(
+    'ultimoChequeo',
+  );
+  @override
+  late final GeneratedColumn<DateTime> ultimoChequeo =
+      GeneratedColumn<DateTime>(
+        'ultimo_chequeo',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -610,6 +646,9 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
     attestationUid,
     creadoEn,
     sincronizado,
+    version,
+    deforestacion,
+    ultimoChequeo,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -707,6 +746,30 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
         ),
       );
     }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('deforestacion')) {
+      context.handle(
+        _deforestacionMeta,
+        deforestacion.isAcceptableOrUnknown(
+          data['deforestacion']!,
+          _deforestacionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ultimo_chequeo')) {
+      context.handle(
+        _ultimoChequeoMeta,
+        ultimoChequeo.isAcceptableOrUnknown(
+          data['ultimo_chequeo']!,
+          _ultimoChequeoMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -756,6 +819,18 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
         DriftSqlType.bool,
         data['${effectivePrefix}sincronizado'],
       )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      deforestacion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}deforestacion'],
+      )!,
+      ultimoChequeo: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}ultimo_chequeo'],
+      ),
     );
   }
 
@@ -786,6 +861,13 @@ class Finca extends DataClass implements Insertable<Finca> {
   final String? attestationUid;
   final DateTime creadoEn;
   final bool sincronizado;
+
+  /// Versión del lindero vigente (sube con cada lindero nuevo).
+  final int version;
+
+  /// Último chequeo satelital: `pendiente`, `verde`, `amarillo` o `rojo`.
+  final String deforestacion;
+  final DateTime? ultimoChequeo;
   const Finca({
     required this.id,
     required this.productorId,
@@ -797,6 +879,9 @@ class Finca extends DataClass implements Insertable<Finca> {
     this.attestationUid,
     required this.creadoEn,
     required this.sincronizado,
+    required this.version,
+    required this.deforestacion,
+    this.ultimoChequeo,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -815,6 +900,11 @@ class Finca extends DataClass implements Insertable<Finca> {
     }
     map['creado_en'] = Variable<DateTime>(creadoEn);
     map['sincronizado'] = Variable<bool>(sincronizado);
+    map['version'] = Variable<int>(version);
+    map['deforestacion'] = Variable<String>(deforestacion);
+    if (!nullToAbsent || ultimoChequeo != null) {
+      map['ultimo_chequeo'] = Variable<DateTime>(ultimoChequeo);
+    }
     return map;
   }
 
@@ -834,6 +924,11 @@ class Finca extends DataClass implements Insertable<Finca> {
           : Value(attestationUid),
       creadoEn: Value(creadoEn),
       sincronizado: Value(sincronizado),
+      version: Value(version),
+      deforestacion: Value(deforestacion),
+      ultimoChequeo: ultimoChequeo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ultimoChequeo),
     );
   }
 
@@ -853,6 +948,9 @@ class Finca extends DataClass implements Insertable<Finca> {
       attestationUid: serializer.fromJson<String?>(json['attestationUid']),
       creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
       sincronizado: serializer.fromJson<bool>(json['sincronizado']),
+      version: serializer.fromJson<int>(json['version']),
+      deforestacion: serializer.fromJson<String>(json['deforestacion']),
+      ultimoChequeo: serializer.fromJson<DateTime?>(json['ultimoChequeo']),
     );
   }
   @override
@@ -869,6 +967,9 @@ class Finca extends DataClass implements Insertable<Finca> {
       'attestationUid': serializer.toJson<String?>(attestationUid),
       'creadoEn': serializer.toJson<DateTime>(creadoEn),
       'sincronizado': serializer.toJson<bool>(sincronizado),
+      'version': serializer.toJson<int>(version),
+      'deforestacion': serializer.toJson<String>(deforestacion),
+      'ultimoChequeo': serializer.toJson<DateTime?>(ultimoChequeo),
     };
   }
 
@@ -883,6 +984,9 @@ class Finca extends DataClass implements Insertable<Finca> {
     Value<String?> attestationUid = const Value.absent(),
     DateTime? creadoEn,
     bool? sincronizado,
+    int? version,
+    String? deforestacion,
+    Value<DateTime?> ultimoChequeo = const Value.absent(),
   }) => Finca(
     id: id ?? this.id,
     productorId: productorId ?? this.productorId,
@@ -898,6 +1002,11 @@ class Finca extends DataClass implements Insertable<Finca> {
         : this.attestationUid,
     creadoEn: creadoEn ?? this.creadoEn,
     sincronizado: sincronizado ?? this.sincronizado,
+    version: version ?? this.version,
+    deforestacion: deforestacion ?? this.deforestacion,
+    ultimoChequeo: ultimoChequeo.present
+        ? ultimoChequeo.value
+        : this.ultimoChequeo,
   );
   Finca copyWithCompanion(FincasCompanion data) {
     return Finca(
@@ -921,6 +1030,13 @@ class Finca extends DataClass implements Insertable<Finca> {
       sincronizado: data.sincronizado.present
           ? data.sincronizado.value
           : this.sincronizado,
+      version: data.version.present ? data.version.value : this.version,
+      deforestacion: data.deforestacion.present
+          ? data.deforestacion.value
+          : this.deforestacion,
+      ultimoChequeo: data.ultimoChequeo.present
+          ? data.ultimoChequeo.value
+          : this.ultimoChequeo,
     );
   }
 
@@ -936,7 +1052,10 @@ class Finca extends DataClass implements Insertable<Finca> {
           ..write('geoHash: $geoHash, ')
           ..write('attestationUid: $attestationUid, ')
           ..write('creadoEn: $creadoEn, ')
-          ..write('sincronizado: $sincronizado')
+          ..write('sincronizado: $sincronizado, ')
+          ..write('version: $version, ')
+          ..write('deforestacion: $deforestacion, ')
+          ..write('ultimoChequeo: $ultimoChequeo')
           ..write(')'))
         .toString();
   }
@@ -953,6 +1072,9 @@ class Finca extends DataClass implements Insertable<Finca> {
     attestationUid,
     creadoEn,
     sincronizado,
+    version,
+    deforestacion,
+    ultimoChequeo,
   );
   @override
   bool operator ==(Object other) =>
@@ -967,7 +1089,10 @@ class Finca extends DataClass implements Insertable<Finca> {
           other.geoHash == this.geoHash &&
           other.attestationUid == this.attestationUid &&
           other.creadoEn == this.creadoEn &&
-          other.sincronizado == this.sincronizado);
+          other.sincronizado == this.sincronizado &&
+          other.version == this.version &&
+          other.deforestacion == this.deforestacion &&
+          other.ultimoChequeo == this.ultimoChequeo);
 }
 
 class FincasCompanion extends UpdateCompanion<Finca> {
@@ -981,6 +1106,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
   final Value<String?> attestationUid;
   final Value<DateTime> creadoEn;
   final Value<bool> sincronizado;
+  final Value<int> version;
+  final Value<String> deforestacion;
+  final Value<DateTime?> ultimoChequeo;
   final Value<int> rowid;
   const FincasCompanion({
     this.id = const Value.absent(),
@@ -993,6 +1121,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     this.attestationUid = const Value.absent(),
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.version = const Value.absent(),
+    this.deforestacion = const Value.absent(),
+    this.ultimoChequeo = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FincasCompanion.insert({
@@ -1006,6 +1137,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     this.attestationUid = const Value.absent(),
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.version = const Value.absent(),
+    this.deforestacion = const Value.absent(),
+    this.ultimoChequeo = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        productorId = Value(productorId),
@@ -1024,6 +1158,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     Expression<String>? attestationUid,
     Expression<DateTime>? creadoEn,
     Expression<bool>? sincronizado,
+    Expression<int>? version,
+    Expression<String>? deforestacion,
+    Expression<DateTime>? ultimoChequeo,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1037,6 +1174,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
       if (attestationUid != null) 'attestation_uid': attestationUid,
       if (creadoEn != null) 'creado_en': creadoEn,
       if (sincronizado != null) 'sincronizado': sincronizado,
+      if (version != null) 'version': version,
+      if (deforestacion != null) 'deforestacion': deforestacion,
+      if (ultimoChequeo != null) 'ultimo_chequeo': ultimoChequeo,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1052,6 +1192,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     Value<String?>? attestationUid,
     Value<DateTime>? creadoEn,
     Value<bool>? sincronizado,
+    Value<int>? version,
+    Value<String>? deforestacion,
+    Value<DateTime?>? ultimoChequeo,
     Value<int>? rowid,
   }) {
     return FincasCompanion(
@@ -1065,6 +1208,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
       attestationUid: attestationUid ?? this.attestationUid,
       creadoEn: creadoEn ?? this.creadoEn,
       sincronizado: sincronizado ?? this.sincronizado,
+      version: version ?? this.version,
+      deforestacion: deforestacion ?? this.deforestacion,
+      ultimoChequeo: ultimoChequeo ?? this.ultimoChequeo,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1102,6 +1248,15 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     if (sincronizado.present) {
       map['sincronizado'] = Variable<bool>(sincronizado.value);
     }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (deforestacion.present) {
+      map['deforestacion'] = Variable<String>(deforestacion.value);
+    }
+    if (ultimoChequeo.present) {
+      map['ultimo_chequeo'] = Variable<DateTime>(ultimoChequeo.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1120,6 +1275,1330 @@ class FincasCompanion extends UpdateCompanion<Finca> {
           ..write('geoHash: $geoHash, ')
           ..write('attestationUid: $attestationUid, ')
           ..write('creadoEn: $creadoEn, ')
+          ..write('sincronizado: $sincronizado, ')
+          ..write('version: $version, ')
+          ..write('deforestacion: $deforestacion, ')
+          ..write('ultimoChequeo: $ultimoChequeo, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TemporadasTable extends Temporadas
+    with TableInfo<$TemporadasTable, Temporada> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TemporadasTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nombreMeta = const VerificationMeta('nombre');
+  @override
+  late final GeneratedColumn<String> nombre = GeneratedColumn<String>(
+    'nombre',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _inicioMeta = const VerificationMeta('inicio');
+  @override
+  late final GeneratedColumn<DateTime> inicio = GeneratedColumn<DateTime>(
+    'inicio',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _finMeta = const VerificationMeta('fin');
+  @override
+  late final GeneratedColumn<DateTime> fin = GeneratedColumn<DateTime>(
+    'fin',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, nombre, inicio, fin];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'temporadas';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Temporada> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('nombre')) {
+      context.handle(
+        _nombreMeta,
+        nombre.isAcceptableOrUnknown(data['nombre']!, _nombreMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nombreMeta);
+    }
+    if (data.containsKey('inicio')) {
+      context.handle(
+        _inicioMeta,
+        inicio.isAcceptableOrUnknown(data['inicio']!, _inicioMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_inicioMeta);
+    }
+    if (data.containsKey('fin')) {
+      context.handle(
+        _finMeta,
+        fin.isAcceptableOrUnknown(data['fin']!, _finMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_finMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Temporada map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Temporada(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      nombre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nombre'],
+      )!,
+      inicio: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}inicio'],
+      )!,
+      fin: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}fin'],
+      )!,
+    );
+  }
+
+  @override
+  $TemporadasTable createAlias(String alias) {
+    return $TemporadasTable(attachedDatabase, alias);
+  }
+}
+
+class Temporada extends DataClass implements Insertable<Temporada> {
+  final String id;
+  final String nombre;
+
+  /// Días de calendario en Nicaragua, ambos incluidos.
+  final DateTime inicio;
+  final DateTime fin;
+  const Temporada({
+    required this.id,
+    required this.nombre,
+    required this.inicio,
+    required this.fin,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['nombre'] = Variable<String>(nombre);
+    map['inicio'] = Variable<DateTime>(inicio);
+    map['fin'] = Variable<DateTime>(fin);
+    return map;
+  }
+
+  TemporadasCompanion toCompanion(bool nullToAbsent) {
+    return TemporadasCompanion(
+      id: Value(id),
+      nombre: Value(nombre),
+      inicio: Value(inicio),
+      fin: Value(fin),
+    );
+  }
+
+  factory Temporada.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Temporada(
+      id: serializer.fromJson<String>(json['id']),
+      nombre: serializer.fromJson<String>(json['nombre']),
+      inicio: serializer.fromJson<DateTime>(json['inicio']),
+      fin: serializer.fromJson<DateTime>(json['fin']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'nombre': serializer.toJson<String>(nombre),
+      'inicio': serializer.toJson<DateTime>(inicio),
+      'fin': serializer.toJson<DateTime>(fin),
+    };
+  }
+
+  Temporada copyWith({
+    String? id,
+    String? nombre,
+    DateTime? inicio,
+    DateTime? fin,
+  }) => Temporada(
+    id: id ?? this.id,
+    nombre: nombre ?? this.nombre,
+    inicio: inicio ?? this.inicio,
+    fin: fin ?? this.fin,
+  );
+  Temporada copyWithCompanion(TemporadasCompanion data) {
+    return Temporada(
+      id: data.id.present ? data.id.value : this.id,
+      nombre: data.nombre.present ? data.nombre.value : this.nombre,
+      inicio: data.inicio.present ? data.inicio.value : this.inicio,
+      fin: data.fin.present ? data.fin.value : this.fin,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Temporada(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre, ')
+          ..write('inicio: $inicio, ')
+          ..write('fin: $fin')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, nombre, inicio, fin);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Temporada &&
+          other.id == this.id &&
+          other.nombre == this.nombre &&
+          other.inicio == this.inicio &&
+          other.fin == this.fin);
+}
+
+class TemporadasCompanion extends UpdateCompanion<Temporada> {
+  final Value<String> id;
+  final Value<String> nombre;
+  final Value<DateTime> inicio;
+  final Value<DateTime> fin;
+  final Value<int> rowid;
+  const TemporadasCompanion({
+    this.id = const Value.absent(),
+    this.nombre = const Value.absent(),
+    this.inicio = const Value.absent(),
+    this.fin = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TemporadasCompanion.insert({
+    required String id,
+    required String nombre,
+    required DateTime inicio,
+    required DateTime fin,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       nombre = Value(nombre),
+       inicio = Value(inicio),
+       fin = Value(fin);
+  static Insertable<Temporada> custom({
+    Expression<String>? id,
+    Expression<String>? nombre,
+    Expression<DateTime>? inicio,
+    Expression<DateTime>? fin,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (nombre != null) 'nombre': nombre,
+      if (inicio != null) 'inicio': inicio,
+      if (fin != null) 'fin': fin,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TemporadasCompanion copyWith({
+    Value<String>? id,
+    Value<String>? nombre,
+    Value<DateTime>? inicio,
+    Value<DateTime>? fin,
+    Value<int>? rowid,
+  }) {
+    return TemporadasCompanion(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      inicio: inicio ?? this.inicio,
+      fin: fin ?? this.fin,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (nombre.present) {
+      map['nombre'] = Variable<String>(nombre.value);
+    }
+    if (inicio.present) {
+      map['inicio'] = Variable<DateTime>(inicio.value);
+    }
+    if (fin.present) {
+      map['fin'] = Variable<DateTime>(fin.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TemporadasCompanion(')
+          ..write('id: $id, ')
+          ..write('nombre: $nombre, ')
+          ..write('inicio: $inicio, ')
+          ..write('fin: $fin, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $VersionesFincaTable extends VersionesFinca
+    with TableInfo<$VersionesFincaTable, VersionesFincaData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VersionesFincaTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _fincaIdMeta = const VerificationMeta(
+    'fincaId',
+  );
+  @override
+  late final GeneratedColumn<String> fincaId = GeneratedColumn<String>(
+    'finca_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES fincas (id)',
+    ),
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _coordenadasJsonMeta = const VerificationMeta(
+    'coordenadasJson',
+  );
+  @override
+  late final GeneratedColumn<String> coordenadasJson = GeneratedColumn<String>(
+    'coordenadas_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _areaHaMeta = const VerificationMeta('areaHa');
+  @override
+  late final GeneratedColumn<double> areaHa = GeneratedColumn<double>(
+    'area_ha',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _geoHashMeta = const VerificationMeta(
+    'geoHash',
+  );
+  @override
+  late final GeneratedColumn<String> geoHash = GeneratedColumn<String>(
+    'geo_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _creadoEnMeta = const VerificationMeta(
+    'creadoEn',
+  );
+  @override
+  late final GeneratedColumn<DateTime> creadoEn = GeneratedColumn<DateTime>(
+    'creado_en',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _sincronizadoMeta = const VerificationMeta(
+    'sincronizado',
+  );
+  @override
+  late final GeneratedColumn<bool> sincronizado = GeneratedColumn<bool>(
+    'sincronizado',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sincronizado" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    fincaId,
+    version,
+    coordenadasJson,
+    areaHa,
+    geoHash,
+    creadoEn,
+    sincronizado,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'versiones_finca';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<VersionesFincaData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('finca_id')) {
+      context.handle(
+        _fincaIdMeta,
+        fincaId.isAcceptableOrUnknown(data['finca_id']!, _fincaIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fincaIdMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('coordenadas_json')) {
+      context.handle(
+        _coordenadasJsonMeta,
+        coordenadasJson.isAcceptableOrUnknown(
+          data['coordenadas_json']!,
+          _coordenadasJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_coordenadasJsonMeta);
+    }
+    if (data.containsKey('area_ha')) {
+      context.handle(
+        _areaHaMeta,
+        areaHa.isAcceptableOrUnknown(data['area_ha']!, _areaHaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_areaHaMeta);
+    }
+    if (data.containsKey('geo_hash')) {
+      context.handle(
+        _geoHashMeta,
+        geoHash.isAcceptableOrUnknown(data['geo_hash']!, _geoHashMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_geoHashMeta);
+    }
+    if (data.containsKey('creado_en')) {
+      context.handle(
+        _creadoEnMeta,
+        creadoEn.isAcceptableOrUnknown(data['creado_en']!, _creadoEnMeta),
+      );
+    }
+    if (data.containsKey('sincronizado')) {
+      context.handle(
+        _sincronizadoMeta,
+        sincronizado.isAcceptableOrUnknown(
+          data['sincronizado']!,
+          _sincronizadoMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {fincaId, version};
+  @override
+  VersionesFincaData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return VersionesFincaData(
+      fincaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}finca_id'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      coordenadasJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}coordenadas_json'],
+      )!,
+      areaHa: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}area_ha'],
+      )!,
+      geoHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}geo_hash'],
+      )!,
+      creadoEn: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}creado_en'],
+      )!,
+      sincronizado: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sincronizado'],
+      )!,
+    );
+  }
+
+  @override
+  $VersionesFincaTable createAlias(String alias) {
+    return $VersionesFincaTable(attachedDatabase, alias);
+  }
+}
+
+class VersionesFincaData extends DataClass
+    implements Insertable<VersionesFincaData> {
+  final String fincaId;
+  final int version;
+  final String coordenadasJson;
+  final double areaHa;
+  final String geoHash;
+  final DateTime creadoEn;
+  final bool sincronizado;
+  const VersionesFincaData({
+    required this.fincaId,
+    required this.version,
+    required this.coordenadasJson,
+    required this.areaHa,
+    required this.geoHash,
+    required this.creadoEn,
+    required this.sincronizado,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['finca_id'] = Variable<String>(fincaId);
+    map['version'] = Variable<int>(version);
+    map['coordenadas_json'] = Variable<String>(coordenadasJson);
+    map['area_ha'] = Variable<double>(areaHa);
+    map['geo_hash'] = Variable<String>(geoHash);
+    map['creado_en'] = Variable<DateTime>(creadoEn);
+    map['sincronizado'] = Variable<bool>(sincronizado);
+    return map;
+  }
+
+  VersionesFincaCompanion toCompanion(bool nullToAbsent) {
+    return VersionesFincaCompanion(
+      fincaId: Value(fincaId),
+      version: Value(version),
+      coordenadasJson: Value(coordenadasJson),
+      areaHa: Value(areaHa),
+      geoHash: Value(geoHash),
+      creadoEn: Value(creadoEn),
+      sincronizado: Value(sincronizado),
+    );
+  }
+
+  factory VersionesFincaData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return VersionesFincaData(
+      fincaId: serializer.fromJson<String>(json['fincaId']),
+      version: serializer.fromJson<int>(json['version']),
+      coordenadasJson: serializer.fromJson<String>(json['coordenadasJson']),
+      areaHa: serializer.fromJson<double>(json['areaHa']),
+      geoHash: serializer.fromJson<String>(json['geoHash']),
+      creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
+      sincronizado: serializer.fromJson<bool>(json['sincronizado']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'fincaId': serializer.toJson<String>(fincaId),
+      'version': serializer.toJson<int>(version),
+      'coordenadasJson': serializer.toJson<String>(coordenadasJson),
+      'areaHa': serializer.toJson<double>(areaHa),
+      'geoHash': serializer.toJson<String>(geoHash),
+      'creadoEn': serializer.toJson<DateTime>(creadoEn),
+      'sincronizado': serializer.toJson<bool>(sincronizado),
+    };
+  }
+
+  VersionesFincaData copyWith({
+    String? fincaId,
+    int? version,
+    String? coordenadasJson,
+    double? areaHa,
+    String? geoHash,
+    DateTime? creadoEn,
+    bool? sincronizado,
+  }) => VersionesFincaData(
+    fincaId: fincaId ?? this.fincaId,
+    version: version ?? this.version,
+    coordenadasJson: coordenadasJson ?? this.coordenadasJson,
+    areaHa: areaHa ?? this.areaHa,
+    geoHash: geoHash ?? this.geoHash,
+    creadoEn: creadoEn ?? this.creadoEn,
+    sincronizado: sincronizado ?? this.sincronizado,
+  );
+  VersionesFincaData copyWithCompanion(VersionesFincaCompanion data) {
+    return VersionesFincaData(
+      fincaId: data.fincaId.present ? data.fincaId.value : this.fincaId,
+      version: data.version.present ? data.version.value : this.version,
+      coordenadasJson: data.coordenadasJson.present
+          ? data.coordenadasJson.value
+          : this.coordenadasJson,
+      areaHa: data.areaHa.present ? data.areaHa.value : this.areaHa,
+      geoHash: data.geoHash.present ? data.geoHash.value : this.geoHash,
+      creadoEn: data.creadoEn.present ? data.creadoEn.value : this.creadoEn,
+      sincronizado: data.sincronizado.present
+          ? data.sincronizado.value
+          : this.sincronizado,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VersionesFincaData(')
+          ..write('fincaId: $fincaId, ')
+          ..write('version: $version, ')
+          ..write('coordenadasJson: $coordenadasJson, ')
+          ..write('areaHa: $areaHa, ')
+          ..write('geoHash: $geoHash, ')
+          ..write('creadoEn: $creadoEn, ')
+          ..write('sincronizado: $sincronizado')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    fincaId,
+    version,
+    coordenadasJson,
+    areaHa,
+    geoHash,
+    creadoEn,
+    sincronizado,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is VersionesFincaData &&
+          other.fincaId == this.fincaId &&
+          other.version == this.version &&
+          other.coordenadasJson == this.coordenadasJson &&
+          other.areaHa == this.areaHa &&
+          other.geoHash == this.geoHash &&
+          other.creadoEn == this.creadoEn &&
+          other.sincronizado == this.sincronizado);
+}
+
+class VersionesFincaCompanion extends UpdateCompanion<VersionesFincaData> {
+  final Value<String> fincaId;
+  final Value<int> version;
+  final Value<String> coordenadasJson;
+  final Value<double> areaHa;
+  final Value<String> geoHash;
+  final Value<DateTime> creadoEn;
+  final Value<bool> sincronizado;
+  final Value<int> rowid;
+  const VersionesFincaCompanion({
+    this.fincaId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.coordenadasJson = const Value.absent(),
+    this.areaHa = const Value.absent(),
+    this.geoHash = const Value.absent(),
+    this.creadoEn = const Value.absent(),
+    this.sincronizado = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  VersionesFincaCompanion.insert({
+    required String fincaId,
+    required int version,
+    required String coordenadasJson,
+    required double areaHa,
+    required String geoHash,
+    this.creadoEn = const Value.absent(),
+    this.sincronizado = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : fincaId = Value(fincaId),
+       version = Value(version),
+       coordenadasJson = Value(coordenadasJson),
+       areaHa = Value(areaHa),
+       geoHash = Value(geoHash);
+  static Insertable<VersionesFincaData> custom({
+    Expression<String>? fincaId,
+    Expression<int>? version,
+    Expression<String>? coordenadasJson,
+    Expression<double>? areaHa,
+    Expression<String>? geoHash,
+    Expression<DateTime>? creadoEn,
+    Expression<bool>? sincronizado,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (fincaId != null) 'finca_id': fincaId,
+      if (version != null) 'version': version,
+      if (coordenadasJson != null) 'coordenadas_json': coordenadasJson,
+      if (areaHa != null) 'area_ha': areaHa,
+      if (geoHash != null) 'geo_hash': geoHash,
+      if (creadoEn != null) 'creado_en': creadoEn,
+      if (sincronizado != null) 'sincronizado': sincronizado,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  VersionesFincaCompanion copyWith({
+    Value<String>? fincaId,
+    Value<int>? version,
+    Value<String>? coordenadasJson,
+    Value<double>? areaHa,
+    Value<String>? geoHash,
+    Value<DateTime>? creadoEn,
+    Value<bool>? sincronizado,
+    Value<int>? rowid,
+  }) {
+    return VersionesFincaCompanion(
+      fincaId: fincaId ?? this.fincaId,
+      version: version ?? this.version,
+      coordenadasJson: coordenadasJson ?? this.coordenadasJson,
+      areaHa: areaHa ?? this.areaHa,
+      geoHash: geoHash ?? this.geoHash,
+      creadoEn: creadoEn ?? this.creadoEn,
+      sincronizado: sincronizado ?? this.sincronizado,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (fincaId.present) {
+      map['finca_id'] = Variable<String>(fincaId.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (coordenadasJson.present) {
+      map['coordenadas_json'] = Variable<String>(coordenadasJson.value);
+    }
+    if (areaHa.present) {
+      map['area_ha'] = Variable<double>(areaHa.value);
+    }
+    if (geoHash.present) {
+      map['geo_hash'] = Variable<String>(geoHash.value);
+    }
+    if (creadoEn.present) {
+      map['creado_en'] = Variable<DateTime>(creadoEn.value);
+    }
+    if (sincronizado.present) {
+      map['sincronizado'] = Variable<bool>(sincronizado.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VersionesFincaCompanion(')
+          ..write('fincaId: $fincaId, ')
+          ..write('version: $version, ')
+          ..write('coordenadasJson: $coordenadasJson, ')
+          ..write('areaHa: $areaHa, ')
+          ..write('geoHash: $geoHash, ')
+          ..write('creadoEn: $creadoEn, ')
+          ..write('sincronizado: $sincronizado, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $VerificacionesTable extends Verificaciones
+    with TableInfo<$VerificacionesTable, Verificacion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VerificacionesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fincaIdMeta = const VerificationMeta(
+    'fincaId',
+  );
+  @override
+  late final GeneratedColumn<String> fincaId = GeneratedColumn<String>(
+    'finca_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES fincas (id)',
+    ),
+  );
+  static const VerificationMeta _temporadaIdMeta = const VerificationMeta(
+    'temporadaId',
+  );
+  @override
+  late final GeneratedColumn<String> temporadaId = GeneratedColumn<String>(
+    'temporada_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _fechaMeta = const VerificationMeta('fecha');
+  @override
+  late final GeneratedColumn<DateTime> fecha = GeneratedColumn<DateTime>(
+    'fecha',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _linderoCambioMeta = const VerificationMeta(
+    'linderoCambio',
+  );
+  @override
+  late final GeneratedColumn<bool> linderoCambio = GeneratedColumn<bool>(
+    'lindero_cambio',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("lindero_cambio" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _versionFincaMeta = const VerificationMeta(
+    'versionFinca',
+  );
+  @override
+  late final GeneratedColumn<int> versionFinca = GeneratedColumn<int>(
+    'version_finca',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notaMeta = const VerificationMeta('nota');
+  @override
+  late final GeneratedColumn<String> nota = GeneratedColumn<String>(
+    'nota',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sincronizadoMeta = const VerificationMeta(
+    'sincronizado',
+  );
+  @override
+  late final GeneratedColumn<bool> sincronizado = GeneratedColumn<bool>(
+    'sincronizado',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sincronizado" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    fincaId,
+    temporadaId,
+    fecha,
+    linderoCambio,
+    versionFinca,
+    nota,
+    sincronizado,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'verificaciones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Verificacion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('finca_id')) {
+      context.handle(
+        _fincaIdMeta,
+        fincaId.isAcceptableOrUnknown(data['finca_id']!, _fincaIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fincaIdMeta);
+    }
+    if (data.containsKey('temporada_id')) {
+      context.handle(
+        _temporadaIdMeta,
+        temporadaId.isAcceptableOrUnknown(
+          data['temporada_id']!,
+          _temporadaIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('fecha')) {
+      context.handle(
+        _fechaMeta,
+        fecha.isAcceptableOrUnknown(data['fecha']!, _fechaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fechaMeta);
+    }
+    if (data.containsKey('lindero_cambio')) {
+      context.handle(
+        _linderoCambioMeta,
+        linderoCambio.isAcceptableOrUnknown(
+          data['lindero_cambio']!,
+          _linderoCambioMeta,
+        ),
+      );
+    }
+    if (data.containsKey('version_finca')) {
+      context.handle(
+        _versionFincaMeta,
+        versionFinca.isAcceptableOrUnknown(
+          data['version_finca']!,
+          _versionFincaMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_versionFincaMeta);
+    }
+    if (data.containsKey('nota')) {
+      context.handle(
+        _notaMeta,
+        nota.isAcceptableOrUnknown(data['nota']!, _notaMeta),
+      );
+    }
+    if (data.containsKey('sincronizado')) {
+      context.handle(
+        _sincronizadoMeta,
+        sincronizado.isAcceptableOrUnknown(
+          data['sincronizado']!,
+          _sincronizadoMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Verificacion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Verificacion(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      fincaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}finca_id'],
+      )!,
+      temporadaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}temporada_id'],
+      ),
+      fecha: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}fecha'],
+      )!,
+      linderoCambio: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}lindero_cambio'],
+      )!,
+      versionFinca: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version_finca'],
+      )!,
+      nota: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nota'],
+      ),
+      sincronizado: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sincronizado'],
+      )!,
+    );
+  }
+
+  @override
+  $VerificacionesTable createAlias(String alias) {
+    return $VerificacionesTable(attachedDatabase, alias);
+  }
+}
+
+class Verificacion extends DataClass implements Insertable<Verificacion> {
+  final String id;
+  final String fincaId;
+
+  /// La asigna el servidor por la fecha; en el celular se calcula igual.
+  final String? temporadaId;
+  final DateTime fecha;
+  final bool linderoCambio;
+  final int versionFinca;
+  final String? nota;
+  final bool sincronizado;
+  const Verificacion({
+    required this.id,
+    required this.fincaId,
+    this.temporadaId,
+    required this.fecha,
+    required this.linderoCambio,
+    required this.versionFinca,
+    this.nota,
+    required this.sincronizado,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['finca_id'] = Variable<String>(fincaId);
+    if (!nullToAbsent || temporadaId != null) {
+      map['temporada_id'] = Variable<String>(temporadaId);
+    }
+    map['fecha'] = Variable<DateTime>(fecha);
+    map['lindero_cambio'] = Variable<bool>(linderoCambio);
+    map['version_finca'] = Variable<int>(versionFinca);
+    if (!nullToAbsent || nota != null) {
+      map['nota'] = Variable<String>(nota);
+    }
+    map['sincronizado'] = Variable<bool>(sincronizado);
+    return map;
+  }
+
+  VerificacionesCompanion toCompanion(bool nullToAbsent) {
+    return VerificacionesCompanion(
+      id: Value(id),
+      fincaId: Value(fincaId),
+      temporadaId: temporadaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(temporadaId),
+      fecha: Value(fecha),
+      linderoCambio: Value(linderoCambio),
+      versionFinca: Value(versionFinca),
+      nota: nota == null && nullToAbsent ? const Value.absent() : Value(nota),
+      sincronizado: Value(sincronizado),
+    );
+  }
+
+  factory Verificacion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Verificacion(
+      id: serializer.fromJson<String>(json['id']),
+      fincaId: serializer.fromJson<String>(json['fincaId']),
+      temporadaId: serializer.fromJson<String?>(json['temporadaId']),
+      fecha: serializer.fromJson<DateTime>(json['fecha']),
+      linderoCambio: serializer.fromJson<bool>(json['linderoCambio']),
+      versionFinca: serializer.fromJson<int>(json['versionFinca']),
+      nota: serializer.fromJson<String?>(json['nota']),
+      sincronizado: serializer.fromJson<bool>(json['sincronizado']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'fincaId': serializer.toJson<String>(fincaId),
+      'temporadaId': serializer.toJson<String?>(temporadaId),
+      'fecha': serializer.toJson<DateTime>(fecha),
+      'linderoCambio': serializer.toJson<bool>(linderoCambio),
+      'versionFinca': serializer.toJson<int>(versionFinca),
+      'nota': serializer.toJson<String?>(nota),
+      'sincronizado': serializer.toJson<bool>(sincronizado),
+    };
+  }
+
+  Verificacion copyWith({
+    String? id,
+    String? fincaId,
+    Value<String?> temporadaId = const Value.absent(),
+    DateTime? fecha,
+    bool? linderoCambio,
+    int? versionFinca,
+    Value<String?> nota = const Value.absent(),
+    bool? sincronizado,
+  }) => Verificacion(
+    id: id ?? this.id,
+    fincaId: fincaId ?? this.fincaId,
+    temporadaId: temporadaId.present ? temporadaId.value : this.temporadaId,
+    fecha: fecha ?? this.fecha,
+    linderoCambio: linderoCambio ?? this.linderoCambio,
+    versionFinca: versionFinca ?? this.versionFinca,
+    nota: nota.present ? nota.value : this.nota,
+    sincronizado: sincronizado ?? this.sincronizado,
+  );
+  Verificacion copyWithCompanion(VerificacionesCompanion data) {
+    return Verificacion(
+      id: data.id.present ? data.id.value : this.id,
+      fincaId: data.fincaId.present ? data.fincaId.value : this.fincaId,
+      temporadaId: data.temporadaId.present
+          ? data.temporadaId.value
+          : this.temporadaId,
+      fecha: data.fecha.present ? data.fecha.value : this.fecha,
+      linderoCambio: data.linderoCambio.present
+          ? data.linderoCambio.value
+          : this.linderoCambio,
+      versionFinca: data.versionFinca.present
+          ? data.versionFinca.value
+          : this.versionFinca,
+      nota: data.nota.present ? data.nota.value : this.nota,
+      sincronizado: data.sincronizado.present
+          ? data.sincronizado.value
+          : this.sincronizado,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Verificacion(')
+          ..write('id: $id, ')
+          ..write('fincaId: $fincaId, ')
+          ..write('temporadaId: $temporadaId, ')
+          ..write('fecha: $fecha, ')
+          ..write('linderoCambio: $linderoCambio, ')
+          ..write('versionFinca: $versionFinca, ')
+          ..write('nota: $nota, ')
+          ..write('sincronizado: $sincronizado')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    fincaId,
+    temporadaId,
+    fecha,
+    linderoCambio,
+    versionFinca,
+    nota,
+    sincronizado,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Verificacion &&
+          other.id == this.id &&
+          other.fincaId == this.fincaId &&
+          other.temporadaId == this.temporadaId &&
+          other.fecha == this.fecha &&
+          other.linderoCambio == this.linderoCambio &&
+          other.versionFinca == this.versionFinca &&
+          other.nota == this.nota &&
+          other.sincronizado == this.sincronizado);
+}
+
+class VerificacionesCompanion extends UpdateCompanion<Verificacion> {
+  final Value<String> id;
+  final Value<String> fincaId;
+  final Value<String?> temporadaId;
+  final Value<DateTime> fecha;
+  final Value<bool> linderoCambio;
+  final Value<int> versionFinca;
+  final Value<String?> nota;
+  final Value<bool> sincronizado;
+  final Value<int> rowid;
+  const VerificacionesCompanion({
+    this.id = const Value.absent(),
+    this.fincaId = const Value.absent(),
+    this.temporadaId = const Value.absent(),
+    this.fecha = const Value.absent(),
+    this.linderoCambio = const Value.absent(),
+    this.versionFinca = const Value.absent(),
+    this.nota = const Value.absent(),
+    this.sincronizado = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  VerificacionesCompanion.insert({
+    required String id,
+    required String fincaId,
+    this.temporadaId = const Value.absent(),
+    required DateTime fecha,
+    this.linderoCambio = const Value.absent(),
+    required int versionFinca,
+    this.nota = const Value.absent(),
+    this.sincronizado = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       fincaId = Value(fincaId),
+       fecha = Value(fecha),
+       versionFinca = Value(versionFinca);
+  static Insertable<Verificacion> custom({
+    Expression<String>? id,
+    Expression<String>? fincaId,
+    Expression<String>? temporadaId,
+    Expression<DateTime>? fecha,
+    Expression<bool>? linderoCambio,
+    Expression<int>? versionFinca,
+    Expression<String>? nota,
+    Expression<bool>? sincronizado,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fincaId != null) 'finca_id': fincaId,
+      if (temporadaId != null) 'temporada_id': temporadaId,
+      if (fecha != null) 'fecha': fecha,
+      if (linderoCambio != null) 'lindero_cambio': linderoCambio,
+      if (versionFinca != null) 'version_finca': versionFinca,
+      if (nota != null) 'nota': nota,
+      if (sincronizado != null) 'sincronizado': sincronizado,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  VerificacionesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? fincaId,
+    Value<String?>? temporadaId,
+    Value<DateTime>? fecha,
+    Value<bool>? linderoCambio,
+    Value<int>? versionFinca,
+    Value<String?>? nota,
+    Value<bool>? sincronizado,
+    Value<int>? rowid,
+  }) {
+    return VerificacionesCompanion(
+      id: id ?? this.id,
+      fincaId: fincaId ?? this.fincaId,
+      temporadaId: temporadaId ?? this.temporadaId,
+      fecha: fecha ?? this.fecha,
+      linderoCambio: linderoCambio ?? this.linderoCambio,
+      versionFinca: versionFinca ?? this.versionFinca,
+      nota: nota ?? this.nota,
+      sincronizado: sincronizado ?? this.sincronizado,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (fincaId.present) {
+      map['finca_id'] = Variable<String>(fincaId.value);
+    }
+    if (temporadaId.present) {
+      map['temporada_id'] = Variable<String>(temporadaId.value);
+    }
+    if (fecha.present) {
+      map['fecha'] = Variable<DateTime>(fecha.value);
+    }
+    if (linderoCambio.present) {
+      map['lindero_cambio'] = Variable<bool>(linderoCambio.value);
+    }
+    if (versionFinca.present) {
+      map['version_finca'] = Variable<int>(versionFinca.value);
+    }
+    if (nota.present) {
+      map['nota'] = Variable<String>(nota.value);
+    }
+    if (sincronizado.present) {
+      map['sincronizado'] = Variable<bool>(sincronizado.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VerificacionesCompanion(')
+          ..write('id: $id, ')
+          ..write('fincaId: $fincaId, ')
+          ..write('temporadaId: $temporadaId, ')
+          ..write('fecha: $fecha, ')
+          ..write('linderoCambio: $linderoCambio, ')
+          ..write('versionFinca: $versionFinca, ')
+          ..write('nota: $nota, ')
           ..write('sincronizado: $sincronizado, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1154,6 +2633,17 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES fincas (id)',
     ),
+  );
+  static const VerificationMeta _temporadaIdMeta = const VerificationMeta(
+    'temporadaId',
+  );
+  @override
+  late final GeneratedColumn<String> temporadaId = GeneratedColumn<String>(
+    'temporada_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _kgMeta = const VerificationMeta('kg');
   @override
@@ -1224,6 +2714,7 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
   List<GeneratedColumn> get $columns => [
     id,
     fincaId,
+    temporadaId,
     kg,
     estado,
     fecha,
@@ -1255,6 +2746,15 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
       );
     } else if (isInserting) {
       context.missing(_fincaIdMeta);
+    }
+    if (data.containsKey('temporada_id')) {
+      context.handle(
+        _temporadaIdMeta,
+        temporadaId.isAcceptableOrUnknown(
+          data['temporada_id']!,
+          _temporadaIdMeta,
+        ),
+      );
     }
     if (data.containsKey('kg')) {
       context.handle(_kgMeta, kg.isAcceptableOrUnknown(data['kg']!, _kgMeta));
@@ -1318,6 +2818,10 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
         DriftSqlType.string,
         data['${effectivePrefix}finca_id'],
       )!,
+      temporadaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}temporada_id'],
+      ),
       kg: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}kg'],
@@ -1354,6 +2858,7 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
 class Entrega extends DataClass implements Insertable<Entrega> {
   final String id;
   final String fincaId;
+  final String? temporadaId;
   final double kg;
 
   /// `uva` (café maduro) o `pergamino`.
@@ -1365,6 +2870,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   const Entrega({
     required this.id,
     required this.fincaId,
+    this.temporadaId,
     required this.kg,
     required this.estado,
     required this.fecha,
@@ -1377,6 +2883,9 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['finca_id'] = Variable<String>(fincaId);
+    if (!nullToAbsent || temporadaId != null) {
+      map['temporada_id'] = Variable<String>(temporadaId);
+    }
     map['kg'] = Variable<double>(kg);
     map['estado'] = Variable<String>(estado);
     map['fecha'] = Variable<DateTime>(fecha);
@@ -1392,6 +2901,9 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     return EntregasCompanion(
       id: Value(id),
       fincaId: Value(fincaId),
+      temporadaId: temporadaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(temporadaId),
       kg: Value(kg),
       estado: Value(estado),
       fecha: Value(fecha),
@@ -1411,6 +2923,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     return Entrega(
       id: serializer.fromJson<String>(json['id']),
       fincaId: serializer.fromJson<String>(json['fincaId']),
+      temporadaId: serializer.fromJson<String?>(json['temporadaId']),
       kg: serializer.fromJson<double>(json['kg']),
       estado: serializer.fromJson<String>(json['estado']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
@@ -1425,6 +2938,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'fincaId': serializer.toJson<String>(fincaId),
+      'temporadaId': serializer.toJson<String?>(temporadaId),
       'kg': serializer.toJson<double>(kg),
       'estado': serializer.toJson<String>(estado),
       'fecha': serializer.toJson<DateTime>(fecha),
@@ -1437,6 +2951,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   Entrega copyWith({
     String? id,
     String? fincaId,
+    Value<String?> temporadaId = const Value.absent(),
     double? kg,
     String? estado,
     DateTime? fecha,
@@ -1446,6 +2961,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   }) => Entrega(
     id: id ?? this.id,
     fincaId: fincaId ?? this.fincaId,
+    temporadaId: temporadaId.present ? temporadaId.value : this.temporadaId,
     kg: kg ?? this.kg,
     estado: estado ?? this.estado,
     fecha: fecha ?? this.fecha,
@@ -1459,6 +2975,9 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     return Entrega(
       id: data.id.present ? data.id.value : this.id,
       fincaId: data.fincaId.present ? data.fincaId.value : this.fincaId,
+      temporadaId: data.temporadaId.present
+          ? data.temporadaId.value
+          : this.temporadaId,
       kg: data.kg.present ? data.kg.value : this.kg,
       estado: data.estado.present ? data.estado.value : this.estado,
       fecha: data.fecha.present ? data.fecha.value : this.fecha,
@@ -1477,6 +2996,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     return (StringBuffer('Entrega(')
           ..write('id: $id, ')
           ..write('fincaId: $fincaId, ')
+          ..write('temporadaId: $temporadaId, ')
           ..write('kg: $kg, ')
           ..write('estado: $estado, ')
           ..write('fecha: $fecha, ')
@@ -1491,6 +3011,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   int get hashCode => Object.hash(
     id,
     fincaId,
+    temporadaId,
     kg,
     estado,
     fecha,
@@ -1504,6 +3025,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       (other is Entrega &&
           other.id == this.id &&
           other.fincaId == this.fincaId &&
+          other.temporadaId == this.temporadaId &&
           other.kg == this.kg &&
           other.estado == this.estado &&
           other.fecha == this.fecha &&
@@ -1515,6 +3037,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
 class EntregasCompanion extends UpdateCompanion<Entrega> {
   final Value<String> id;
   final Value<String> fincaId;
+  final Value<String?> temporadaId;
   final Value<double> kg;
   final Value<String> estado;
   final Value<DateTime> fecha;
@@ -1525,6 +3048,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
   const EntregasCompanion({
     this.id = const Value.absent(),
     this.fincaId = const Value.absent(),
+    this.temporadaId = const Value.absent(),
     this.kg = const Value.absent(),
     this.estado = const Value.absent(),
     this.fecha = const Value.absent(),
@@ -1536,6 +3060,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
   EntregasCompanion.insert({
     required String id,
     required String fincaId,
+    this.temporadaId = const Value.absent(),
     required double kg,
     required String estado,
     required DateTime fecha,
@@ -1551,6 +3076,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
   static Insertable<Entrega> custom({
     Expression<String>? id,
     Expression<String>? fincaId,
+    Expression<String>? temporadaId,
     Expression<double>? kg,
     Expression<String>? estado,
     Expression<DateTime>? fecha,
@@ -1562,6 +3088,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (fincaId != null) 'finca_id': fincaId,
+      if (temporadaId != null) 'temporada_id': temporadaId,
       if (kg != null) 'kg': kg,
       if (estado != null) 'estado': estado,
       if (fecha != null) 'fecha': fecha,
@@ -1575,6 +3102,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
   EntregasCompanion copyWith({
     Value<String>? id,
     Value<String>? fincaId,
+    Value<String?>? temporadaId,
     Value<double>? kg,
     Value<String>? estado,
     Value<DateTime>? fecha,
@@ -1586,6 +3114,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     return EntregasCompanion(
       id: id ?? this.id,
       fincaId: fincaId ?? this.fincaId,
+      temporadaId: temporadaId ?? this.temporadaId,
       kg: kg ?? this.kg,
       estado: estado ?? this.estado,
       fecha: fecha ?? this.fecha,
@@ -1604,6 +3133,9 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     }
     if (fincaId.present) {
       map['finca_id'] = Variable<String>(fincaId.value);
+    }
+    if (temporadaId.present) {
+      map['temporada_id'] = Variable<String>(temporadaId.value);
     }
     if (kg.present) {
       map['kg'] = Variable<double>(kg.value);
@@ -1634,6 +3166,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     return (StringBuffer('EntregasCompanion(')
           ..write('id: $id, ')
           ..write('fincaId: $fincaId, ')
+          ..write('temporadaId: $temporadaId, ')
           ..write('kg: $kg, ')
           ..write('estado: $estado, ')
           ..write('fecha: $fecha, ')
@@ -1899,11 +3432,11 @@ class $FotosTable extends Fotos with TableInfo<$FotosTable, Foto> {
 class Foto extends DataClass implements Insertable<Foto> {
   final String id;
 
-  /// `productor` o `finca`.
+  /// `productor`, `finca` o `verificacion`.
   final String entidadTipo;
   final String entidadId;
 
-  /// `consentimiento`, `finca` o `documento`.
+  /// `consentimiento`, `finca`, `documento` o `verificacion`.
   final String tipo;
   final String ruta;
   final String sha256;
@@ -2216,6 +3749,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ProductoresTable productores = $ProductoresTable(this);
   late final $FincasTable fincas = $FincasTable(this);
+  late final $TemporadasTable temporadas = $TemporadasTable(this);
+  late final $VersionesFincaTable versionesFinca = $VersionesFincaTable(this);
+  late final $VerificacionesTable verificaciones = $VerificacionesTable(this);
   late final $EntregasTable entregas = $EntregasTable(this);
   late final $FotosTable fotos = $FotosTable(this);
   @override
@@ -2225,6 +3761,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     productores,
     fincas,
+    temporadas,
+    versionesFinca,
+    verificaciones,
     entregas,
     fotos,
   ];
@@ -2587,6 +4126,9 @@ typedef $$FincasTableCreateCompanionBuilder = FincasCompanion Function({
   Value<String?> attestationUid,
   Value<DateTime> creadoEn,
   Value<bool> sincronizado,
+  Value<int> version,
+  Value<String> deforestacion,
+  Value<DateTime?> ultimoChequeo,
   Value<int> rowid,
 });
 typedef $$FincasTableUpdateCompanionBuilder = FincasCompanion Function({
@@ -2600,6 +4142,9 @@ typedef $$FincasTableUpdateCompanionBuilder = FincasCompanion Function({
   Value<String?> attestationUid,
   Value<DateTime> creadoEn,
   Value<bool> sincronizado,
+  Value<int> version,
+  Value<String> deforestacion,
+  Value<DateTime?> ultimoChequeo,
   Value<int> rowid,
 });
 
@@ -2621,6 +4166,42 @@ final class $$FincasTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$VersionesFincaTable, List<VersionesFincaData>>
+  _versionesFincaRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.versionesFinca,
+    aliasName: 'fincas__id__versiones_finca__finca_id',
+  );
+
+  $$VersionesFincaTableProcessedTableManager get versionesFincaRefs {
+    final manager = $$VersionesFincaTableTableManager(
+      $_db,
+      $_db.versionesFinca,
+    ).filter((f) => f.fincaId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_versionesFincaRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$VerificacionesTable, List<Verificacion>>
+  _verificacionesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.verificaciones,
+    aliasName: 'fincas__id__verificaciones__finca_id',
+  );
+
+  $$VerificacionesTableProcessedTableManager get verificacionesRefs {
+    final manager = $$VerificacionesTableTableManager(
+      $_db,
+      $_db.verificaciones,
+    ).filter((f) => f.fincaId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_verificacionesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
     );
   }
 
@@ -2698,6 +4279,21 @@ class $$FincasTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deforestacion => $composableBuilder(
+    column: $table.deforestacion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get ultimoChequeo => $composableBuilder(
+    column: $table.ultimoChequeo,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ProductoresTableFilterComposer get productorId {
     final $$ProductoresTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -2719,6 +4315,56 @@ class $$FincasTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> versionesFincaRefs(
+    Expression<bool> Function($$VersionesFincaTableFilterComposer f) f,
+  ) {
+    final $$VersionesFincaTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.versionesFinca,
+      getReferencedColumn: (t) => t.fincaId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VersionesFincaTableFilterComposer(
+            $db: $db,
+            $table: $db.versionesFinca,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> verificacionesRefs(
+    Expression<bool> Function($$VerificacionesTableFilterComposer f) f,
+  ) {
+    final $$VerificacionesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.verificaciones,
+      getReferencedColumn: (t) => t.fincaId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VerificacionesTableFilterComposer(
+            $db: $db,
+            $table: $db.verificaciones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 
   Expression<bool> entregasRefs(
@@ -2801,6 +4447,21 @@ class $$FincasTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deforestacion => $composableBuilder(
+    column: $table.deforestacion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get ultimoChequeo => $composableBuilder(
+    column: $table.ultimoChequeo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ProductoresTableOrderingComposer get productorId {
     final $$ProductoresTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2869,6 +4530,19 @@ class $$FincasTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get deforestacion => $composableBuilder(
+    column: $table.deforestacion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get ultimoChequeo => $composableBuilder(
+    column: $table.ultimoChequeo,
+    builder: (column) => column,
+  );
+
   $$ProductoresTableAnnotationComposer get productorId {
     final $$ProductoresTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -2890,6 +4564,56 @@ class $$FincasTableAnnotationComposer
           ),
     );
     return composer;
+  }
+
+  Expression<T> versionesFincaRefs<T extends Object>(
+    Expression<T> Function($$VersionesFincaTableAnnotationComposer a) f,
+  ) {
+    final $$VersionesFincaTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.versionesFinca,
+      getReferencedColumn: (t) => t.fincaId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VersionesFincaTableAnnotationComposer(
+            $db: $db,
+            $table: $db.versionesFinca,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> verificacionesRefs<T extends Object>(
+    Expression<T> Function($$VerificacionesTableAnnotationComposer a) f,
+  ) {
+    final $$VerificacionesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.verificaciones,
+      getReferencedColumn: (t) => t.fincaId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VerificacionesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.verificaciones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 
   Expression<T> entregasRefs<T extends Object>(
@@ -2931,7 +4655,12 @@ class $$FincasTableTableManager
           $$FincasTableUpdateCompanionBuilder,
           (Finca, $$FincasTableReferences),
           Finca,
-          PrefetchHooks Function({bool productorId, bool entregasRefs})
+          PrefetchHooks Function({
+            bool productorId,
+            bool versionesFincaRefs,
+            bool verificacionesRefs,
+            bool entregasRefs,
+          })
         > {
   $$FincasTableTableManager(_$AppDatabase db, $FincasTable table)
     : super(
@@ -2956,6 +4685,9 @@ class $$FincasTableTableManager
                 Value<String?> attestationUid = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> deforestacion = const Value.absent(),
+                Value<DateTime?> ultimoChequeo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FincasCompanion(
                 id: id,
@@ -2968,6 +4700,9 @@ class $$FincasTableTableManager
                 attestationUid: attestationUid,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                version: version,
+                deforestacion: deforestacion,
+                ultimoChequeo: ultimoChequeo,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2982,6 +4717,9 @@ class $$FincasTableTableManager
                 Value<String?> attestationUid = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> deforestacion = const Value.absent(),
+                Value<DateTime?> ultimoChequeo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FincasCompanion.insert(
                 id: id,
@@ -2994,6 +4732,9 @@ class $$FincasTableTableManager
                 attestationUid: attestationUid,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                version: version,
+                deforestacion: deforestacion,
+                ultimoChequeo: ultimoChequeo,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3004,57 +4745,115 @@ class $$FincasTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({productorId = false, entregasRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (entregasRefs) db.entregas],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (productorId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.productorId,
-                        referencedTable: $$FincasTableReferences
-                            ._productorIdTable(db),
-                        referencedColumn: $$FincasTableReferences
-                            ._productorIdTable(db)
-                            .id,
-                      ) as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                productorId = false,
+                versionesFincaRefs = false,
+                verificacionesRefs = false,
+                entregasRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (versionesFincaRefs) db.versionesFinca,
+                    if (verificacionesRefs) db.verificaciones,
+                    if (entregasRefs) db.entregas,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (productorId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.productorId,
+                            referencedTable: $$FincasTableReferences
+                                ._productorIdTable(db),
+                            referencedColumn: $$FincasTableReferences
+                                ._productorIdTable(db)
+                                .id,
+                          ) as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (versionesFincaRefs)
+                        await $_getPrefetchedData<
+                          Finca,
+                          $FincasTable,
+                          VersionesFincaData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$FincasTableReferences
+                              ._versionesFincaRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$FincasTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).versionesFincaRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.fincaId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (verificacionesRefs)
+                        await $_getPrefetchedData<
+                          Finca,
+                          $FincasTable,
+                          Verificacion
+                        >(
+                          currentTable: table,
+                          referencedTable: $$FincasTableReferences
+                              ._verificacionesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$FincasTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).verificacionesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.fincaId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (entregasRefs)
+                        await $_getPrefetchedData<Finca, $FincasTable, Entrega>(
+                          currentTable: table,
+                          referencedTable: $$FincasTableReferences
+                              ._entregasRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$FincasTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).entregasRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.fincaId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (entregasRefs)
-                    await $_getPrefetchedData<Finca, $FincasTable, Entrega>(
-                      currentTable: table,
-                      referencedTable: $$FincasTableReferences
-                          ._entregasRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$FincasTableReferences(db, table, p0).entregasRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.fincaId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -3071,11 +4870,956 @@ typedef $$FincasTableProcessedTableManager =
       $$FincasTableUpdateCompanionBuilder,
       (Finca, $$FincasTableReferences),
       Finca,
-      PrefetchHooks Function({bool productorId, bool entregasRefs})
+      PrefetchHooks Function({
+        bool productorId,
+        bool versionesFincaRefs,
+        bool verificacionesRefs,
+        bool entregasRefs,
+      })
+    >;
+typedef $$TemporadasTableCreateCompanionBuilder = TemporadasCompanion Function({
+  required String id,
+  required String nombre,
+  required DateTime inicio,
+  required DateTime fin,
+  Value<int> rowid,
+});
+typedef $$TemporadasTableUpdateCompanionBuilder = TemporadasCompanion Function({
+  Value<String> id,
+  Value<String> nombre,
+  Value<DateTime> inicio,
+  Value<DateTime> fin,
+  Value<int> rowid,
+});
+
+class $$TemporadasTableFilterComposer
+    extends Composer<_$AppDatabase, $TemporadasTable> {
+  $$TemporadasTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get inicio => $composableBuilder(
+    column: $table.inicio,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get fin => $composableBuilder(
+    column: $table.fin,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TemporadasTableOrderingComposer
+    extends Composer<_$AppDatabase, $TemporadasTable> {
+  $$TemporadasTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nombre => $composableBuilder(
+    column: $table.nombre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get inicio => $composableBuilder(
+    column: $table.inicio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get fin => $composableBuilder(
+    column: $table.fin,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TemporadasTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TemporadasTable> {
+  $$TemporadasTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get nombre =>
+      $composableBuilder(column: $table.nombre, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get inicio =>
+      $composableBuilder(column: $table.inicio, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get fin =>
+      $composableBuilder(column: $table.fin, builder: (column) => column);
+}
+
+class $$TemporadasTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TemporadasTable,
+          Temporada,
+          $$TemporadasTableFilterComposer,
+          $$TemporadasTableOrderingComposer,
+          $$TemporadasTableAnnotationComposer,
+          $$TemporadasTableCreateCompanionBuilder,
+          $$TemporadasTableUpdateCompanionBuilder,
+          (
+            Temporada,
+            BaseReferences<_$AppDatabase, $TemporadasTable, Temporada>,
+          ),
+          Temporada,
+          PrefetchHooks Function()
+        > {
+  $$TemporadasTableTableManager(_$AppDatabase db, $TemporadasTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TemporadasTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TemporadasTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TemporadasTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> nombre = const Value.absent(),
+                Value<DateTime> inicio = const Value.absent(),
+                Value<DateTime> fin = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TemporadasCompanion(
+                id: id,
+                nombre: nombre,
+                inicio: inicio,
+                fin: fin,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String nombre,
+                required DateTime inicio,
+                required DateTime fin,
+                Value<int> rowid = const Value.absent(),
+              }) => TemporadasCompanion.insert(
+                id: id,
+                nombre: nombre,
+                inicio: inicio,
+                fin: fin,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TemporadasTable, Temporada>(table),
+                  BaseReferences<_$AppDatabase, $TemporadasTable, Temporada>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TemporadasTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TemporadasTable,
+      Temporada,
+      $$TemporadasTableFilterComposer,
+      $$TemporadasTableOrderingComposer,
+      $$TemporadasTableAnnotationComposer,
+      $$TemporadasTableCreateCompanionBuilder,
+      $$TemporadasTableUpdateCompanionBuilder,
+      (Temporada, BaseReferences<_$AppDatabase, $TemporadasTable, Temporada>),
+      Temporada,
+      PrefetchHooks Function()
+    >;
+typedef $$VersionesFincaTableCreateCompanionBuilder =
+    VersionesFincaCompanion Function({
+      required String fincaId,
+      required int version,
+      required String coordenadasJson,
+      required double areaHa,
+      required String geoHash,
+      Value<DateTime> creadoEn,
+      Value<bool> sincronizado,
+      Value<int> rowid,
+    });
+typedef $$VersionesFincaTableUpdateCompanionBuilder =
+    VersionesFincaCompanion Function({
+      Value<String> fincaId,
+      Value<int> version,
+      Value<String> coordenadasJson,
+      Value<double> areaHa,
+      Value<String> geoHash,
+      Value<DateTime> creadoEn,
+      Value<bool> sincronizado,
+      Value<int> rowid,
+    });
+
+final class $$VersionesFincaTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $VersionesFincaTable,
+          VersionesFincaData
+        > {
+  $$VersionesFincaTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $FincasTable _fincaIdTable(_$AppDatabase db) =>
+      db.fincas.createAlias('versiones_finca__finca_id__fincas__id');
+
+  $$FincasTableProcessedTableManager get fincaId {
+    final $_column = $_itemColumn<String>('finca_id')!;
+
+    final manager = $$FincasTableTableManager(
+      $_db,
+      $_db.fincas,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_fincaIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$VersionesFincaTableFilterComposer
+    extends Composer<_$AppDatabase, $VersionesFincaTable> {
+  $$VersionesFincaTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coordenadasJson => $composableBuilder(
+    column: $table.coordenadasJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get areaHa => $composableBuilder(
+    column: $table.areaHa,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get geoHash => $composableBuilder(
+    column: $table.geoHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get creadoEn => $composableBuilder(
+    column: $table.creadoEn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$FincasTableFilterComposer get fincaId {
+    final $$FincasTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fincaId,
+      referencedTable: $db.fincas,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FincasTableFilterComposer(
+            $db: $db,
+            $table: $db.fincas,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VersionesFincaTableOrderingComposer
+    extends Composer<_$AppDatabase, $VersionesFincaTable> {
+  $$VersionesFincaTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get coordenadasJson => $composableBuilder(
+    column: $table.coordenadasJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get areaHa => $composableBuilder(
+    column: $table.areaHa,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get geoHash => $composableBuilder(
+    column: $table.geoHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get creadoEn => $composableBuilder(
+    column: $table.creadoEn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$FincasTableOrderingComposer get fincaId {
+    final $$FincasTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fincaId,
+      referencedTable: $db.fincas,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FincasTableOrderingComposer(
+            $db: $db,
+            $table: $db.fincas,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VersionesFincaTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VersionesFincaTable> {
+  $$VersionesFincaTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get coordenadasJson => $composableBuilder(
+    column: $table.coordenadasJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get areaHa =>
+      $composableBuilder(column: $table.areaHa, builder: (column) => column);
+
+  GeneratedColumn<String> get geoHash =>
+      $composableBuilder(column: $table.geoHash, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get creadoEn =>
+      $composableBuilder(column: $table.creadoEn, builder: (column) => column);
+
+  GeneratedColumn<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => column,
+  );
+
+  $$FincasTableAnnotationComposer get fincaId {
+    final $$FincasTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fincaId,
+      referencedTable: $db.fincas,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FincasTableAnnotationComposer(
+            $db: $db,
+            $table: $db.fincas,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VersionesFincaTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VersionesFincaTable,
+          VersionesFincaData,
+          $$VersionesFincaTableFilterComposer,
+          $$VersionesFincaTableOrderingComposer,
+          $$VersionesFincaTableAnnotationComposer,
+          $$VersionesFincaTableCreateCompanionBuilder,
+          $$VersionesFincaTableUpdateCompanionBuilder,
+          (VersionesFincaData, $$VersionesFincaTableReferences),
+          VersionesFincaData,
+          PrefetchHooks Function({bool fincaId})
+        > {
+  $$VersionesFincaTableTableManager(
+    _$AppDatabase db,
+    $VersionesFincaTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VersionesFincaTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VersionesFincaTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VersionesFincaTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> fincaId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> coordenadasJson = const Value.absent(),
+                Value<double> areaHa = const Value.absent(),
+                Value<String> geoHash = const Value.absent(),
+                Value<DateTime> creadoEn = const Value.absent(),
+                Value<bool> sincronizado = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VersionesFincaCompanion(
+                fincaId: fincaId,
+                version: version,
+                coordenadasJson: coordenadasJson,
+                areaHa: areaHa,
+                geoHash: geoHash,
+                creadoEn: creadoEn,
+                sincronizado: sincronizado,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String fincaId,
+                required int version,
+                required String coordenadasJson,
+                required double areaHa,
+                required String geoHash,
+                Value<DateTime> creadoEn = const Value.absent(),
+                Value<bool> sincronizado = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VersionesFincaCompanion.insert(
+                fincaId: fincaId,
+                version: version,
+                coordenadasJson: coordenadasJson,
+                areaHa: areaHa,
+                geoHash: geoHash,
+                creadoEn: creadoEn,
+                sincronizado: sincronizado,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$VersionesFincaTable, VersionesFincaData>(table),
+                  $$VersionesFincaTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({fincaId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (fincaId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.fincaId,
+                        referencedTable: $$VersionesFincaTableReferences
+                            ._fincaIdTable(db),
+                        referencedColumn: $$VersionesFincaTableReferences
+                            ._fincaIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$VersionesFincaTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VersionesFincaTable,
+      VersionesFincaData,
+      $$VersionesFincaTableFilterComposer,
+      $$VersionesFincaTableOrderingComposer,
+      $$VersionesFincaTableAnnotationComposer,
+      $$VersionesFincaTableCreateCompanionBuilder,
+      $$VersionesFincaTableUpdateCompanionBuilder,
+      (VersionesFincaData, $$VersionesFincaTableReferences),
+      VersionesFincaData,
+      PrefetchHooks Function({bool fincaId})
+    >;
+typedef $$VerificacionesTableCreateCompanionBuilder =
+    VerificacionesCompanion Function({
+      required String id,
+      required String fincaId,
+      Value<String?> temporadaId,
+      required DateTime fecha,
+      Value<bool> linderoCambio,
+      required int versionFinca,
+      Value<String?> nota,
+      Value<bool> sincronizado,
+      Value<int> rowid,
+    });
+typedef $$VerificacionesTableUpdateCompanionBuilder =
+    VerificacionesCompanion Function({
+      Value<String> id,
+      Value<String> fincaId,
+      Value<String?> temporadaId,
+      Value<DateTime> fecha,
+      Value<bool> linderoCambio,
+      Value<int> versionFinca,
+      Value<String?> nota,
+      Value<bool> sincronizado,
+      Value<int> rowid,
+    });
+
+final class $$VerificacionesTableReferences
+    extends BaseReferences<_$AppDatabase, $VerificacionesTable, Verificacion> {
+  $$VerificacionesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $FincasTable _fincaIdTable(_$AppDatabase db) =>
+      db.fincas.createAlias('verificaciones__finca_id__fincas__id');
+
+  $$FincasTableProcessedTableManager get fincaId {
+    final $_column = $_itemColumn<String>('finca_id')!;
+
+    final manager = $$FincasTableTableManager(
+      $_db,
+      $_db.fincas,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_fincaIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$VerificacionesTableFilterComposer
+    extends Composer<_$AppDatabase, $VerificacionesTable> {
+  $$VerificacionesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get temporadaId => $composableBuilder(
+    column: $table.temporadaId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get fecha => $composableBuilder(
+    column: $table.fecha,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get linderoCambio => $composableBuilder(
+    column: $table.linderoCambio,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get versionFinca => $composableBuilder(
+    column: $table.versionFinca,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nota => $composableBuilder(
+    column: $table.nota,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$FincasTableFilterComposer get fincaId {
+    final $$FincasTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fincaId,
+      referencedTable: $db.fincas,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FincasTableFilterComposer(
+            $db: $db,
+            $table: $db.fincas,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VerificacionesTableOrderingComposer
+    extends Composer<_$AppDatabase, $VerificacionesTable> {
+  $$VerificacionesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get temporadaId => $composableBuilder(
+    column: $table.temporadaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get fecha => $composableBuilder(
+    column: $table.fecha,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get linderoCambio => $composableBuilder(
+    column: $table.linderoCambio,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get versionFinca => $composableBuilder(
+    column: $table.versionFinca,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nota => $composableBuilder(
+    column: $table.nota,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$FincasTableOrderingComposer get fincaId {
+    final $$FincasTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fincaId,
+      referencedTable: $db.fincas,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FincasTableOrderingComposer(
+            $db: $db,
+            $table: $db.fincas,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VerificacionesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VerificacionesTable> {
+  $$VerificacionesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get temporadaId => $composableBuilder(
+    column: $table.temporadaId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get fecha =>
+      $composableBuilder(column: $table.fecha, builder: (column) => column);
+
+  GeneratedColumn<bool> get linderoCambio => $composableBuilder(
+    column: $table.linderoCambio,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get versionFinca => $composableBuilder(
+    column: $table.versionFinca,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nota =>
+      $composableBuilder(column: $table.nota, builder: (column) => column);
+
+  GeneratedColumn<bool> get sincronizado => $composableBuilder(
+    column: $table.sincronizado,
+    builder: (column) => column,
+  );
+
+  $$FincasTableAnnotationComposer get fincaId {
+    final $$FincasTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.fincaId,
+      referencedTable: $db.fincas,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FincasTableAnnotationComposer(
+            $db: $db,
+            $table: $db.fincas,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VerificacionesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VerificacionesTable,
+          Verificacion,
+          $$VerificacionesTableFilterComposer,
+          $$VerificacionesTableOrderingComposer,
+          $$VerificacionesTableAnnotationComposer,
+          $$VerificacionesTableCreateCompanionBuilder,
+          $$VerificacionesTableUpdateCompanionBuilder,
+          (Verificacion, $$VerificacionesTableReferences),
+          Verificacion,
+          PrefetchHooks Function({bool fincaId})
+        > {
+  $$VerificacionesTableTableManager(
+    _$AppDatabase db,
+    $VerificacionesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VerificacionesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VerificacionesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VerificacionesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> fincaId = const Value.absent(),
+                Value<String?> temporadaId = const Value.absent(),
+                Value<DateTime> fecha = const Value.absent(),
+                Value<bool> linderoCambio = const Value.absent(),
+                Value<int> versionFinca = const Value.absent(),
+                Value<String?> nota = const Value.absent(),
+                Value<bool> sincronizado = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VerificacionesCompanion(
+                id: id,
+                fincaId: fincaId,
+                temporadaId: temporadaId,
+                fecha: fecha,
+                linderoCambio: linderoCambio,
+                versionFinca: versionFinca,
+                nota: nota,
+                sincronizado: sincronizado,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String fincaId,
+                Value<String?> temporadaId = const Value.absent(),
+                required DateTime fecha,
+                Value<bool> linderoCambio = const Value.absent(),
+                required int versionFinca,
+                Value<String?> nota = const Value.absent(),
+                Value<bool> sincronizado = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VerificacionesCompanion.insert(
+                id: id,
+                fincaId: fincaId,
+                temporadaId: temporadaId,
+                fecha: fecha,
+                linderoCambio: linderoCambio,
+                versionFinca: versionFinca,
+                nota: nota,
+                sincronizado: sincronizado,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$VerificacionesTable, Verificacion>(table),
+                  $$VerificacionesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({fincaId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (fincaId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.fincaId,
+                        referencedTable: $$VerificacionesTableReferences
+                            ._fincaIdTable(db),
+                        referencedColumn: $$VerificacionesTableReferences
+                            ._fincaIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$VerificacionesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VerificacionesTable,
+      Verificacion,
+      $$VerificacionesTableFilterComposer,
+      $$VerificacionesTableOrderingComposer,
+      $$VerificacionesTableAnnotationComposer,
+      $$VerificacionesTableCreateCompanionBuilder,
+      $$VerificacionesTableUpdateCompanionBuilder,
+      (Verificacion, $$VerificacionesTableReferences),
+      Verificacion,
+      PrefetchHooks Function({bool fincaId})
     >;
 typedef $$EntregasTableCreateCompanionBuilder = EntregasCompanion Function({
   required String id,
   required String fincaId,
+  Value<String?> temporadaId,
   required double kg,
   required String estado,
   required DateTime fecha,
@@ -3087,6 +5831,7 @@ typedef $$EntregasTableCreateCompanionBuilder = EntregasCompanion Function({
 typedef $$EntregasTableUpdateCompanionBuilder = EntregasCompanion Function({
   Value<String> id,
   Value<String> fincaId,
+  Value<String?> temporadaId,
   Value<double> kg,
   Value<String> estado,
   Value<DateTime> fecha,
@@ -3129,6 +5874,11 @@ class $$EntregasTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get temporadaId => $composableBuilder(
+    column: $table.temporadaId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3200,6 +5950,11 @@ class $$EntregasTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get temporadaId => $composableBuilder(
+    column: $table.temporadaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get kg => $composableBuilder(
     column: $table.kg,
     builder: (column) => ColumnOrderings(column),
@@ -3265,6 +6020,11 @@ class $$EntregasTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get temporadaId => $composableBuilder(
+    column: $table.temporadaId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<double> get kg =>
       $composableBuilder(column: $table.kg, builder: (column) => column);
@@ -3342,6 +6102,7 @@ class $$EntregasTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> fincaId = const Value.absent(),
+                Value<String?> temporadaId = const Value.absent(),
                 Value<double> kg = const Value.absent(),
                 Value<String> estado = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
@@ -3352,6 +6113,7 @@ class $$EntregasTableTableManager
               }) => EntregasCompanion(
                 id: id,
                 fincaId: fincaId,
+                temporadaId: temporadaId,
                 kg: kg,
                 estado: estado,
                 fecha: fecha,
@@ -3364,6 +6126,7 @@ class $$EntregasTableTableManager
               ({
                 required String id,
                 required String fincaId,
+                Value<String?> temporadaId = const Value.absent(),
                 required double kg,
                 required String estado,
                 required DateTime fecha,
@@ -3374,6 +6137,7 @@ class $$EntregasTableTableManager
               }) => EntregasCompanion.insert(
                 id: id,
                 fincaId: fincaId,
+                temporadaId: temporadaId,
                 kg: kg,
                 estado: estado,
                 fecha: fecha,
@@ -3735,6 +6499,12 @@ class $AppDatabaseManager {
       $$ProductoresTableTableManager(_db, _db.productores);
   $$FincasTableTableManager get fincas =>
       $$FincasTableTableManager(_db, _db.fincas);
+  $$TemporadasTableTableManager get temporadas =>
+      $$TemporadasTableTableManager(_db, _db.temporadas);
+  $$VersionesFincaTableTableManager get versionesFinca =>
+      $$VersionesFincaTableTableManager(_db, _db.versionesFinca);
+  $$VerificacionesTableTableManager get verificaciones =>
+      $$VerificacionesTableTableManager(_db, _db.verificaciones);
   $$EntregasTableTableManager get entregas =>
       $$EntregasTableTableManager(_db, _db.entregas);
   $$FotosTableTableManager get fotos =>

@@ -28,8 +28,10 @@ class VerificadorScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     SelectableText(uid!, textAlign: TextAlign.center),
                     const SizedBox(height: 8),
-                    SelectableText('$_easScan$uid',
-                        textAlign: TextAlign.center),
+                    SelectableText(
+                      '$_easScan$uid',
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 ),
         ),

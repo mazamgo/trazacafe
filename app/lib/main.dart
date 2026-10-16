@@ -54,8 +54,11 @@ class _Inicio extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watch(sesionProvider).when(
-          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+    return ref
+        .watch(sesionProvider)
+        .when(
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
           error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
           data: (sesion) => switch (sesion) {
             null => const LoginScreen(),

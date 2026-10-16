@@ -13,8 +13,8 @@ import {
 } from "../src/index.ts";
 
 describe("esquemas EAS", () => {
-  it("define los cuatro pasos de la cadena de custodia", () => {
-    expect(esquemas.map((e) => e.nombre)).toEqual(["Finca", "Entrega", "Lote", "Exportacion"]);
+  it("define la finca, su verificación y los pasos de la cadena de custodia", () => {
+    expect(esquemas.map((e) => e.nombre)).toEqual(["Finca", "Verificacion", "Entrega", "Lote", "Exportacion"]);
   });
 
   it("calcula UIDs distintos y estables", () => {
@@ -28,6 +28,7 @@ describe("codificarFinca", () => {
   it("codifica y decodifica los mismos valores", () => {
     const datos = {
       fincaId: "3f2b8c1e-9a4d-4e7f-8b21-0c5d6e7f8a90",
+      version: 2,
       geoHash: geoHash(vectores[0].coords as Coordenada[]),
       areaHa: 1.2345,
       deforestacionOK: true,
@@ -39,10 +40,11 @@ describe("codificarFinca", () => {
       codificarFinca(datos),
     );
     expect(decodificado[0]).toBe(uuidABytes32(datos.fincaId));
-    expect(decodificado[1]).toBe(datos.geoHash);
-    expect(decodificado[2]).toBe(123);
-    expect(decodificado[3]).toBe(true);
-    expect(decodificado[4]).toBe("JRC-GFC2020+GFW");
+    expect(decodificado[1]).toBe(2);
+    expect(decodificado[2]).toBe(datos.geoHash);
+    expect(decodificado[3]).toBe(123);
+    expect(decodificado[4]).toBe(true);
+    expect(decodificado[5]).toBe("JRC-GFC2020+GFW");
   });
 
   it("rechaza IDs que no son UUID", () => {

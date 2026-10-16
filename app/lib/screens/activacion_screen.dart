@@ -39,7 +39,9 @@ class _ActivacionScreenState extends ConsumerState<ActivacionScreen> {
       // La sesión ya se cerró; el login mostrará el mensaje.
       aviso.mostrar(e.mensaje);
     } catch (e) {
-      if (mounted) setState(() => _error = 'No se pudo verificar tu acceso: $e');
+      if (mounted) {
+        setState(() => _error = 'No se pudo verificar tu acceso: $e');
+      }
     } finally {
       if (mounted) setState(() => _intentando = false);
     }
@@ -58,13 +60,23 @@ class _ActivacionScreenState extends ConsumerState<ActivacionScreen> {
                 if (_intentando) ...[
                   const CircularProgressIndicator(),
                   const SizedBox(height: 16),
-                  Text('Verificando el acceso de ${widget.email}…', textAlign: TextAlign.center),
+                  Text(
+                    'Verificando el acceso de ${widget.email}…',
+                    textAlign: TextAlign.center,
+                  ),
                 ] else if (_error != null) ...[
-                  Icon(Icons.wifi_off, size: 48, color: Theme.of(context).colorScheme.error),
+                  Icon(
+                    Icons.wifi_off,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                   const SizedBox(height: 12),
                   Text(_error!, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
-                  FilledButton(onPressed: _activar, child: const Text('Reintentar')),
+                  FilledButton(
+                    onPressed: _activar,
+                    child: const Text('Reintentar'),
+                  ),
                 ],
                 const SizedBox(height: 8),
                 TextButton(

@@ -39,6 +39,7 @@ Future<void> cargarEjemplo(AppDatabase db) async {
   final p = (ejemplo['productores'] as List).single as Map;
   final f = (ejemplo['fincas'] as List).single as Map;
   final e = (ejemplo['entregas'] as List).single as Map;
+  final v = (ejemplo['verificaciones'] as List).single as Map;
   final foto = (ejemplo['fotos'] as List).single as Map;
   final puntos = [
     for (final c in f['coordenadas'] as List)
@@ -59,6 +60,14 @@ Future<void> cargarEjemplo(AppDatabase db) async {
         coordenadasJson: aGeoJsonCoords(puntos),
         areaHa: (f['areaHa'] as num).toDouble(),
         geoHash: geoHash(puntos),
+      ));
+  await db.into(db.verificaciones).insert(VerificacionesCompanion.insert(
+        id: v['id'],
+        fincaId: f['id'],
+        fecha: DateTime.parse(v['fecha']),
+        linderoCambio: Value(v['linderoCambio']),
+        versionFinca: v['versionFinca'],
+        nota: Value(v['nota']),
       ));
   await db.into(db.entregas).insert(EntregasCompanion.insert(
         id: e['id'],
@@ -116,7 +125,7 @@ void main() {
     final api = apiOk();
     final r = await servicio(api).sincronizar();
 
-    expect(r.enviados, 4);
+    expect(r.enviados, 5);
     expect(r.fotosSubidas, 1);
     expect(r.errorFotos, isNull);
     expect(subidor.subidas, ['organizaciones/$org/fotos/$fotoId.jpg']);
@@ -145,7 +154,7 @@ void main() {
       servicio(api).sincronizar(),
       throwsA(isA<ApiError>().having((e) => e.mensaje, 'mensaje', contains('geoHash no coincide'))),
     );
-    expect((await db.pendientes()).total, 4);
+    expect((await db.pendientes()).total, 5);
     expect(subidor.subidas, isEmpty);
   });
 

@@ -25,8 +25,8 @@ double areaHectareas(List<LatLng> puntos) {
     final p1 = anillo[i];
     final p2 = anillo[i + 1];
     final p3 = anillo[(i + 2) % (anillo.length - 1)];
-    total += (_rad(p3.longitude) - _rad(p1.longitude)) *
-        math.sin(_rad(p2.latitude));
+    total +=
+        (_rad(p3.longitude) - _rad(p1.longitude)) * math.sin(_rad(p2.latitude));
   }
   final m2 = (total * _radioTierra * _radioTierra / 2).abs();
   return m2 / 10000;
@@ -38,8 +38,10 @@ double _rad(double grados) => grados * math.pi / 180;
 /// (~11 cm). El backend usa exactamente el mismo formato; ver
 /// `schemas/test-vectors.json`.
 String coordenadasCanonicas(List<LatLng> puntos) => puntos
-    .map((p) =>
-        '${p.longitude.toStringAsFixed(6)},${p.latitude.toStringAsFixed(6)}')
+    .map(
+      (p) =>
+          '${p.longitude.toStringAsFixed(6)},${p.latitude.toStringAsFixed(6)}',
+    )
     .join(';');
 
 /// Hash `0x…` (SHA-256) de las coordenadas: va en la attestation en lugar
@@ -52,18 +54,17 @@ enum ProblemaPoligono { pocosPuntos, puntosRepetidos, seCruza }
 extension ProblemaPoligonoTexto on ProblemaPoligono {
   /// Código igual al de la API (`schemas/src/index.ts`).
   String get codigo => switch (this) {
-        ProblemaPoligono.pocosPuntos => 'pocos_puntos',
-        ProblemaPoligono.puntosRepetidos => 'puntos_repetidos',
-        ProblemaPoligono.seCruza => 'se_cruza',
-      };
+    ProblemaPoligono.pocosPuntos => 'pocos_puntos',
+    ProblemaPoligono.puntosRepetidos => 'puntos_repetidos',
+    ProblemaPoligono.seCruza => 'se_cruza',
+  };
 
   String get mensaje => switch (this) {
-        ProblemaPoligono.pocosPuntos => 'Marca al menos 3 puntos para el polígono.',
-        ProblemaPoligono.puntosRepetidos =>
-          'Hay dos puntos seguidos en el mismo lugar. Quita el último.',
-        ProblemaPoligono.seCruza =>
-          'Los linderos se cruzan. Marca los puntos en orden, siguiendo el borde de la finca.',
-      };
+    ProblemaPoligono.pocosPuntos => 'Marca al menos 3 puntos para el polígono.',
+    ProblemaPoligono.puntosRepetidos =>
+      'Hay dos puntos seguidos en el mismo lugar. Quita el último.',
+    ProblemaPoligono.seCruza => 'Los linderos se cruzan. Marca los puntos en orden, siguiendo el borde de la finca.',
+  };
 }
 
 /// Por qué el polígono no es válido para el EUDR, o `null` si lo es. Recibe
@@ -97,7 +98,8 @@ ProblemaPoligono? problemaPoligono(List<LatLng> puntos) {
 }
 
 int _orientacion(List<double> p, List<double> q, List<double> r) =>
-    ((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])).sign.toInt();
+    ((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])).sign
+        .toInt();
 
 bool _dentroDelRectangulo(List<double> p, List<double> q, List<double> r) =>
     math.min(p[0], q[0]) <= r[0] &&
@@ -105,7 +107,12 @@ bool _dentroDelRectangulo(List<double> p, List<double> q, List<double> r) =>
     math.min(p[1], q[1]) <= r[1] &&
     r[1] <= math.max(p[1], q[1]);
 
-bool _segmentosSeTocan(List<double> a, List<double> b, List<double> c, List<double> d) {
+bool _segmentosSeTocan(
+  List<double> a,
+  List<double> b,
+  List<double> c,
+  List<double> d,
+) {
   final o1 = _orientacion(a, b, c);
   final o2 = _orientacion(a, b, d);
   final o3 = _orientacion(c, d, a);

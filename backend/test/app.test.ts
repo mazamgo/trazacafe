@@ -3,16 +3,21 @@ import { describe, expect, it } from "vitest";
 import { rutaFoto, sha256Hex, type Almacen } from "../src/almacen.ts";
 import { buildApp } from "../src/app.ts";
 import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
+import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/deforestacion.ts";
 import {
   AccesoDenegado,
   aGeometria,
   desdeGeometria,
+  VersionDesfasada,
+  type Chequeo,
   type DatosOrganizacion,
+  type FincaPorRevisar,
   type Invitacion,
   type Repo,
   type ResultadoEliminarFinca,
+  type Temporada,
 } from "../src/repo.ts";
-import type { LoteSync } from "../src/sync.ts";
+import type { LoteSync, TemporadaNueva } from "../src/sync.ts";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const OTRA_ORG = "22222222-2222-4222-8222-222222222222";
@@ -69,9 +74,34 @@ class RepoMemoria implements Repo {
     this.fincas.delete(fincaId);
     return { estado: "eliminada", archivos: f.archivos ?? [] };
   }
-  datos: DatosOrganizacion = { productores: [], fincas: [], entregas: [] };
-  async datosOrganizacion(organizacionId: string) {
-    return organizacionId === ORG ? this.datos : { productores: [], fincas: [], entregas: [] };
+  datos: DatosOrganizacion = { temporadas: [], productores: [], fincas: [], verificaciones: [], entregas: [] };
+  async datosOrganizacion(organizacionId: string): Promise<DatosOrganizacion> {
+    return organizacionId === ORG
+      ? this.datos
+      : { temporadas: [], productores: [], fincas: [], verificaciones: [], entregas: [] };
+  }
+  temporadas: (Temporada & { organizacionId: string })[] = [];
+  async listarTemporadas(organizacionId: string) {
+    return this.temporadas.filter((t) => t.organizacionId === organizacionId);
+  }
+  async crearTemporada(organizacionId: string, t: TemporadaNueva & { id: string }) {
+    const traslapa = this.temporadas.some(
+      (x) => x.organizacionId === organizacionId && x.inicio <= t.fin && t.inicio <= x.fin,
+    );
+    if (traslapa) return null;
+    this.temporadas.push({ ...t, organizacionId });
+    return { id: t.id, nombre: t.nombre, inicio: t.inicio, fin: t.fin };
+  }
+  porRevisar: FincaPorRevisar[] = [];
+  chequeos: Chequeo[] = [];
+  async fincasPorRevisar(limite: number) {
+    return this.porRevisar.slice(0, limite);
+  }
+  async fincaParaRevisar(organizacionId: string, fincaId: string) {
+    return organizacionId === ORG ? (this.porRevisar.find((f) => f.fincaId === fincaId) ?? null) : null;
+  }
+  async guardarChequeo(c: Chequeo) {
+    this.chequeos.push(c);
   }
   fotos = new Map<string, { organizacionId: string; sha256: string; storagePath: string | null }>();
   async buscarFoto(organizacionId: string, fotoId: string) {
@@ -123,12 +153,31 @@ class AlmacenMemoria implements Almacen {
   }
 }
 
-function crearApp() {
+/** Satélite falso: devuelve los hallazgos indicados por id de finca. */
+class SateliteFalso implements FuenteSatelital {
+  nombre = "satelite falso";
+  hallazgos: Hallazgos = { alertas: 0, haAlertas: 0, haPerdida: 0, detalle: {} };
+  falla = false;
+  async consultar() {
+    if (this.falla) throw new Error("GFW caído");
+    return this.hallazgos;
+  }
+}
+
+function crearApp({ conSatelite = true } = {}) {
   const repo = new RepoMemoria();
   const identidad = new IdentidadFalsa();
   const almacen = new AlmacenMemoria();
-  const app = buildApp({ repo, identidad, almacen, verificarToken: async (t) => usuarios[t] ?? null });
-  return { app, repo, identidad, almacen };
+  const satelite = new SateliteFalso();
+  const app = buildApp({
+    repo,
+    identidad,
+    almacen,
+    satelite: conSatelite ? satelite : null,
+    verificarToken: async (t) => usuarios[t] ?? null,
+    verificarTarea: async (t) => t === "oidc-scheduler",
+  });
+  return { app, repo, identidad, almacen, satelite };
 }
 
 type App = ReturnType<typeof crearApp>["app"];
@@ -141,7 +190,9 @@ describe("POST /v1/sync", () => {
     const { app, repo } = crearApp();
     const res = await pedir(app, "POST", "/v1/sync", "tecnico", { productores: [productor], fincas: [finca] });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ recibidos: { productores: 1, fincas: 1, entregas: 0, fotos: 0 } });
+    expect(res.json()).toEqual({
+      recibidos: { productores: 1, fincas: 1, versionesFinca: 0, verificaciones: 0, entregas: 0, fotos: 0 },
+    });
     expect(repo.sync[0].usuario).toMatchObject({ uid: "u-tec", organizacionId: ORG });
   });
 
@@ -414,6 +465,150 @@ describe("POST /v1/fotos/:id/subida", () => {
     const { app, repo } = crearApp();
     repo.fotos.set(fotoId, { organizacionId: OTRA_ORG, sha256: sha256Hex(contenido), storagePath: null });
     expect((await pedir(app, "POST", `/v1/fotos/${fotoId}/subida`, "tecnico", {})).statusCode).toBe(404);
+  });
+});
+
+describe("visitas y linderos nuevos en /v1/sync", () => {
+  const otraForma: Coordenada[] = [
+    [-86.0023, 13.091],
+    [-86.0011, 13.091],
+    [-86.0011, 13.0922],
+    [-86.0023, 13.0922],
+  ];
+  const version = { fincaId: finca.id, version: 2, coordenadas: otraForma, areaHa: 1.4, geoHash: geoHash(otraForma) };
+  const visita = {
+    id: "8a7b6c5d-4e3f-4a1b-9c8d-7e6f5a4b3c2d",
+    fincaId: finca.id,
+    fecha: "2026-10-16T10:00:00.000-06:00",
+    linderoCambio: true,
+    versionFinca: 2,
+    nota: "Amplió hacia el río",
+  };
+
+  it("acepta una visita con lindero nuevo", async () => {
+    const { app, repo } = crearApp();
+    const res = await pedir(app, "POST", "/v1/sync", "tecnico", { versionesFinca: [version], verificaciones: [visita] });
+    expect(res.statusCode).toBe(200);
+    expect(repo.sync[0].datos.versionesFinca[0].version).toBe(2);
+    expect(repo.sync[0].datos.verificaciones[0].linderoCambio).toBe(true);
+  });
+
+  it("aplica a la versión nueva las mismas reglas de geometría", async () => {
+    const { app } = crearApp();
+    const mono: Coordenada[] = [otraForma[0], otraForma[2], otraForma[1], otraForma[3]];
+    const res = await pedir(app, "POST", "/v1/sync", "tecnico", {
+      versionesFinca: [{ ...version, coordenadas: mono, geoHash: geoHash(mono) }],
+    });
+    expect(res.statusCode).toBe(422);
+  });
+
+  it("no acepta versión 1 como lindero nuevo ni visitas en el futuro", async () => {
+    const { app } = crearApp();
+    expect((await pedir(app, "POST", "/v1/sync", "tecnico", { versionesFinca: [{ ...version, version: 1 }] })).statusCode).toBe(422);
+    const futuro = new Date(Date.now() + 5 * 24 * 3600_000).toISOString();
+    expect((await pedir(app, "POST", "/v1/sync", "tecnico", { verificaciones: [{ ...visita, fecha: futuro }] })).statusCode).toBe(422);
+  });
+
+  it("responde 409 si otro técnico ya subió esa versión del lindero", async () => {
+    const { app, repo } = crearApp();
+    repo.fallarSync = new VersionDesfasada("La finca ya tiene una versión 2 distinta");
+    const res = await pedir(app, "POST", "/v1/sync", "tecnico", { versionesFinca: [version] });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("version_desfasada");
+  });
+
+  it("acepta fotos de una visita", async () => {
+    const { app } = crearApp();
+    const foto = {
+      id: "9b2e1f4a-6c3d-4f8e-a1b2-3c4d5e6f7a8b",
+      entidadTipo: "verificacion",
+      entidadId: visita.id,
+      tipo: "verificacion",
+      sha256: `0x${"ef".repeat(32)}`,
+    };
+    expect((await pedir(app, "POST", "/v1/sync", "tecnico", { verificaciones: [visita], fotos: [foto] })).statusCode).toBe(200);
+  });
+});
+
+describe("/v1/temporadas", () => {
+  const temporada = { nombre: "2026/27", inicio: "2026-10-01", fin: "2027-09-30" };
+
+  it("el administrador crea una temporada y todos la ven", async () => {
+    const { app } = crearApp();
+    const res = await pedir(app, "POST", "/v1/temporadas", "admin", temporada);
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject(temporada);
+    const lista = await pedir(app, "GET", "/v1/temporadas", "tecnico");
+    expect(lista.json().temporadas).toHaveLength(1);
+  });
+
+  it("rechaza temporadas que se traslapan", async () => {
+    const { app } = crearApp();
+    await pedir(app, "POST", "/v1/temporadas", "admin", temporada);
+    const res = await pedir(app, "POST", "/v1/temporadas", "admin", { nombre: "otra", inicio: "2027-09-01", fin: "2028-08-31" });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it("valida fechas y que solo el administrador cree temporadas", async () => {
+    const { app } = crearApp();
+    expect((await pedir(app, "POST", "/v1/temporadas", "admin", { ...temporada, fin: "2026-09-01" })).statusCode).toBe(422);
+    expect((await pedir(app, "POST", "/v1/temporadas", "admin", { ...temporada, inicio: "1/10/2026" })).statusCode).toBe(422);
+    expect((await pedir(app, "POST", "/v1/temporadas", "tecnico", temporada)).statusCode).toBe(403);
+  });
+});
+
+describe("chequeo satelital", () => {
+  const porRevisar: FincaPorRevisar = {
+    fincaId: finca.id,
+    version: 1,
+    temporadaId: "t1",
+    geometria: aGeometria(coords) as FincaPorRevisar["geometria"],
+  };
+
+  it.each<[string, Partial<Hallazgos>, Chequeo["resultado"]]>([
+    ["sin nada", {}, "verde"],
+    ["una alerta sin área", { alertas: 1 }, "amarillo"],
+    ["pérdida de 0.05 ha", { haPerdida: 0.05 }, "amarillo"],
+    ["pérdida de 0.1 ha", { haPerdida: 0.1 }, "rojo"],
+    ["alertas por 0.3 ha", { alertas: 4, haAlertas: 0.3 }, "rojo"],
+  ])("clasifica %s como %s", (_, h, esperado) => {
+    expect(clasificar({ alertas: 0, haAlertas: 0, haPerdida: 0, detalle: {}, ...h })).toBe(esperado);
+  });
+
+  it("la tarea programada exige el token de Cloud Scheduler", async () => {
+    const { app } = crearApp();
+    expect((await pedir(app, "POST", "/v1/tareas/chequeo-deforestacion", "admin", {})).statusCode).toBe(401);
+  });
+
+  it("la tarea revisa las fincas pendientes y guarda el resultado", async () => {
+    const { app, repo, satelite } = crearApp();
+    repo.porRevisar.push(porRevisar);
+    satelite.hallazgos = { alertas: 2, haAlertas: 0.4, haPerdida: 0, detalle: {} };
+    const res = await pedir(app, "POST", "/v1/tareas/chequeo-deforestacion", "oidc-scheduler", {});
+    expect(res.json()).toMatchObject({ revisadas: 1, rojo: 1, errores: 0 });
+    expect(repo.chequeos[0]).toMatchObject({ fincaId: finca.id, temporadaId: "t1", resultado: "rojo", areaAfectadaHa: 0.4 });
+  });
+
+  it("si el satélite falla en una finca, sigue con las demás", async () => {
+    const { app, repo, satelite } = crearApp();
+    repo.porRevisar.push(porRevisar);
+    satelite.falla = true;
+    const res = await pedir(app, "POST", "/v1/tareas/chequeo-deforestacion", "oidc-scheduler", {});
+    expect(res.json()).toMatchObject({ revisadas: 0, errores: 1 });
+    expect(repo.chequeos).toHaveLength(0);
+  });
+
+  it("sin API key de GFW responde 503 en vez de marcar fincas", async () => {
+    const { app } = crearApp({ conSatelite: false });
+    expect((await pedir(app, "POST", "/v1/tareas/chequeo-deforestacion", "oidc-scheduler", {})).statusCode).toBe(503);
+  });
+
+  it("el administrador puede revisar una finca en el momento", async () => {
+    const { app, repo } = crearApp();
+    repo.porRevisar.push(porRevisar);
+    const res = await pedir(app, "POST", `/v1/fincas/${finca.id}/chequeo`, "admin", {});
+    expect(res.json()).toMatchObject({ resultado: "verde" });
+    expect((await pedir(app, "POST", `/v1/fincas/${finca.id}/chequeo`, "tecnico", {})).statusCode).toBe(403);
   });
 });
 

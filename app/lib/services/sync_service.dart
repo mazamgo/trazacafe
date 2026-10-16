@@ -105,55 +105,108 @@ class SyncService {
 
   /// Formato que espera `backend/src/sync.ts`.
   static Map<String, dynamic> payload(Pendientes p) => {
-        'productores': [
-          for (final x in p.productores)
-            {
-              'id': x.id,
-              'nombre': x.nombre,
-              'cedula': x.cedula,
-              'comunidad': x.comunidad,
-              'consentimientoFirmado': x.consentimientoFirmado,
-            },
-        ],
-        'fincas': [
-          for (final f in p.fincas)
-            {
-              'id': f.id,
-              'productorId': f.productorId,
-              'nombre': f.nombre,
-              'coordenadas': jsonDecode(f.coordenadasJson),
-              'areaHa': f.areaHa,
-              'geoHash': f.geoHash,
-            },
-        ],
-        'entregas': [
-          for (final e in p.entregas)
-            {
-              'id': e.id,
-              'fincaId': e.fincaId,
-              'kg': e.kg,
-              'estado': e.estado,
-              // Con zona horaria, para que el servidor guarde el instante exacto.
-              'fecha': e.fecha.toUtc().toIso8601String(),
-            },
-        ],
-        'fotos': [
-          for (final f in p.fotos)
-            {
-              'id': f.id,
-              'entidadTipo': f.entidadTipo,
-              'entidadId': f.entidadId,
-              'tipo': f.tipo,
-              'sha256': f.sha256,
-            },
-        ],
-      };
+    'productores': [
+      for (final x in p.productores)
+        {
+          'id': x.id,
+          'nombre': x.nombre,
+          'cedula': x.cedula,
+          'comunidad': x.comunidad,
+          'consentimientoFirmado': x.consentimientoFirmado,
+        },
+    ],
+    'fincas': [
+      for (final f in p.fincas)
+        {
+          'id': f.id,
+          'productorId': f.productorId,
+          'nombre': f.nombre,
+          'coordenadas': jsonDecode(f.coordenadasJson),
+          'areaHa': f.areaHa,
+          'geoHash': f.geoHash,
+        },
+    ],
+    'versionesFinca': [
+      for (final v in p.versionesFinca)
+        {
+          'fincaId': v.fincaId,
+          'version': v.version,
+          'coordenadas': jsonDecode(v.coordenadasJson),
+          'areaHa': v.areaHa,
+          'geoHash': v.geoHash,
+        },
+    ],
+    'verificaciones': [
+      for (final v in p.verificaciones)
+        {
+          'id': v.id,
+          'fincaId': v.fincaId,
+          'fecha': v.fecha.toUtc().toIso8601String(),
+          'linderoCambio': v.linderoCambio,
+          'versionFinca': v.versionFinca,
+          'nota': v.nota,
+        },
+    ],
+    'entregas': [
+      for (final e in p.entregas)
+        {
+          'id': e.id,
+          'fincaId': e.fincaId,
+          'kg': e.kg,
+          'estado': e.estado,
+          // Con zona horaria, para que el servidor guarde el instante exacto.
+          'fecha': e.fecha.toUtc().toIso8601String(),
+        },
+    ],
+    'fotos': [
+      for (final f in p.fotos)
+        {
+          'id': f.id,
+          'entidadTipo': f.entidadTipo,
+          'entidadId': f.entidadId,
+          'tipo': f.tipo,
+          'sha256': f.sha256,
+        },
+    ],
+  };
 
   /// Convierte la respuesta de `GET /v1/datos` en filas locales ya sincronizadas.
   static DatosServidor desdeServidor(Map<String, dynamic> d) {
     const enviado = Value(true);
+    List<Map<String, dynamic>> lista(String clave) =>
+        ((d[clave] as List?) ?? const []).cast<Map<String, dynamic>>();
+    DateTime? fecha(Object? v) =>
+        v == null ? null : DateTime.parse(v as String).toLocal();
+    // "2026-10-01" → medianoche local de ese día (las temporadas son días en Nicaragua).
+    DateTime dia(Object v) {
+      final p = (v as String).split('-').map(int.parse).toList();
+      return DateTime(p[0], p[1], p[2]);
+    }
+
     return DatosServidor(
-      [
+      temporadas: [
+        for (final t in lista('temporadas'))
+          TemporadasCompanion(
+            id: Value(t['id'] as String),
+            nombre: Value(t['nombre'] as String),
+            inicio: Value(dia(t['inicio']!)),
+            fin: Value(dia(t['fin']!)),
+          ),
+      ],
+      verificaciones: [
+        for (final v in lista('verificaciones'))
+          VerificacionesCompanion(
+            id: Value(v['id'] as String),
+            fincaId: Value(v['fincaId'] as String),
+            temporadaId: Value(v['temporadaId'] as String?),
+            fecha: Value(fecha(v['fecha'])!),
+            linderoCambio: Value(v['linderoCambio'] as bool),
+            versionFinca: Value(v['versionFinca'] as int),
+            nota: Value(v['nota'] as String?),
+            sincronizado: enviado,
+          ),
+      ],
+      productores: [
         for (final p in (d['productores'] as List).cast<Map<String, dynamic>>())
           ProductoresCompanion(
             id: Value(p['id'] as String),
@@ -164,7 +217,7 @@ class SyncService {
             sincronizado: enviado,
           ),
       ],
-      [
+      fincas: [
         for (final f in (d['fincas'] as List).cast<Map<String, dynamic>>())
           FincasCompanion(
             id: Value(f['id'] as String),
@@ -175,14 +228,20 @@ class SyncService {
             areaOficialHa: Value((f['areaOficialHa'] as num?)?.toDouble()),
             geoHash: Value(f['geoHash'] as String),
             attestationUid: Value(f['attestationUid'] as String?),
+            version: Value((f['version'] as int?) ?? 1),
+            deforestacion: Value(
+              (f['deforestacion'] as String?) ?? 'pendiente',
+            ),
+            ultimoChequeo: Value(fecha(f['ultimoChequeo'])),
             sincronizado: enviado,
           ),
       ],
-      [
+      entregas: [
         for (final e in (d['entregas'] as List).cast<Map<String, dynamic>>())
           EntregasCompanion(
             id: Value(e['id'] as String),
             fincaId: Value(e['fincaId'] as String),
+            temporadaId: Value(e['temporadaId'] as String?),
             kg: Value((e['kg'] as num).toDouble()),
             estado: Value(e['estado'] as String),
             fecha: Value(DateTime.parse(e['fecha'] as String).toLocal()),

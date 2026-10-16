@@ -51,6 +51,8 @@ export function uuidABytes32(uuid: string): Hex {
 
 export interface DatosFinca {
   fincaId: string;
+  /** Versión del lindero (1 la primera; sube con cada lindero nuevo). */
+  version: number;
   geoHash: Hex;
   areaHa: number;
   deforestacionOK: boolean;
@@ -61,6 +63,7 @@ export interface DatosFinca {
 export function codificarFinca(d: DatosFinca): Hex {
   return codificar("Finca", [
     uuidABytes32(d.fincaId),
+    d.version,
     d.geoHash,
     Math.round(d.areaHa * 100),
     d.deforestacionOK,

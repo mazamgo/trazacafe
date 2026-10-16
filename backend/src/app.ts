@@ -2,24 +2,36 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
-import { AccesoDenegado, type Repo } from "./repo.ts";
-import { syncSchema } from "./sync.ts";
+import { revisar, type FuenteSatelital } from "./deforestacion.ts";
+import { AccesoDenegado, VersionDesfasada, type Repo } from "./repo.ts";
+import { syncSchema, temporadaSchema } from "./sync.ts";
 
 const invitacionSchema = z.object({
   email: z.email().transform((e) => e.toLowerCase()),
   rol: z.enum(["admin", "tecnico"]),
 });
 
+/** Fincas que revisa cada ejecución diaria de la tarea programada. */
+const FINCAS_POR_TAREA = 50;
+
+/** Valida el token OIDC con el que Cloud Scheduler llama a las tareas. */
+export type VerificarTarea = (token: string) => Promise<boolean>;
+
 export function buildApp({
   repo,
   verificarToken,
   identidad,
   almacen,
+  satelite,
+  verificarTarea,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
   identidad: Identidad;
   almacen: Almacen;
+  /** `null` mientras no haya API key de Global Forest Watch. */
+  satelite: FuenteSatelital | null;
+  verificarTarea: VerificarTarea;
 }) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -83,17 +95,82 @@ export function buildApp({
       await repo.guardarSync(usuario, datos.data);
     } catch (e) {
       if (e instanceof AccesoDenegado) return reply.code(403).send({ error: e.message });
+      if (e instanceof VersionDesfasada) {
+        return reply.code(409).send({ error: "version_desfasada", mensaje: e.message });
+      }
       throw e;
     }
-    const { productores, fincas, entregas, fotos } = datos.data;
+    const d = datos.data;
     return {
       recibidos: {
-        productores: productores.length,
-        fincas: fincas.length,
-        entregas: entregas.length,
-        fotos: fotos.length,
+        productores: d.productores.length,
+        fincas: d.fincas.length,
+        versionesFinca: d.versionesFinca.length,
+        verificaciones: d.verificaciones.length,
+        entregas: d.entregas.length,
+        fotos: d.fotos.length,
       },
     };
+  });
+
+  app.get("/v1/temporadas", async (req, reply) => {
+    const usuario = await activo(req, reply);
+    if (!usuario) return;
+    return { temporadas: await repo.listarTemporadas(usuario.organizacionId) };
+  });
+
+  app.post("/v1/temporadas", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    const datos = temporadaSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const t = await repo.crearTemporada(admin.organizacionId, { ...datos.data, id: crypto.randomUUID() }, admin.uid);
+    if (!t) {
+      return reply.code(409).send({ error: "traslape", mensaje: "Esas fechas se cruzan con otra temporada." });
+    }
+    return reply.code(201).send(t);
+  });
+
+  /**
+   * Chequeo satelital programado (Cloud Scheduler, una vez al día). Revisa
+   * las fincas que todavía no tienen chequeo de su lindero vigente en la
+   * temporada actual: en la práctica, una vez por temporada.
+   */
+  app.post("/v1/tareas/chequeo-deforestacion", async (req, reply) => {
+    const token = req.headers.authorization?.replace(/^Bearer /, "");
+    if (!token || !(await verificarTarea(token))) return reply.code(401).send({ error: "No autorizado" });
+    if (!satelite) return reply.code(503).send({ error: "sin_satelite", mensaje: "Falta GFW_API_KEY." });
+
+    const fincas = await repo.fincasPorRevisar(FINCAS_POR_TAREA);
+    const resultados = { revisadas: 0, verde: 0, amarillo: 0, rojo: 0, errores: 0 };
+    for (const f of fincas) {
+      try {
+        const c = await revisar(satelite, f);
+        await repo.guardarChequeo(c);
+        resultados.revisadas++;
+        resultados[c.resultado]++;
+      } catch (e) {
+        resultados.errores++;
+        req.log.error({ fincaId: f.fincaId, err: e }, "chequeo satelital falló");
+      }
+    }
+    return resultados;
+  });
+
+  /** Revisar una finca ahora (p. ej. después de una denuncia). Solo administradores. */
+  app.post<{ Params: { id: string } }>("/v1/fincas/:id/chequeo", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    if (!satelite) return reply.code(503).send({ error: "sin_satelite", mensaje: "El chequeo satelital aún no está configurado." });
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrada" });
+
+    const finca = await repo.fincaParaRevisar(admin.organizacionId, req.params.id);
+    if (!finca) return reply.code(404).send({ error: "no_encontrada" });
+    const c = await revisar(satelite, finca);
+    await repo.guardarChequeo(c);
+    return { resultado: c.resultado, alertas: c.alertas, areaAfectadaHa: c.areaAfectadaHa };
   });
 
   /** Productores, fincas y entregas de toda la organización (lo de todo el equipo). */

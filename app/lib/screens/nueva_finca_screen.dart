@@ -11,12 +11,27 @@ import '../providers.dart';
 import '../services/fotos_service.dart';
 import '../widgets/mapa_google.dart';
 
+/// Lindero dibujado en modo "nuevo lindero" (se devuelve, no se guarda aquí).
+typedef LinderoNuevo = ({
+  String coordenadasJson,
+  double areaHa,
+  String geoHash,
+});
+
 /// Registro de una finca: el técnico marca los vértices tocando el mapa o
 /// caminando el lindero con "Agregar mi ubicación".
+///
+/// Con [linderoAnterior] sirve para volver a dibujar el lindero en una visita
+/// de verificación: muestra el anterior como referencia y devuelve el nuevo
+/// con `Navigator.pop` como [LinderoNuevo], sin tocar la base.
 class NuevaFincaScreen extends ConsumerStatefulWidget {
-  const NuevaFincaScreen({super.key, required this.productorId});
+  const NuevaFincaScreen({super.key, this.productorId, this.linderoAnterior})
+    : assert(productorId != null || linderoAnterior != null);
 
-  final String productorId;
+  final String? productorId;
+  final List<LatLng>? linderoAnterior;
+
+  bool get esLindero => linderoAnterior != null;
 
   @override
   ConsumerState<NuevaFincaScreen> createState() => _NuevaFincaScreenState();
@@ -83,7 +98,7 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
   }
 
   Future<void> _guardar() async {
-    if (_fincaCtrl.text.trim().isEmpty) {
+    if (!widget.esLindero && _fincaCtrl.text.trim().isEmpty) {
       _aviso('Escribe el nombre de la finca.');
       return;
     }
@@ -106,6 +121,16 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
       return;
     }
 
+    if (widget.esLindero) {
+      final LinderoNuevo nuevo = (
+        coordenadasJson: aGeoJsonCoords(_puntos),
+        areaHa: area,
+        geoHash: geoHash(_puntos),
+      );
+      Navigator.of(context).pop(nuevo);
+      return;
+    }
+
     setState(() => _guardando = true);
     final db = ref.read(databaseProvider);
     final fincaId = const Uuid().v4();
@@ -116,7 +141,7 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
           .insert(
             FincasCompanion.insert(
               id: fincaId,
-              productorId: widget.productorId,
+              productorId: widget.productorId!,
               nombre: _fincaCtrl.text.trim(),
               coordenadasJson: aGeoJsonCoords(_puntos),
               areaHa: area,
@@ -149,48 +174,84 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     final esPoligono = _puntos.length >= 3;
     final problema = _problema;
     // Amarillo y rojo se distinguen bien sobre la imagen satelital.
-    final colorBorde = problema == null ? Colors.yellowAccent : Colors.red.shade600;
+    final colorBorde = problema == null
+        ? Colors.yellowAccent
+        : Colors.red.shade600;
     final sesionMapa = ref.watch(sesionMapaProvider).value;
 
+    final anterior = widget.linderoAnterior;
+    // En modo lindero, el mapa arranca sobre la finca.
+    final centro = anterior == null || anterior.isEmpty
+        ? _centroInicial
+        : LatLng(
+            anterior.map((p) => p.latitude).reduce((a, b) => a + b) /
+                anterior.length,
+            anterior.map((p) => p.longitude).reduce((a, b) => a + b) /
+                anterior.length,
+          );
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Nueva finca')),
+      appBar: AppBar(
+        title: Text(widget.esLindero ? 'Nuevo lindero' : 'Nueva finca'),
+      ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _fincaCtrl,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre de la finca',
+          if (widget.esLindero)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Text(
+                'El lindero anterior se ve en blanco. Marca el nuevo siguiendo el borde actual; '
+                'el anterior se conserva en el historial.',
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _fincaCtrl,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre de la finca',
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Foto de la finca',
-                  onPressed: _tomarFoto,
-                  icon: Badge(
-                    isLabelVisible: _fotos.isNotEmpty,
-                    label: Text('${_fotos.length}'),
-                    child: const Icon(Icons.photo_camera),
+                  IconButton(
+                    tooltip: 'Foto de la finca',
+                    onPressed: _tomarFoto,
+                    icon: Badge(
+                      isLabelVisible: _fotos.isNotEmpty,
+                      label: Text('${_fotos.length}'),
+                      child: const Icon(Icons.photo_camera),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           Expanded(
             child: FlutterMap(
               mapController: _mapCtrl,
               options: MapOptions(
-                initialCenter: _centroInicial,
-                initialZoom: 14,
+                initialCenter: centro,
+                initialZoom: anterior == null ? 14 : 17,
                 onTap: (_, punto) => setState(() => _puntos.add(punto)),
               ),
               children: [
                 if (sesionMapa != null) capaGoogle(sesionMapa),
+                if (anterior != null && anterior.length >= 3)
+                  PolygonLayer(
+                    polygons: [
+                      Polygon(
+                        points: anterior,
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderColor: Colors.white,
+                        borderStrokeWidth: 2,
+                        pattern: StrokePattern.dashed(segments: const [10, 6]),
+                      ),
+                    ],
+                  ),
                 if (esPoligono)
                   PolygonLayer(
                     polygons: [
@@ -231,7 +292,10 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                   ],
                 ),
                 if (sesionMapa != null)
-                  AtribucionGoogle(sesion: sesionMapa, servicio: ref.read(mapasServiceProvider))
+                  AtribucionGoogle(
+                    sesion: sesionMapa,
+                    servicio: ref.read(mapasServiceProvider),
+                  )
                 else
                   const Align(
                     alignment: Alignment.topCenter,
@@ -307,7 +371,11 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                       onPressed: _guardando || problema != null
                           ? null
                           : _guardar,
-                      child: const Text('Guardar finca'),
+                      child: Text(
+                        widget.esLindero
+                            ? 'Usar este lindero'
+                            : 'Guardar finca',
+                      ),
                     ),
                   ),
                 ],

@@ -127,6 +127,24 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - **Al publicar en Play Store** agrega el SHA-1 de Play App Signing a esta key (como en la sección 4) y compila con `--dart-define=ANDROID_CERT_SHA1=<SHA1>`.
 - La app muestra "Google" y el copyright de las imágenes visibles (`/tile/v1/viewport`), como exigen las políticas de Google. Para producción conviene usar el logo oficial de Google en vez del texto.
 
+## 4d. Temporadas, visitas y chequeo satelital
+
+- **Temporadas:** cada organización crea las suyas (menú ⋮ → Temporadas, solo administradores). No pueden traslaparse. Las entregas y visitas que llegan sin temporada se asignan solas al crearla.
+- **Visita de verificación:** al menos una foto y, si cambió el lindero, uno nuevo. El lindero anterior queda en `fincas_versiones` y cada versión se atesta con su propio número.
+- **Aviso:** si la finca no tiene visita en la temporada actual, o está en rojo, la app avisa al registrar una entrega. En la semana 4, el lote de exportación rechazará esas entregas.
+- **Chequeo satelital** (`backend/src/deforestacion.ts`): consulta la Data API de Global Forest Watch.
+  - **Datos:** pérdida de cobertura (`umd_tree_cover_loss`, años > 2020, densidad ≥ 30 %) y alertas integradas (`gfw_integrated_alerts` posteriores al 31/12/2020, confianza nominal o alta).
+  - **Resultado:** verde = nada; amarillo = menos de 0.1 ha; rojo = 0.1 ha o más. Las fincas de un solo punto se revisan como un círculo de su área.
+  - **Programación:** Cloud Scheduler `chequeo-deforestacion` (us-east4) llama todos los días a las 6:00 (hora de Managua) a `POST /v1/tareas/chequeo-deforestacion`, con un token OIDC de la cuenta `trazacafe-tareas@…`. Cada día revisa hasta 50 fincas que aún no tienen chequeo de su lindero vigente en la temporada actual; en la práctica, cada finca una vez por temporada.
+  - **Revisión a mano:** el administrador puede revisar una finca en el momento desde la app (`POST /v1/fincas/:id/chequeo`).
+- **API key de GFW:** con tu cuenta de globalforestwatch.org creada (con correo, no con Google), ejecuta `powershell -ExecutionPolicy Bypass -File infra\gfw-api-key.ps1`. El script la guarda en Secret Manager (`gfw-api-key`). Después:
+
+  ```powershell
+  gcloud run deploy trazacafe-api --image=<imagen actual> --region=$REGION --project=$PROYECTO --set-secrets=GFW_API_KEY=gfw-api-key:latest
+  ```
+
+  Sin la key, la tarea responde 503 y no marca ninguna finca. La key vence al año: vuelve a correr el script.
+
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, entregas, fotos), `GET /v1/datos` (todo lo de la organización), `POST /v1/fotos/:id/subida`, `DELETE /v1/fincas/:id`, `GET|POST|DELETE /v1/invitaciones`.

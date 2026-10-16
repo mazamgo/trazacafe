@@ -23,6 +23,17 @@
       "geoHash": "0x2f95794d89008adc55fc3797ed22992bb737b4049d5a73383f7a02d79a2cdfe4"
     }
   ],
+  "versionesFinca": [],
+  "verificaciones": [
+    {
+      "id": "8a7b6c5d-4e3f-4a1b-9c8d-7e6f5a4b3c2d",
+      "fincaId": "3f2b8c1e-9a4d-4e7f-8b21-0c5d6e7f8a90",
+      "fecha": "2026-10-16T16:00:00.000Z",
+      "linderoCambio": false,
+      "versionFinca": 1,
+      "nota": "Sin cambios en el lindero"
+    }
+  ],
   "entregas": [
     {
       "id": "5d1c9e2a-7b3f-4a6d-9e8c-1f2a3b4c5d6e",
