@@ -1,8 +1,17 @@
 import { geoHash, type Coordenada } from "@trazacafe/eudr-eas-schemas";
 import { describe, expect, it } from "vitest";
+import { rutaFoto, sha256Hex, type Almacen } from "../src/almacen.ts";
 import { buildApp } from "../src/app.ts";
 import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
-import { AccesoDenegado, aGeometria, type Invitacion, type Repo } from "../src/repo.ts";
+import {
+  AccesoDenegado,
+  aGeometria,
+  desdeGeometria,
+  type DatosOrganizacion,
+  type Invitacion,
+  type Repo,
+  type ResultadoEliminarFinca,
+} from "../src/repo.ts";
 import type { LoteSync } from "../src/sync.ts";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -52,13 +61,25 @@ class RepoMemoria implements Repo {
     this.invitaciones.set(inv.email, { ...inv, usuarioUid: null, creadoEn: "ahora", aceptadaEn: null });
     return true;
   }
-  fincas = new Map<string, { organizacionId: string; atestada: boolean }>();
-  async eliminarFinca(organizacionId: string, fincaId: string) {
+  fincas = new Map<string, { organizacionId: string; atestada: boolean; archivos?: string[] }>();
+  async eliminarFinca(organizacionId: string, fincaId: string): Promise<ResultadoEliminarFinca> {
     const f = this.fincas.get(fincaId);
-    if (!f || f.organizacionId !== organizacionId) return "no_encontrada" as const;
-    if (f.atestada) return "atestada" as const;
+    if (!f || f.organizacionId !== organizacionId) return { estado: "no_encontrada", archivos: [] };
+    if (f.atestada) return { estado: "atestada", archivos: [] };
     this.fincas.delete(fincaId);
-    return "eliminada" as const;
+    return { estado: "eliminada", archivos: f.archivos ?? [] };
+  }
+  datos: DatosOrganizacion = { productores: [], fincas: [], entregas: [] };
+  async datosOrganizacion(organizacionId: string) {
+    return organizacionId === ORG ? this.datos : { productores: [], fincas: [], entregas: [] };
+  }
+  fotos = new Map<string, { organizacionId: string; sha256: string; storagePath: string | null }>();
+  async buscarFoto(organizacionId: string, fotoId: string) {
+    const f = this.fotos.get(fotoId);
+    return f && f.organizacionId === organizacionId ? f : null;
+  }
+  async marcarFotoSubida(fotoId: string, storagePath: string) {
+    this.fotos.get(fotoId)!.storagePath = storagePath;
   }
   async listarInvitaciones(organizacionId: string) {
     return [...this.invitaciones.values()].filter((i) => i.organizacionId === organizacionId);
@@ -90,11 +111,24 @@ const usuarios: Record<string, Usuario> = {
   nuevo: { uid: "u-nuevo", email: "Nuevo@Gmail.com" },
 };
 
+class AlmacenMemoria implements Almacen {
+  archivos = new Map<string, Buffer>();
+  borrados: string[] = [];
+  async leer(ruta: string) {
+    return this.archivos.get(ruta) ?? null;
+  }
+  async borrar(ruta: string) {
+    this.archivos.delete(ruta);
+    this.borrados.push(ruta);
+  }
+}
+
 function crearApp() {
   const repo = new RepoMemoria();
   const identidad = new IdentidadFalsa();
-  const app = buildApp({ repo, identidad, verificarToken: async (t) => usuarios[t] ?? null });
-  return { app, repo, identidad };
+  const almacen = new AlmacenMemoria();
+  const app = buildApp({ repo, identidad, almacen, verificarToken: async (t) => usuarios[t] ?? null });
+  return { app, repo, identidad, almacen };
 }
 
 type App = ReturnType<typeof crearApp>["app"];
@@ -107,7 +141,7 @@ describe("POST /v1/sync", () => {
     const { app, repo } = crearApp();
     const res = await pedir(app, "POST", "/v1/sync", "tecnico", { productores: [productor], fincas: [finca] });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ recibidos: { productores: 1, fincas: 1, fotos: 0 } });
+    expect(res.json()).toEqual({ recibidos: { productores: 1, fincas: 1, entregas: 0, fotos: 0 } });
     expect(repo.sync[0].usuario).toMatchObject({ uid: "u-tec", organizacionId: ORG });
   });
 
@@ -289,6 +323,104 @@ describe("DELETE /v1/fincas/:id", () => {
     const { app } = crearApp();
     expect((await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "nuevo")).statusCode).toBe(403);
     expect((await pedir(app, "DELETE", "/v1/fincas/no-es-uuid", "tecnico")).statusCode).toBe(404);
+  });
+
+  it("borra también las fotos de la finca en Storage", async () => {
+    const { app, repo, almacen } = crearApp();
+    const ruta = rutaFoto(ORG, "9b2e1f4a-6c3d-4f8e-a1b2-3c4d5e6f7a8b");
+    repo.fincas.set(finca.id, { organizacionId: ORG, atestada: false, archivos: [ruta] });
+    expect((await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "tecnico")).statusCode).toBe(204);
+    expect(almacen.borrados).toEqual([ruta]);
+  });
+});
+
+describe("entregas en /v1/sync", () => {
+  const entrega = {
+    id: "5d1c9e2a-7b3f-4a6d-9e8c-1f2a3b4c5d6e",
+    fincaId: finca.id,
+    kg: 345.5,
+    estado: "uva",
+    fecha: "2026-10-16T08:30:00.000-06:00",
+  };
+
+  it("acepta entregas válidas", async () => {
+    const { app, repo } = crearApp();
+    const res = await pedir(app, "POST", "/v1/sync", "tecnico", { entregas: [entrega] });
+    expect(res.statusCode).toBe(200);
+    expect(repo.sync[0].datos.entregas[0]).toMatchObject({ kg: 345.5, estado: "uva" });
+  });
+
+  it.each([
+    ["kg en cero", { kg: 0 }],
+    ["más de 20 toneladas", { kg: 25_000 }],
+    ["estado desconocido", { estado: "oro" }],
+    ["fecha en el futuro", { fecha: new Date(Date.now() + 3 * 24 * 3600_000).toISOString() }],
+    ["fecha sin zona horaria válida", { fecha: "16/10/2026" }],
+  ])("rechaza %s", async (_, cambio) => {
+    const { app, repo } = crearApp();
+    expect((await pedir(app, "POST", "/v1/sync", "tecnico", { entregas: [{ ...entrega, ...cambio }] })).statusCode).toBe(422);
+    expect(repo.sync).toHaveLength(0);
+  });
+});
+
+describe("GET /v1/datos", () => {
+  it("devuelve los datos de la organización del token", async () => {
+    const { app, repo } = crearApp();
+    repo.datos.productores.push({ ...productor, cedula: null, comunidad: null });
+    const res = await pedir(app, "GET", "/v1/datos", "tecnico");
+    expect(res.statusCode).toBe(200);
+    expect(res.json().productores).toHaveLength(1);
+  });
+
+  it("exige acceso activo", async () => {
+    const { app } = crearApp();
+    expect((await pedir(app, "GET", "/v1/datos", "nuevo")).statusCode).toBe(403);
+  });
+});
+
+describe("POST /v1/fotos/:id/subida", () => {
+  const fotoId = "9b2e1f4a-6c3d-4f8e-a1b2-3c4d5e6f7a8b";
+  const contenido = Buffer.from("jpeg de prueba");
+
+  function conFoto() {
+    const ctx = crearApp();
+    ctx.repo.fotos.set(fotoId, { organizacionId: ORG, sha256: sha256Hex(contenido), storagePath: null });
+    return ctx;
+  }
+
+  it("acepta el archivo si su SHA-256 coincide y guarda la ruta", async () => {
+    const { app, repo, almacen } = conFoto();
+    almacen.archivos.set(rutaFoto(ORG, fotoId), contenido);
+    const res = await pedir(app, "POST", `/v1/fotos/${fotoId}/subida`, "tecnico", {});
+    expect(res.statusCode).toBe(200);
+    expect(repo.fotos.get(fotoId)?.storagePath).toBe(rutaFoto(ORG, fotoId));
+  });
+
+  it("rechaza y borra un archivo distinto al registrado", async () => {
+    const { app, repo, almacen } = conFoto();
+    almacen.archivos.set(rutaFoto(ORG, fotoId), Buffer.from("otra foto"));
+    const res = await pedir(app, "POST", `/v1/fotos/${fotoId}/subida`, "tecnico", {});
+    expect(res.statusCode).toBe(422);
+    expect(almacen.borrados).toEqual([rutaFoto(ORG, fotoId)]);
+    expect(repo.fotos.get(fotoId)?.storagePath).toBeNull();
+  });
+
+  it("responde 409 si el archivo aún no está en Storage", async () => {
+    const { app } = conFoto();
+    expect((await pedir(app, "POST", `/v1/fotos/${fotoId}/subida`, "tecnico", {})).statusCode).toBe(409);
+  });
+
+  it("no deja confirmar fotos de otra organización", async () => {
+    const { app, repo } = crearApp();
+    repo.fotos.set(fotoId, { organizacionId: OTRA_ORG, sha256: sha256Hex(contenido), storagePath: null });
+    expect((await pedir(app, "POST", `/v1/fotos/${fotoId}/subida`, "tecnico", {})).statusCode).toBe(404);
+  });
+});
+
+describe("desdeGeometria", () => {
+  it("es lo inverso de aGeometria", () => {
+    expect(desdeGeometria(aGeometria(coords))).toEqual(coords);
+    expect(desdeGeometria(aGeometria([[-86.235, 13.6305]]))).toEqual([[-86.235, 13.6305]]);
   });
 });
 

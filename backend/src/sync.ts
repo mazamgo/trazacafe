@@ -50,7 +50,22 @@ export const fincaSchema = z
     }
   });
 
-/** Por ahora solo llega el hash; el archivo se subirá a Cloud Storage. */
+/** Entrega de café de una finca al beneficio húmedo. */
+export const entregaSchema = z
+  .object({
+    id: z.uuid(),
+    fincaId: z.uuid(),
+    // Un camión grande lleva ~15 t; más que eso en una entrega es un error de digitación.
+    kg: z.number().positive().max(20_000),
+    estado: z.enum(["uva", "pergamino"]),
+    fecha: z.iso.datetime({ offset: true }),
+  })
+  .refine((e) => Date.parse(e.fecha) <= Date.now() + 24 * 3600_000, {
+    path: ["fecha"],
+    message: "La fecha de la entrega no puede estar en el futuro",
+  });
+
+/** Llega el hash; el archivo se sube aparte a Cloud Storage y se confirma con /v1/fotos/:id/subida. */
 export const fotoSchema = z.object({
   id: z.uuid(),
   entidadTipo: z.enum(["productor", "finca"]),
@@ -62,10 +77,12 @@ export const fotoSchema = z.object({
 export const syncSchema = z.object({
   productores: z.array(productorSchema).default([]),
   fincas: z.array(fincaSchema).default([]),
+  entregas: z.array(entregaSchema).default([]),
   fotos: z.array(fotoSchema).default([]),
 });
 
 export type Productor = z.infer<typeof productorSchema>;
 export type FincaSync = z.infer<typeof fincaSchema>;
+export type EntregaSync = z.infer<typeof entregaSchema>;
 export type FotoSync = z.infer<typeof fotoSchema>;
 export type LoteSync = z.infer<typeof syncSchema>;

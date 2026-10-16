@@ -106,7 +106,30 @@ npm run crear-organizacion -- --nombre "Cooperativa Ejemplo R.L." --admin gerent
 
 El administrador entra con "Entrar con Google" usando ese correo y desde **Equipo** invita a sus técnicos. Quitar a alguien le borra los permisos y cierra sus sesiones al instante (la API verifica tokens revocados). Necesita la base de datos (paso 2).
 
+## 4b. Fotos en Firebase Storage (ya hecho)
+
+| Dato | Valor |
+|---|---|
+| Bucket | `trazacafe-dev.firebasestorage.app` en **US-EAST1** (región con cuota gratis de Storage) |
+| Ruta | `organizaciones/{organizacionId}/fotos/{fotoId}.jpg` |
+| Reglas | `storage.rules` en la raíz: cada organización lee y crea solo en su carpeta; JPEG < 5 MB; nada se reemplaza ni se borra desde la app |
+
+Flujo: la app sincroniza el hash de la foto, sube el archivo directo a Storage y llama a `POST /v1/fotos/:id/subida`; la API descarga el archivo, compara su SHA-256 y solo entonces guarda `storage_path`. Si no coincide, lo borra. La cuenta de servicio de la API tiene `storage.objectAdmin` sobre el bucket.
+
+Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz).
+
+## 4c. Mapas: Google Map Tiles (ya hecho)
+
+- API `tile.googleapis.com` activada; mosaicos **satelitales con calles** (`mapType: satellite` + `layerRoadmap`).
+- Key "TrazaCafe mapas (Android)" (`87275de0-…`) limitada al paquete `com.goproduction.trazacafe` + SHA-1 de depuración y solo a `tile.googleapis.com`. Está en `app/lib/mapas_config.dart`; la app envía `X-Android-Package` y `X-Android-Cert` en cada petición.
+- Cuota gratis: **100,000 mosaicos al mes**; un técnico marcando una finca usa del orden de cientos.
+- La sesión dura ~2 semanas y se guarda en el celular; Google solo permite la caché temporal del teléfono, no descargar zonas completas.
+- **Al publicar en Play Store** agrega el SHA-1 de Play App Signing a esta key (como en la sección 4) y compila con `--dart-define=ANDROID_CERT_SHA1=<SHA1>`.
+- La app muestra "Google" y el copyright de las imágenes visibles (`/tile/v1/viewport`), como exigen las políticas de Google. Para producción conviene usar el logo oficial de Google en vez del texto.
+
 ## 5. Backend en Cloud Run (ya hecho)
+
+Endpoints: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, entregas, fotos), `GET /v1/datos` (todo lo de la organización), `POST /v1/fotos/:id/subida`, `DELETE /v1/fincas/:id`, `GET|POST|DELETE /v1/invitaciones`.
 
 **URL de la API:** https://trazacafe-api-85528878949.us-east4.run.app
 
@@ -116,6 +139,7 @@ El administrador entra con "Entrar con Google" usando ese correo y desde **Equip
 | Cuenta de servicio | `trazacafe-api@trazacafe-dev.iam.gserviceaccount.com` con solo `cloudsql.client`, `cloudsql.instanceUser` y `firebaseauth.admin` |
 | Usuario de la base | `trazacafe-api@trazacafe-dev.iam` (IAM, rol `trazacafe_app`: solo datos) |
 | Imágenes | Artifact Registry `us-east4-docker.pkg.dev/trazacafe-dev/trazacafe/backend` |
+| Variables | `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`, `FIREBASE_PROJECT_ID`, `STORAGE_BUCKET` |
 
 La URL es pública (`allUsers` como invocador) porque la app la llama directamente; la API exige el token de Firebase en cada `/v1/*`. `.gcloudignore` limita lo que se sube a Cloud Build a `package*.json`, `schemas/` y `backend/`.
 

@@ -1,5 +1,6 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
+import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
 import { AccesoDenegado, type Repo } from "./repo.ts";
 import { syncSchema } from "./sync.ts";
@@ -13,10 +14,12 @@ export function buildApp({
   repo,
   verificarToken,
   identidad,
+  almacen,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
   identidad: Identidad;
+  almacen: Almacen;
 }) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -82,8 +85,51 @@ export function buildApp({
       if (e instanceof AccesoDenegado) return reply.code(403).send({ error: e.message });
       throw e;
     }
-    const { productores, fincas, fotos } = datos.data;
-    return { recibidos: { productores: productores.length, fincas: fincas.length, fotos: fotos.length } };
+    const { productores, fincas, entregas, fotos } = datos.data;
+    return {
+      recibidos: {
+        productores: productores.length,
+        fincas: fincas.length,
+        entregas: entregas.length,
+        fotos: fotos.length,
+      },
+    };
+  });
+
+  /** Productores, fincas y entregas de toda la organización (lo de todo el equipo). */
+  app.get("/v1/datos", async (req, reply) => {
+    const usuario = await activo(req, reply);
+    if (!usuario) return;
+    return repo.datosOrganizacion(usuario.organizacionId);
+  });
+
+  /**
+   * La app avisa que ya subió el archivo de una foto a Storage. La API lo lee
+   * y solo lo acepta si su SHA-256 es el que llegó al sincronizar: así el
+   * hash que irá en la attestation corresponde de verdad a la foto guardada.
+   */
+  app.post<{ Params: { id: string } }>("/v1/fotos/:id/subida", async (req, reply) => {
+    const usuario = await activo(req, reply);
+    if (!usuario) return;
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrada" });
+
+    const foto = await repo.buscarFoto(usuario.organizacionId, req.params.id);
+    if (!foto) return reply.code(404).send({ error: "no_encontrada", mensaje: "Sincroniza la foto antes de subirla." });
+
+    const ruta = rutaFoto(usuario.organizacionId, req.params.id);
+    if (foto.storagePath === ruta) return { storagePath: ruta };
+
+    const archivo = await almacen.leer(ruta);
+    if (!archivo) return reply.code(409).send({ error: "sin_archivo", mensaje: "El archivo todavía no está en Storage." });
+    if (sha256Hex(archivo) !== foto.sha256) {
+      await almacen.borrar(ruta);
+      return reply.code(422).send({
+        error: "hash_distinto",
+        mensaje: "El archivo subido no coincide con la foto registrada; se borró. Vuelve a subirla.",
+      });
+    }
+    await repo.marcarFotoSubida(req.params.id, ruta);
+    return { storagePath: ruta };
   });
 
   /** Corrige un error de campo: borra una finca que aún no se atestó. */
@@ -93,13 +139,16 @@ export function buildApp({
     if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrada" });
 
     const r = await repo.eliminarFinca(usuario.organizacionId, req.params.id);
-    if (r === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
-    if (r === "atestada") {
+    if (r.estado === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
+    if (r.estado === "atestada") {
       return reply.code(409).send({
         error: "atestada",
-        mensaje: "Esta finca ya está registrada en la blockchain; hay que revocar su attestation.",
+        mensaje: "Esta finca o una de sus entregas ya está en la blockchain; hay que revocar su attestation.",
       });
     }
+    // Si falla borrar un archivo, la finca ya no existe: queda un archivo
+    // huérfano en Storage, que no expone nada (solo lo lee la organización).
+    await Promise.allSettled(r.archivos.map((a) => almacen.borrar(a)));
     return reply.code(204).send();
   });
 

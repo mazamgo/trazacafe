@@ -538,6 +538,17 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _areaOficialHaMeta = const VerificationMeta(
+    'areaOficialHa',
+  );
+  @override
+  late final GeneratedColumn<double> areaOficialHa = GeneratedColumn<double>(
+    'area_oficial_ha',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _geoHashMeta = const VerificationMeta(
     'geoHash',
   );
@@ -594,6 +605,7 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
     nombre,
     coordenadasJson,
     areaHa,
+    areaOficialHa,
     geoHash,
     attestationUid,
     creadoEn,
@@ -653,6 +665,15 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
       );
     } else if (isInserting) {
       context.missing(_areaHaMeta);
+    }
+    if (data.containsKey('area_oficial_ha')) {
+      context.handle(
+        _areaOficialHaMeta,
+        areaOficialHa.isAcceptableOrUnknown(
+          data['area_oficial_ha']!,
+          _areaOficialHaMeta,
+        ),
+      );
     }
     if (data.containsKey('geo_hash')) {
       context.handle(
@@ -715,6 +736,10 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
         DriftSqlType.double,
         data['${effectivePrefix}area_ha'],
       )!,
+      areaOficialHa: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}area_oficial_ha'],
+      ),
       geoHash: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}geo_hash'],
@@ -746,14 +771,18 @@ class Finca extends DataClass implements Insertable<Finca> {
   final String nombre;
 
   /// Coordenadas en GeoJSON: `[[lon, lat], ...]`. Un solo punto si la finca
-  /// mide menos de 4 ha; polÃ­gono cerrado si mide 4 ha o mÃ¡s (regla EUDR).
+  /// mide menos de 4 ha; polígono cerrado si mide 4 ha o más (regla EUDR).
   final String coordenadasJson;
   final double areaHa;
 
-  /// Hash SHA-256 de las coordenadas canÃ³nicas; es lo que va a la blockchain.
+  /// Área que calcula el servidor (PostGIS, sobre el elipsoide). Es la que
+  /// va al paquete EUDR; llega al sincronizar.
+  final double? areaOficialHa;
+
+  /// Hash SHA-256 de las coordenadas canónicas; es lo que va a la blockchain.
   final String geoHash;
 
-  /// UID de la attestation en EAS, cuando el backend ya la firmÃ³.
+  /// UID de la attestation en EAS, cuando el backend ya la firmó.
   final String? attestationUid;
   final DateTime creadoEn;
   final bool sincronizado;
@@ -763,6 +792,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     required this.nombre,
     required this.coordenadasJson,
     required this.areaHa,
+    this.areaOficialHa,
     required this.geoHash,
     this.attestationUid,
     required this.creadoEn,
@@ -776,6 +806,9 @@ class Finca extends DataClass implements Insertable<Finca> {
     map['nombre'] = Variable<String>(nombre);
     map['coordenadas_json'] = Variable<String>(coordenadasJson);
     map['area_ha'] = Variable<double>(areaHa);
+    if (!nullToAbsent || areaOficialHa != null) {
+      map['area_oficial_ha'] = Variable<double>(areaOficialHa);
+    }
     map['geo_hash'] = Variable<String>(geoHash);
     if (!nullToAbsent || attestationUid != null) {
       map['attestation_uid'] = Variable<String>(attestationUid);
@@ -792,6 +825,9 @@ class Finca extends DataClass implements Insertable<Finca> {
       nombre: Value(nombre),
       coordenadasJson: Value(coordenadasJson),
       areaHa: Value(areaHa),
+      areaOficialHa: areaOficialHa == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaOficialHa),
       geoHash: Value(geoHash),
       attestationUid: attestationUid == null && nullToAbsent
           ? const Value.absent()
@@ -812,6 +848,7 @@ class Finca extends DataClass implements Insertable<Finca> {
       nombre: serializer.fromJson<String>(json['nombre']),
       coordenadasJson: serializer.fromJson<String>(json['coordenadasJson']),
       areaHa: serializer.fromJson<double>(json['areaHa']),
+      areaOficialHa: serializer.fromJson<double?>(json['areaOficialHa']),
       geoHash: serializer.fromJson<String>(json['geoHash']),
       attestationUid: serializer.fromJson<String?>(json['attestationUid']),
       creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
@@ -827,6 +864,7 @@ class Finca extends DataClass implements Insertable<Finca> {
       'nombre': serializer.toJson<String>(nombre),
       'coordenadasJson': serializer.toJson<String>(coordenadasJson),
       'areaHa': serializer.toJson<double>(areaHa),
+      'areaOficialHa': serializer.toJson<double?>(areaOficialHa),
       'geoHash': serializer.toJson<String>(geoHash),
       'attestationUid': serializer.toJson<String?>(attestationUid),
       'creadoEn': serializer.toJson<DateTime>(creadoEn),
@@ -840,6 +878,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     String? nombre,
     String? coordenadasJson,
     double? areaHa,
+    Value<double?> areaOficialHa = const Value.absent(),
     String? geoHash,
     Value<String?> attestationUid = const Value.absent(),
     DateTime? creadoEn,
@@ -850,6 +889,9 @@ class Finca extends DataClass implements Insertable<Finca> {
     nombre: nombre ?? this.nombre,
     coordenadasJson: coordenadasJson ?? this.coordenadasJson,
     areaHa: areaHa ?? this.areaHa,
+    areaOficialHa: areaOficialHa.present
+        ? areaOficialHa.value
+        : this.areaOficialHa,
     geoHash: geoHash ?? this.geoHash,
     attestationUid: attestationUid.present
         ? attestationUid.value
@@ -868,6 +910,9 @@ class Finca extends DataClass implements Insertable<Finca> {
           ? data.coordenadasJson.value
           : this.coordenadasJson,
       areaHa: data.areaHa.present ? data.areaHa.value : this.areaHa,
+      areaOficialHa: data.areaOficialHa.present
+          ? data.areaOficialHa.value
+          : this.areaOficialHa,
       geoHash: data.geoHash.present ? data.geoHash.value : this.geoHash,
       attestationUid: data.attestationUid.present
           ? data.attestationUid.value
@@ -887,6 +932,7 @@ class Finca extends DataClass implements Insertable<Finca> {
           ..write('nombre: $nombre, ')
           ..write('coordenadasJson: $coordenadasJson, ')
           ..write('areaHa: $areaHa, ')
+          ..write('areaOficialHa: $areaOficialHa, ')
           ..write('geoHash: $geoHash, ')
           ..write('attestationUid: $attestationUid, ')
           ..write('creadoEn: $creadoEn, ')
@@ -902,6 +948,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     nombre,
     coordenadasJson,
     areaHa,
+    areaOficialHa,
     geoHash,
     attestationUid,
     creadoEn,
@@ -916,6 +963,7 @@ class Finca extends DataClass implements Insertable<Finca> {
           other.nombre == this.nombre &&
           other.coordenadasJson == this.coordenadasJson &&
           other.areaHa == this.areaHa &&
+          other.areaOficialHa == this.areaOficialHa &&
           other.geoHash == this.geoHash &&
           other.attestationUid == this.attestationUid &&
           other.creadoEn == this.creadoEn &&
@@ -928,6 +976,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
   final Value<String> nombre;
   final Value<String> coordenadasJson;
   final Value<double> areaHa;
+  final Value<double?> areaOficialHa;
   final Value<String> geoHash;
   final Value<String?> attestationUid;
   final Value<DateTime> creadoEn;
@@ -939,6 +988,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     this.nombre = const Value.absent(),
     this.coordenadasJson = const Value.absent(),
     this.areaHa = const Value.absent(),
+    this.areaOficialHa = const Value.absent(),
     this.geoHash = const Value.absent(),
     this.attestationUid = const Value.absent(),
     this.creadoEn = const Value.absent(),
@@ -951,6 +1001,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     required String nombre,
     required String coordenadasJson,
     required double areaHa,
+    this.areaOficialHa = const Value.absent(),
     required String geoHash,
     this.attestationUid = const Value.absent(),
     this.creadoEn = const Value.absent(),
@@ -968,6 +1019,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     Expression<String>? nombre,
     Expression<String>? coordenadasJson,
     Expression<double>? areaHa,
+    Expression<double>? areaOficialHa,
     Expression<String>? geoHash,
     Expression<String>? attestationUid,
     Expression<DateTime>? creadoEn,
@@ -980,6 +1032,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
       if (nombre != null) 'nombre': nombre,
       if (coordenadasJson != null) 'coordenadas_json': coordenadasJson,
       if (areaHa != null) 'area_ha': areaHa,
+      if (areaOficialHa != null) 'area_oficial_ha': areaOficialHa,
       if (geoHash != null) 'geo_hash': geoHash,
       if (attestationUid != null) 'attestation_uid': attestationUid,
       if (creadoEn != null) 'creado_en': creadoEn,
@@ -994,6 +1047,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     Value<String>? nombre,
     Value<String>? coordenadasJson,
     Value<double>? areaHa,
+    Value<double?>? areaOficialHa,
     Value<String>? geoHash,
     Value<String?>? attestationUid,
     Value<DateTime>? creadoEn,
@@ -1006,6 +1060,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
       nombre: nombre ?? this.nombre,
       coordenadasJson: coordenadasJson ?? this.coordenadasJson,
       areaHa: areaHa ?? this.areaHa,
+      areaOficialHa: areaOficialHa ?? this.areaOficialHa,
       geoHash: geoHash ?? this.geoHash,
       attestationUid: attestationUid ?? this.attestationUid,
       creadoEn: creadoEn ?? this.creadoEn,
@@ -1031,6 +1086,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     }
     if (areaHa.present) {
       map['area_ha'] = Variable<double>(areaHa.value);
+    }
+    if (areaOficialHa.present) {
+      map['area_oficial_ha'] = Variable<double>(areaOficialHa.value);
     }
     if (geoHash.present) {
       map['geo_hash'] = Variable<String>(geoHash.value);
@@ -1058,6 +1116,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
           ..write('nombre: $nombre, ')
           ..write('coordenadasJson: $coordenadasJson, ')
           ..write('areaHa: $areaHa, ')
+          ..write('areaOficialHa: $areaOficialHa, ')
           ..write('geoHash: $geoHash, ')
           ..write('attestationUid: $attestationUid, ')
           ..write('creadoEn: $creadoEn, ')
@@ -1134,6 +1193,18 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _creadoEnMeta = const VerificationMeta(
+    'creadoEn',
+  );
+  @override
+  late final GeneratedColumn<DateTime> creadoEn = GeneratedColumn<DateTime>(
+    'creado_en',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
   static const VerificationMeta _sincronizadoMeta = const VerificationMeta(
     'sincronizado',
   );
@@ -1157,6 +1228,7 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
     estado,
     fecha,
     attestationUid,
+    creadoEn,
     sincronizado,
   ];
   @override
@@ -1214,6 +1286,12 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
         ),
       );
     }
+    if (data.containsKey('creado_en')) {
+      context.handle(
+        _creadoEnMeta,
+        creadoEn.isAcceptableOrUnknown(data['creado_en']!, _creadoEnMeta),
+      );
+    }
     if (data.containsKey('sincronizado')) {
       context.handle(
         _sincronizadoMeta,
@@ -1256,6 +1334,10 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
         DriftSqlType.string,
         data['${effectivePrefix}attestation_uid'],
       ),
+      creadoEn: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}creado_en'],
+      )!,
       sincronizado: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}sincronizado'],
@@ -1274,10 +1356,11 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   final String fincaId;
   final double kg;
 
-  /// `uva` (cafÃ© maduro) o `pergamino`.
+  /// `uva` (café maduro) o `pergamino`.
   final String estado;
   final DateTime fecha;
   final String? attestationUid;
+  final DateTime creadoEn;
   final bool sincronizado;
   const Entrega({
     required this.id,
@@ -1286,6 +1369,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     required this.estado,
     required this.fecha,
     this.attestationUid,
+    required this.creadoEn,
     required this.sincronizado,
   });
   @override
@@ -1299,6 +1383,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     if (!nullToAbsent || attestationUid != null) {
       map['attestation_uid'] = Variable<String>(attestationUid);
     }
+    map['creado_en'] = Variable<DateTime>(creadoEn);
     map['sincronizado'] = Variable<bool>(sincronizado);
     return map;
   }
@@ -1313,6 +1398,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       attestationUid: attestationUid == null && nullToAbsent
           ? const Value.absent()
           : Value(attestationUid),
+      creadoEn: Value(creadoEn),
       sincronizado: Value(sincronizado),
     );
   }
@@ -1329,6 +1415,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       estado: serializer.fromJson<String>(json['estado']),
       fecha: serializer.fromJson<DateTime>(json['fecha']),
       attestationUid: serializer.fromJson<String?>(json['attestationUid']),
+      creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
       sincronizado: serializer.fromJson<bool>(json['sincronizado']),
     );
   }
@@ -1342,6 +1429,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       'estado': serializer.toJson<String>(estado),
       'fecha': serializer.toJson<DateTime>(fecha),
       'attestationUid': serializer.toJson<String?>(attestationUid),
+      'creadoEn': serializer.toJson<DateTime>(creadoEn),
       'sincronizado': serializer.toJson<bool>(sincronizado),
     };
   }
@@ -1353,6 +1441,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     String? estado,
     DateTime? fecha,
     Value<String?> attestationUid = const Value.absent(),
+    DateTime? creadoEn,
     bool? sincronizado,
   }) => Entrega(
     id: id ?? this.id,
@@ -1363,6 +1452,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     attestationUid: attestationUid.present
         ? attestationUid.value
         : this.attestationUid,
+    creadoEn: creadoEn ?? this.creadoEn,
     sincronizado: sincronizado ?? this.sincronizado,
   );
   Entrega copyWithCompanion(EntregasCompanion data) {
@@ -1375,6 +1465,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       attestationUid: data.attestationUid.present
           ? data.attestationUid.value
           : this.attestationUid,
+      creadoEn: data.creadoEn.present ? data.creadoEn.value : this.creadoEn,
       sincronizado: data.sincronizado.present
           ? data.sincronizado.value
           : this.sincronizado,
@@ -1390,14 +1481,23 @@ class Entrega extends DataClass implements Insertable<Entrega> {
           ..write('estado: $estado, ')
           ..write('fecha: $fecha, ')
           ..write('attestationUid: $attestationUid, ')
+          ..write('creadoEn: $creadoEn, ')
           ..write('sincronizado: $sincronizado')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, fincaId, kg, estado, fecha, attestationUid, sincronizado);
+  int get hashCode => Object.hash(
+    id,
+    fincaId,
+    kg,
+    estado,
+    fecha,
+    attestationUid,
+    creadoEn,
+    sincronizado,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1408,6 +1508,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
           other.estado == this.estado &&
           other.fecha == this.fecha &&
           other.attestationUid == this.attestationUid &&
+          other.creadoEn == this.creadoEn &&
           other.sincronizado == this.sincronizado);
 }
 
@@ -1418,6 +1519,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
   final Value<String> estado;
   final Value<DateTime> fecha;
   final Value<String?> attestationUid;
+  final Value<DateTime> creadoEn;
   final Value<bool> sincronizado;
   final Value<int> rowid;
   const EntregasCompanion({
@@ -1427,6 +1529,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     this.estado = const Value.absent(),
     this.fecha = const Value.absent(),
     this.attestationUid = const Value.absent(),
+    this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1437,6 +1540,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     required String estado,
     required DateTime fecha,
     this.attestationUid = const Value.absent(),
+    this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1451,6 +1555,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     Expression<String>? estado,
     Expression<DateTime>? fecha,
     Expression<String>? attestationUid,
+    Expression<DateTime>? creadoEn,
     Expression<bool>? sincronizado,
     Expression<int>? rowid,
   }) {
@@ -1461,6 +1566,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
       if (estado != null) 'estado': estado,
       if (fecha != null) 'fecha': fecha,
       if (attestationUid != null) 'attestation_uid': attestationUid,
+      if (creadoEn != null) 'creado_en': creadoEn,
       if (sincronizado != null) 'sincronizado': sincronizado,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1473,6 +1579,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     Value<String>? estado,
     Value<DateTime>? fecha,
     Value<String?>? attestationUid,
+    Value<DateTime>? creadoEn,
     Value<bool>? sincronizado,
     Value<int>? rowid,
   }) {
@@ -1483,6 +1590,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
       estado: estado ?? this.estado,
       fecha: fecha ?? this.fecha,
       attestationUid: attestationUid ?? this.attestationUid,
+      creadoEn: creadoEn ?? this.creadoEn,
       sincronizado: sincronizado ?? this.sincronizado,
       rowid: rowid ?? this.rowid,
     );
@@ -1509,6 +1617,9 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     if (attestationUid.present) {
       map['attestation_uid'] = Variable<String>(attestationUid.value);
     }
+    if (creadoEn.present) {
+      map['creado_en'] = Variable<DateTime>(creadoEn.value);
+    }
     if (sincronizado.present) {
       map['sincronizado'] = Variable<bool>(sincronizado.value);
     }
@@ -1527,6 +1638,7 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
           ..write('estado: $estado, ')
           ..write('fecha: $fecha, ')
           ..write('attestationUid: $attestationUid, ')
+          ..write('creadoEn: $creadoEn, ')
           ..write('sincronizado: $sincronizado, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1624,6 +1736,19 @@ class $FotosTable extends Fotos with TableInfo<$FotosTable, Foto> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _subidaMeta = const VerificationMeta('subida');
+  @override
+  late final GeneratedColumn<bool> subida = GeneratedColumn<bool>(
+    'subida',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("subida" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1634,6 +1759,7 @@ class $FotosTable extends Fotos with TableInfo<$FotosTable, Foto> {
     sha256,
     creadoEn,
     sincronizado,
+    subida,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1710,6 +1836,12 @@ class $FotosTable extends Fotos with TableInfo<$FotosTable, Foto> {
         ),
       );
     }
+    if (data.containsKey('subida')) {
+      context.handle(
+        _subidaMeta,
+        subida.isAcceptableOrUnknown(data['subida']!, _subidaMeta),
+      );
+    }
     return context;
   }
 
@@ -1751,6 +1883,10 @@ class $FotosTable extends Fotos with TableInfo<$FotosTable, Foto> {
         DriftSqlType.bool,
         data['${effectivePrefix}sincronizado'],
       )!,
+      subida: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}subida'],
+      )!,
     );
   }
 
@@ -1773,6 +1909,7 @@ class Foto extends DataClass implements Insertable<Foto> {
   final String sha256;
   final DateTime creadoEn;
   final bool sincronizado;
+  final bool subida;
   const Foto({
     required this.id,
     required this.entidadTipo,
@@ -1782,6 +1919,7 @@ class Foto extends DataClass implements Insertable<Foto> {
     required this.sha256,
     required this.creadoEn,
     required this.sincronizado,
+    required this.subida,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1794,6 +1932,7 @@ class Foto extends DataClass implements Insertable<Foto> {
     map['sha256'] = Variable<String>(sha256);
     map['creado_en'] = Variable<DateTime>(creadoEn);
     map['sincronizado'] = Variable<bool>(sincronizado);
+    map['subida'] = Variable<bool>(subida);
     return map;
   }
 
@@ -1807,6 +1946,7 @@ class Foto extends DataClass implements Insertable<Foto> {
       sha256: Value(sha256),
       creadoEn: Value(creadoEn),
       sincronizado: Value(sincronizado),
+      subida: Value(subida),
     );
   }
 
@@ -1824,6 +1964,7 @@ class Foto extends DataClass implements Insertable<Foto> {
       sha256: serializer.fromJson<String>(json['sha256']),
       creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
       sincronizado: serializer.fromJson<bool>(json['sincronizado']),
+      subida: serializer.fromJson<bool>(json['subida']),
     );
   }
   @override
@@ -1838,6 +1979,7 @@ class Foto extends DataClass implements Insertable<Foto> {
       'sha256': serializer.toJson<String>(sha256),
       'creadoEn': serializer.toJson<DateTime>(creadoEn),
       'sincronizado': serializer.toJson<bool>(sincronizado),
+      'subida': serializer.toJson<bool>(subida),
     };
   }
 
@@ -1850,6 +1992,7 @@ class Foto extends DataClass implements Insertable<Foto> {
     String? sha256,
     DateTime? creadoEn,
     bool? sincronizado,
+    bool? subida,
   }) => Foto(
     id: id ?? this.id,
     entidadTipo: entidadTipo ?? this.entidadTipo,
@@ -1859,6 +2002,7 @@ class Foto extends DataClass implements Insertable<Foto> {
     sha256: sha256 ?? this.sha256,
     creadoEn: creadoEn ?? this.creadoEn,
     sincronizado: sincronizado ?? this.sincronizado,
+    subida: subida ?? this.subida,
   );
   Foto copyWithCompanion(FotosCompanion data) {
     return Foto(
@@ -1874,6 +2018,7 @@ class Foto extends DataClass implements Insertable<Foto> {
       sincronizado: data.sincronizado.present
           ? data.sincronizado.value
           : this.sincronizado,
+      subida: data.subida.present ? data.subida.value : this.subida,
     );
   }
 
@@ -1887,7 +2032,8 @@ class Foto extends DataClass implements Insertable<Foto> {
           ..write('ruta: $ruta, ')
           ..write('sha256: $sha256, ')
           ..write('creadoEn: $creadoEn, ')
-          ..write('sincronizado: $sincronizado')
+          ..write('sincronizado: $sincronizado, ')
+          ..write('subida: $subida')
           ..write(')'))
         .toString();
   }
@@ -1902,6 +2048,7 @@ class Foto extends DataClass implements Insertable<Foto> {
     sha256,
     creadoEn,
     sincronizado,
+    subida,
   );
   @override
   bool operator ==(Object other) =>
@@ -1914,7 +2061,8 @@ class Foto extends DataClass implements Insertable<Foto> {
           other.ruta == this.ruta &&
           other.sha256 == this.sha256 &&
           other.creadoEn == this.creadoEn &&
-          other.sincronizado == this.sincronizado);
+          other.sincronizado == this.sincronizado &&
+          other.subida == this.subida);
 }
 
 class FotosCompanion extends UpdateCompanion<Foto> {
@@ -1926,6 +2074,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
   final Value<String> sha256;
   final Value<DateTime> creadoEn;
   final Value<bool> sincronizado;
+  final Value<bool> subida;
   final Value<int> rowid;
   const FotosCompanion({
     this.id = const Value.absent(),
@@ -1936,6 +2085,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
     this.sha256 = const Value.absent(),
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.subida = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FotosCompanion.insert({
@@ -1947,6 +2097,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
     required String sha256,
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.subida = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        entidadTipo = Value(entidadTipo),
@@ -1963,6 +2114,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
     Expression<String>? sha256,
     Expression<DateTime>? creadoEn,
     Expression<bool>? sincronizado,
+    Expression<bool>? subida,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1974,6 +2126,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
       if (sha256 != null) 'sha256': sha256,
       if (creadoEn != null) 'creado_en': creadoEn,
       if (sincronizado != null) 'sincronizado': sincronizado,
+      if (subida != null) 'subida': subida,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1987,6 +2140,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
     Value<String>? sha256,
     Value<DateTime>? creadoEn,
     Value<bool>? sincronizado,
+    Value<bool>? subida,
     Value<int>? rowid,
   }) {
     return FotosCompanion(
@@ -1998,6 +2152,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
       sha256: sha256 ?? this.sha256,
       creadoEn: creadoEn ?? this.creadoEn,
       sincronizado: sincronizado ?? this.sincronizado,
+      subida: subida ?? this.subida,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2029,6 +2184,9 @@ class FotosCompanion extends UpdateCompanion<Foto> {
     if (sincronizado.present) {
       map['sincronizado'] = Variable<bool>(sincronizado.value);
     }
+    if (subida.present) {
+      map['subida'] = Variable<bool>(subida.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2046,6 +2204,7 @@ class FotosCompanion extends UpdateCompanion<Foto> {
           ..write('sha256: $sha256, ')
           ..write('creadoEn: $creadoEn, ')
           ..write('sincronizado: $sincronizado, ')
+          ..write('subida: $subida, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2423,6 +2582,7 @@ typedef $$FincasTableCreateCompanionBuilder = FincasCompanion Function({
   required String nombre,
   required String coordenadasJson,
   required double areaHa,
+  Value<double?> areaOficialHa,
   required String geoHash,
   Value<String?> attestationUid,
   Value<DateTime> creadoEn,
@@ -2435,6 +2595,7 @@ typedef $$FincasTableUpdateCompanionBuilder = FincasCompanion Function({
   Value<String> nombre,
   Value<String> coordenadasJson,
   Value<double> areaHa,
+  Value<double?> areaOficialHa,
   Value<String> geoHash,
   Value<String?> attestationUid,
   Value<DateTime> creadoEn,
@@ -2509,6 +2670,11 @@ class $$FincasTableFilterComposer
 
   ColumnFilters<double> get areaHa => $composableBuilder(
     column: $table.areaHa,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get areaOficialHa => $composableBuilder(
+    column: $table.areaOficialHa,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2610,6 +2776,11 @@ class $$FincasTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get areaOficialHa => $composableBuilder(
+    column: $table.areaOficialHa,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get geoHash => $composableBuilder(
     column: $table.geoHash,
     builder: (column) => ColumnOrderings(column),
@@ -2676,6 +2847,11 @@ class $$FincasTableAnnotationComposer
 
   GeneratedColumn<double> get areaHa =>
       $composableBuilder(column: $table.areaHa, builder: (column) => column);
+
+  GeneratedColumn<double> get areaOficialHa => $composableBuilder(
+    column: $table.areaOficialHa,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get geoHash =>
       $composableBuilder(column: $table.geoHash, builder: (column) => column);
@@ -2775,6 +2951,7 @@ class $$FincasTableTableManager
                 Value<String> nombre = const Value.absent(),
                 Value<String> coordenadasJson = const Value.absent(),
                 Value<double> areaHa = const Value.absent(),
+                Value<double?> areaOficialHa = const Value.absent(),
                 Value<String> geoHash = const Value.absent(),
                 Value<String?> attestationUid = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
@@ -2786,6 +2963,7 @@ class $$FincasTableTableManager
                 nombre: nombre,
                 coordenadasJson: coordenadasJson,
                 areaHa: areaHa,
+                areaOficialHa: areaOficialHa,
                 geoHash: geoHash,
                 attestationUid: attestationUid,
                 creadoEn: creadoEn,
@@ -2799,6 +2977,7 @@ class $$FincasTableTableManager
                 required String nombre,
                 required String coordenadasJson,
                 required double areaHa,
+                Value<double?> areaOficialHa = const Value.absent(),
                 required String geoHash,
                 Value<String?> attestationUid = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
@@ -2810,6 +2989,7 @@ class $$FincasTableTableManager
                 nombre: nombre,
                 coordenadasJson: coordenadasJson,
                 areaHa: areaHa,
+                areaOficialHa: areaOficialHa,
                 geoHash: geoHash,
                 attestationUid: attestationUid,
                 creadoEn: creadoEn,
@@ -2900,6 +3080,7 @@ typedef $$EntregasTableCreateCompanionBuilder = EntregasCompanion Function({
   required String estado,
   required DateTime fecha,
   Value<String?> attestationUid,
+  Value<DateTime> creadoEn,
   Value<bool> sincronizado,
   Value<int> rowid,
 });
@@ -2910,6 +3091,7 @@ typedef $$EntregasTableUpdateCompanionBuilder = EntregasCompanion Function({
   Value<String> estado,
   Value<DateTime> fecha,
   Value<String?> attestationUid,
+  Value<DateTime> creadoEn,
   Value<bool> sincronizado,
   Value<int> rowid,
 });
@@ -2967,6 +3149,11 @@ class $$EntregasTableFilterComposer
 
   ColumnFilters<String> get attestationUid => $composableBuilder(
     column: $table.attestationUid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get creadoEn => $composableBuilder(
+    column: $table.creadoEn,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3033,6 +3220,11 @@ class $$EntregasTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get creadoEn => $composableBuilder(
+    column: $table.creadoEn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get sincronizado => $composableBuilder(
     column: $table.sincronizado,
     builder: (column) => ColumnOrderings(column),
@@ -3087,6 +3279,9 @@ class $$EntregasTableAnnotationComposer
     column: $table.attestationUid,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get creadoEn =>
+      $composableBuilder(column: $table.creadoEn, builder: (column) => column);
 
   GeneratedColumn<bool> get sincronizado => $composableBuilder(
     column: $table.sincronizado,
@@ -3151,6 +3346,7 @@ class $$EntregasTableTableManager
                 Value<String> estado = const Value.absent(),
                 Value<DateTime> fecha = const Value.absent(),
                 Value<String?> attestationUid = const Value.absent(),
+                Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntregasCompanion(
@@ -3160,6 +3356,7 @@ class $$EntregasTableTableManager
                 estado: estado,
                 fecha: fecha,
                 attestationUid: attestationUid,
+                creadoEn: creadoEn,
                 sincronizado: sincronizado,
                 rowid: rowid,
               ),
@@ -3171,6 +3368,7 @@ class $$EntregasTableTableManager
                 required String estado,
                 required DateTime fecha,
                 Value<String?> attestationUid = const Value.absent(),
+                Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntregasCompanion.insert(
@@ -3180,6 +3378,7 @@ class $$EntregasTableTableManager
                 estado: estado,
                 fecha: fecha,
                 attestationUid: attestationUid,
+                creadoEn: creadoEn,
                 sincronizado: sincronizado,
                 rowid: rowid,
               ),
@@ -3257,6 +3456,7 @@ typedef $$FotosTableCreateCompanionBuilder = FotosCompanion Function({
   required String sha256,
   Value<DateTime> creadoEn,
   Value<bool> sincronizado,
+  Value<bool> subida,
   Value<int> rowid,
 });
 typedef $$FotosTableUpdateCompanionBuilder = FotosCompanion Function({
@@ -3268,6 +3468,7 @@ typedef $$FotosTableUpdateCompanionBuilder = FotosCompanion Function({
   Value<String> sha256,
   Value<DateTime> creadoEn,
   Value<bool> sincronizado,
+  Value<bool> subida,
   Value<int> rowid,
 });
 
@@ -3316,6 +3517,11 @@ class $$FotosTableFilterComposer extends Composer<_$AppDatabase, $FotosTable> {
 
   ColumnFilters<bool> get sincronizado => $composableBuilder(
     column: $table.sincronizado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get subida => $composableBuilder(
+    column: $table.subida,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3368,6 +3574,11 @@ class $$FotosTableOrderingComposer
     column: $table.sincronizado,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get subida => $composableBuilder(
+    column: $table.subida,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FotosTableAnnotationComposer
@@ -3406,6 +3617,9 @@ class $$FotosTableAnnotationComposer
     column: $table.sincronizado,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get subida =>
+      $composableBuilder(column: $table.subida, builder: (column) => column);
 }
 
 class $$FotosTableTableManager
@@ -3444,6 +3658,7 @@ class $$FotosTableTableManager
                 Value<String> sha256 = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<bool> subida = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FotosCompanion(
                 id: id,
@@ -3454,6 +3669,7 @@ class $$FotosTableTableManager
                 sha256: sha256,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                subida: subida,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3466,6 +3682,7 @@ class $$FotosTableTableManager
                 required String sha256,
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<bool> subida = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FotosCompanion.insert(
                 id: id,
@@ -3476,6 +3693,7 @@ class $$FotosTableTableManager
                 sha256: sha256,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                subida: subida,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

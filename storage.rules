@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Fotos de campo. La organización viene del token (custom claim que asigna la
+// API al activar la invitación). Una foto subida no se reemplaza ni se borra
+// desde la app: su SHA-256 va a la blockchain. Si el archivo no coincide con
+// el hash registrado, la API lo borra (con permisos de servidor).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /organizaciones/{org}/fotos/{archivo} {
+      allow read: if request.auth != null
+        && request.auth.token.organizacionId == org;
+
+      allow create: if request.auth != null
+        && request.auth.token.organizacionId == org
+        && archivo.matches('^[0-9a-f-]{36}[.]jpg$')
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size < 5 * 1024 * 1024;
+
+      allow update, delete: if false;
+    }
+
+    match /{todo=**} {
+      allow read, write: if false;
+    }
+  }
+}

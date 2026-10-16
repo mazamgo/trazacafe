@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getStorage } from "firebase-admin/storage";
+import type { Almacen } from "./almacen.ts";
 import { buildApp } from "./app.ts";
 import type { Identidad, Rol, VerificarToken } from "./auth.ts";
 import { crearPool } from "./db.ts";
@@ -34,7 +36,22 @@ const identidad: Identidad = {
   },
 };
 
+// Bucket de Firebase Storage del proyecto (STORAGE_BUCKET en Cloud Run).
+const bucket = getStorage().bucket(process.env.STORAGE_BUCKET);
+const almacen: Almacen = {
+  leer: async (ruta) => {
+    const archivo = bucket.file(ruta);
+    const [existe] = await archivo.exists();
+    if (!existe) return null;
+    const [contenido] = await archivo.download();
+    return contenido;
+  },
+  borrar: async (ruta) => {
+    await bucket.file(ruta).delete({ ignoreNotFound: true });
+  },
+};
+
 const { pool } = await crearPool();
-const app = buildApp({ repo: new PgRepo(pool), verificarToken, identidad });
+const app = buildApp({ repo: new PgRepo(pool), verificarToken, identidad, almacen });
 
 await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 8080) });

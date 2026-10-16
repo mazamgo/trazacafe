@@ -1,0 +1,5 @@
+# Pendiente: equipo_screen_test.dart a veces queda "did not complete" cuando
+# corre en la misma sesión que otros archivos de prueba (también en serie);
+# solo, pasa siempre (8/8). Es un problema de las pruebas, no de la app; la
+# causa no está identificada. En serie falla menos que en paralelo.
+concurrency: 1

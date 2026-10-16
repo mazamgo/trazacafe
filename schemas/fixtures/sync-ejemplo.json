@@ -23,6 +23,15 @@
       "geoHash": "0x2f95794d89008adc55fc3797ed22992bb737b4049d5a73383f7a02d79a2cdfe4"
     }
   ],
+  "entregas": [
+    {
+      "id": "5d1c9e2a-7b3f-4a6d-9e8c-1f2a3b4c5d6e",
+      "fincaId": "3f2b8c1e-9a4d-4e7f-8b21-0c5d6e7f8a90",
+      "kg": 345.5,
+      "estado": "uva",
+      "fecha": "2026-10-16T14:30:00.000Z"
+    }
+  ],
   "fotos": [
     {
       "id": "9b2e1f4a-6c3d-4f8e-a1b2-3c4d5e6f7a8b",

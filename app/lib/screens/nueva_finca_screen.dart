@@ -9,6 +9,7 @@ import '../data/database.dart';
 import '../domain/geo.dart';
 import '../providers.dart';
 import '../services/fotos_service.dart';
+import '../widgets/mapa_google.dart';
 
 /// Registro de una finca: el técnico marca los vértices tocando el mapa o
 /// caminando el lindero con "Agregar mi ubicación".
@@ -147,9 +148,9 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
   Widget build(BuildContext context) {
     final esPoligono = _puntos.length >= 3;
     final problema = _problema;
-    final colorBorde = problema == null
-        ? Colors.green.shade800
-        : Colors.red.shade700;
+    // Amarillo y rojo se distinguen bien sobre la imagen satelital.
+    final colorBorde = problema == null ? Colors.yellowAccent : Colors.red.shade600;
+    final sesionMapa = ref.watch(sesionMapaProvider).value;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva finca')),
@@ -189,10 +190,7 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                 onTap: (_, punto) => setState(() => _puntos.add(punto)),
               ),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.goproduction.trazacafe',
-                ),
+                if (sesionMapa != null) capaGoogle(sesionMapa),
                 if (esPoligono)
                   PolygonLayer(
                     polygons: [
@@ -232,6 +230,22 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                       ),
                   ],
                 ),
+                if (sesionMapa != null)
+                  AtribucionGoogle(sesion: sesionMapa, servicio: ref.read(mapasServiceProvider))
+                else
+                  const Align(
+                    alignment: Alignment.topCenter,
+                    child: Card(
+                      margin: EdgeInsets.all(8),
+                      child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Text(
+                          'Sin señal: el mapa no carga, pero puedes marcar\nlos linderos con "Agregar mi ubicación".',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

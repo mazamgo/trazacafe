@@ -98,7 +98,12 @@ class _BotonSincronizarState extends ConsumerState<BotonSincronizar> {
     try {
       final r = await ref.read(syncServiceProvider).sincronizar();
       mensajero.showSnackBar(SnackBar(
-        content: Text(r.enviados == 0 ? 'Todo está al día.' : 'Enviados ${r.enviados} registros.'),
+        content: Text([
+          if (r.enviados > 0) 'Enviados ${r.enviados} registros.',
+          if (r.fotosSubidas > 0) 'Subidas ${r.fotosSubidas} fotos.',
+          if (r.errorFotos != null) 'Algunas fotos no se subieron: ${r.errorFotos}',
+          if (r.enviados == 0 && r.fotosSubidas == 0 && r.errorFotos == null) 'Todo está al día.',
+        ].join(' ')),
       ));
     } catch (e) {
       mensajero.showSnackBar(SnackBar(content: Text('No se pudo sincronizar: $e')));
