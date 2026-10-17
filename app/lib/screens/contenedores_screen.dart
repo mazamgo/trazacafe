@@ -50,6 +50,113 @@ class ContenedoresScreen extends ConsumerWidget {
     }
   }
 
+  /// Descarga el PDF o el GeoJSON del paquete y abre el menú de compartir.
+  Future<void> _compartir(
+    BuildContext context,
+    WidgetRef ref,
+    Exportacion x, {
+    required bool pdf,
+  }) async {
+    var conProductores = false;
+    if (!pdf) {
+      final eleccion = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('GeoJSON para TRACES'),
+          content: const Text(
+            'Lleva la ubicación de cada finca de origen para la declaración de diligencia '
+            'debida. ¿Incluir los nombres de los productores? TRACES no los exige y son '
+            'datos personales.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Con nombres'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Sin nombres'),
+            ),
+          ],
+        ),
+      );
+      if (eleccion == null || !context.mounted) return;
+      conProductores = eleccion;
+    }
+    final mensajero = ScaffoldMessenger.of(context);
+    final archivo = x.codigo.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
+    try {
+      final api = ref.read(apiProvider);
+      final bytes = pdf
+          ? await api.pdfExportacion(x.id)
+          : await api.geojsonExportacion(x.id, conProductores: conProductores);
+      await ref
+          .read(compartidorProvider)
+          .compartir(
+            nombre: pdf ? 'Paquete-EUDR-$archivo.pdf' : '$archivo.geojson',
+            bytes: bytes,
+            tipo: pdf ? 'application/pdf' : 'application/geo+json',
+            asunto: 'Paquete EUDR ${x.codigo}',
+          );
+    } catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo descargar: $e')),
+      );
+    }
+  }
+
+  Future<void> _cerrar(
+    BuildContext context,
+    WidgetRef ref,
+    Exportacion x,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('¿Cerrar el contenedor ${x.codigo}?'),
+        content: const Text(
+          'El paquete EUDR queda completo y se registrará en la blockchain. Después ya no '
+          'se pueden cambiar sus lotes ni sus datos; solo anotar la referencia de la DDS.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(apiProvider).cerrarExportacion(x.id);
+      ref.invalidate(exportacionesProvider);
+      mensajero.showSnackBar(
+        SnackBar(content: Text('Contenedor ${x.codigo} cerrado.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          icon: const Icon(Icons.info_outline, color: Colors.orange),
+          title: const Text('Todavía no se puede cerrar'),
+          content: Text('$e'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   Future<void> _deshacer(
     BuildContext context,
     WidgetRef ref,
@@ -139,12 +246,18 @@ class ContenedoresScreen extends ConsumerWidget {
                     for (final x in xs)
                       _TarjetaContenedor(
                         exportacion: x,
-                        onEditar: x.abierta
-                            ? () => _editar(context, ref, x)
-                            : null,
+                        onEditar: x.atestada
+                            ? null
+                            : () => _editar(context, ref, x),
                         onDeshacer: x.abierta
                             ? () => _deshacer(context, ref, x)
                             : null,
+                        onCerrar: x.abierta
+                            ? () => _cerrar(context, ref, x)
+                            : null,
+                        onPdf: () => _compartir(context, ref, x, pdf: true),
+                        onGeojson: () =>
+                            _compartir(context, ref, x, pdf: false),
                       ),
                   ],
                 ),
@@ -164,11 +277,17 @@ class _TarjetaContenedor extends StatelessWidget {
     required this.exportacion,
     required this.onEditar,
     required this.onDeshacer,
+    required this.onCerrar,
+    required this.onPdf,
+    required this.onGeojson,
   });
 
   final Exportacion exportacion;
   final VoidCallback? onEditar;
   final VoidCallback? onDeshacer;
+  final VoidCallback? onCerrar;
+  final VoidCallback onPdf;
+  final VoidCallback onGeojson;
 
   @override
   Widget build(BuildContext context) {
@@ -219,22 +338,50 @@ class _TarjetaContenedor extends StatelessWidget {
                 '${c.nombreEstado(l.estado).toLowerCase()} · ${l.temporada}',
               ),
             ),
-          if (x.abierta)
-            OverflowBar(
-              alignment: MainAxisAlignment.end,
-              children: [
+          const SizedBox(height: 8),
+          const Text(
+            'Paquete EUDR',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          OverflowBar(
+            alignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: onPdf,
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text('PDF'),
+              ),
+              TextButton.icon(
+                onPressed: onGeojson,
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('GeoJSON (TRACES)'),
+              ),
+            ],
+          ),
+          OverflowBar(
+            alignment: MainAxisAlignment.end,
+            children: [
+              if (onDeshacer != null)
                 TextButton.icon(
                   onPressed: onDeshacer,
                   icon: const Icon(Icons.undo),
                   label: const Text('Deshacer'),
                 ),
+              if (onEditar != null)
                 TextButton.icon(
                   onPressed: onEditar,
                   icon: const Icon(Icons.edit),
-                  label: const Text('Editar datos'),
+                  label: Text(x.abierta ? 'Editar datos' : 'Anotar DDS'),
                 ),
-              ],
-            ),
+              if (onCerrar != null)
+                FilledButton.icon(
+                  onPressed: onCerrar,
+                  icon: const Icon(Icons.lock_outline),
+                  label: const Text('Cerrar'),
+                ),
+            ],
+          ),
+          if (x.atestada) const Text('Registrado en la blockchain ✓'),
         ],
       ),
     );
@@ -286,6 +433,7 @@ class _DialogoDatosState extends State<_DialogoDatos> {
       if (vacioNull(_contenedor) != x.contenedor)
         'contenedor': vacioNull(_contenedor),
       if (vacioNull(_dds) != x.ddsRef) 'ddsRef': vacioNull(_dds),
+      // Cerrado: solo la DDS (lo demás no se mostró y no cambia).
       if (_embarque != x.fechaEmbarque)
         'fechaEmbarque': _embarque == null ? null : _iso(_embarque!),
     };
@@ -293,58 +441,62 @@ class _DialogoDatosState extends State<_DialogoDatos> {
 
   @override
   Widget build(BuildContext context) {
+    final abierta = widget.exportacion.abierta;
     return AlertDialog(
       title: Text('Contenedor ${widget.exportacion.codigo}'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: _comprador,
-              decoration: const InputDecoration(labelText: 'Comprador'),
-            ),
-            TextField(
-              controller: _destino,
-              decoration: const InputDecoration(labelText: 'Destino'),
-            ),
-            TextField(
-              controller: _contenedor,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Número de contenedor',
-                hintText: 'p. ej. MSCU1234565',
+            if (abierta) ...[
+              TextField(
+                controller: _comprador,
+                decoration: const InputDecoration(labelText: 'Comprador'),
               ),
-            ),
+              TextField(
+                controller: _destino,
+                decoration: const InputDecoration(labelText: 'Destino'),
+              ),
+              TextField(
+                controller: _contenedor,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Número de contenedor',
+                  hintText: 'p. ej. MSCU1234565',
+                ),
+              ),
+            ],
             TextField(
               controller: _dds,
               decoration: const InputDecoration(
                 labelText: 'Referencia de la DDS (TRACES)',
               ),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Fecha de embarque'),
-              subtitle: Text(
-                _embarque == null ? 'Sin fecha' : fecha(_embarque!),
+            if (abierta)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Fecha de embarque'),
+                subtitle: Text(
+                  _embarque == null ? 'Sin fecha' : fecha(_embarque!),
+                ),
+                trailing: _embarque == null
+                    ? null
+                    : IconButton(
+                        tooltip: 'Quitar fecha',
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => _embarque = null),
+                      ),
+                onTap: () async {
+                  final hoy = DateTime.now();
+                  final d = await showDatePicker(
+                    context: context,
+                    initialDate: _embarque ?? hoy,
+                    firstDate: DateTime(hoy.year - 1),
+                    lastDate: DateTime(hoy.year + 2),
+                  );
+                  if (d != null) setState(() => _embarque = d);
+                },
               ),
-              trailing: _embarque == null
-                  ? null
-                  : IconButton(
-                      tooltip: 'Quitar fecha',
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => setState(() => _embarque = null),
-                    ),
-              onTap: () async {
-                final hoy = DateTime.now();
-                final d = await showDatePicker(
-                  context: context,
-                  initialDate: _embarque ?? hoy,
-                  firstDate: DateTime(hoy.year - 1),
-                  lastDate: DateTime(hoy.year + 2),
-                );
-                if (d != null) setState(() => _embarque = d);
-              },
-            ),
           ],
         ),
       ),

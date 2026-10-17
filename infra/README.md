@@ -185,6 +185,15 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
   - **cerrado:** ya no cambia. Se cierra en el paso del paquete EUDR, que exigirá todas las fincas en verde y encolará la attestation `Exportacion`.
 - **Resumen de origen** para el paquete: fincas, hectáreas oficiales, entregas y cuántas fincas no tienen chequeo satelital verde.
 
+## 4h. Paquete EUDR (Fase 2)
+
+Desde la tarjeta del contenedor (`backend/src/paquete.ts`):
+
+- **GeoJSON para TRACES** (`GET /v1/exportaciones/:id/geojson`): una Feature por finca de origen con su lindero vigente (WGS84, 8 decimales; punto si mide menos de 4 ha). Propiedades: `ProducerCountry` (NI), `ProductionPlace` (finca y comunidad) y `Area` (ha oficiales). `ProducerName` solo con `?productores=1`, porque es dato personal (Ley 787). **Pendiente:** validar el archivo subiéndolo a TRACES (entorno de aceptación) antes del primer envío real.
+- **PDF para el comprador** (`GET /v1/exportaciones/:id/pdf`): envío, cumplimiento (corte 31/12/2020, chequeo satelital, visitas), lotes y fincas con su huella geoHash. No lleva nombres de productores.
+- **Cerrar** (`POST /v1/exportaciones/:id/cerrar`): exige el número de contenedor y **todas las fincas en verde**; si no, responde 409 con los motivos. Al cerrar, encola la attestation `Exportacion`. Cerrado, solo se puede anotar la referencia de la DDS, mientras la attestation no esté firmada.
+- En la app, el PDF y el GeoJSON se comparten con el menú del celular (WhatsApp, correo, Drive) usando `share_plus`.
+
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints:
@@ -192,7 +201,7 @@ Endpoints:
 - Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`, `PUT /v1/fincas/:id/cultivo`.
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
 - Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `DELETE /v1/lotes/:id`.
-- Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`.
+- Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`.
 

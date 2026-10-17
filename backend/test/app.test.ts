@@ -6,6 +6,7 @@ import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
 import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/deforestacion.ts";
 import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "../src/exportaciones.ts";
 import type { EntregaCandidata } from "../src/lotes.ts";
+import { fincaDePaquete, paqueteDePrueba } from "./datos-paquete.ts";
 import {
   AccesoDenegado,
   aGeometria,
@@ -20,6 +21,7 @@ import {
   type Invitacion,
   type Lote,
   type Organizacion,
+  type Paquete,
   type Repo,
   type ResultadoEliminarFinca,
   type Temporada,
@@ -157,8 +159,24 @@ class RepoMemoria implements Repo {
   async actualizarExportacion(organizacionId: string, id: string, c: CambiosExportacion) {
     const x = this.exportaciones.find((e) => e.id === id && e.organizacionId === organizacionId);
     if (!x) return "no_encontrada" as const;
-    if (x.estado === "cerrada") return "cerrada" as const;
+    const soloDds = Object.keys(c).every((k) => k === "ddsRef");
+    if (x.estado === "cerrada" && !soloDds) return "cerrada" as const;
     Object.assign(x, c);
+    return "cambiada" as const;
+  }
+  /** Fincas de origen que devuelve el paquete de cualquier contenedor de ORG. */
+  fincasPaquete = paqueteDePrueba().fincas;
+  async paqueteExportacion(organizacionId: string, id: string): Promise<Paquete | null> {
+    const exportacion = (await this.listarExportaciones(organizacionId)).find((x) => x.id === id);
+    return exportacion ? { organizacion: "Prueba", exportacion, fincas: this.fincasPaquete } : null;
+  }
+  colaAttestations: string[] = [];
+  async cerrarExportacion(organizacionId: string, id: string) {
+    const x = this.exportaciones.find((e) => e.id === id && e.organizacionId === organizacionId);
+    if (!x) return "no_encontrada" as const;
+    if (x.estado === "cerrada") return "cerrada" as const;
+    x.estado = "cerrada";
+    this.colaAttestations.push(`Exportacion:${id}`);
     return "cambiada" as const;
   }
   async eliminarExportacion(organizacionId: string, id: string) {
@@ -905,6 +923,70 @@ describe("/v1/exportaciones", () => {
     expect((await pedir(app, "DELETE", `/v1/exportaciones/${id}`, "admin")).statusCode).toBe(204);
     expect(repo.exportaciones).toHaveLength(0);
     expect((await pedir(app, "DELETE", `/v1/exportaciones/${id}`, "admin")).statusCode).toBe(404);
+  });
+});
+
+describe("paquete EUDR del contenedor", () => {
+  const L1 = "66666666-6666-4666-8666-666666666661";
+  async function preparar(p: object = {}) {
+    const c = crearApp();
+    c.repo.lotesLibres.push({ id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null });
+    const res = await pedir(c.app, "POST", "/v1/exportaciones", "admin", {
+      codigo: "EXP 2026/001", comprador: "Tostador GmbH", destino: "Hamburgo", lotes: [L1], ...p,
+    });
+    return { ...c, id: res.json().id as string };
+  }
+
+  it("descarga el GeoJSON para TRACES, sin nombres de productores salvo que se pidan", async () => {
+    const { app, id } = await preparar();
+    const res = await pedir(app, "GET", `/v1/exportaciones/${id}/geojson`, "admin");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/geo+json");
+    expect(res.headers["content-disposition"]).toContain('filename="EXP_2026_001.geojson"');
+    const g = res.json();
+    expect(g.features).toHaveLength(2);
+    expect(g.features[0].properties.ProducerName).toBeUndefined();
+    const con = await pedir(app, "GET", `/v1/exportaciones/${id}/geojson?productores=1`, "admin");
+    expect(con.json().features[0].properties.ProducerName).toBe("Ana Pérez");
+  });
+
+  it("descarga el PDF para el comprador", async () => {
+    const { app, id } = await preparar();
+    const res = await pedir(app, "GET", `/v1/exportaciones/${id}/pdf`, "admin");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/pdf");
+    expect(res.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+
+  it("no cierra sin número de contenedor ni con fincas fuera de verde, y dice por qué", async () => {
+    const { app, repo, id } = await preparar();
+    repo.fincasPaquete = [fincaDePaquete({ nombre: "XXX", deforestacion: "pendiente" })];
+    const res = await pedir(app, "POST", `/v1/exportaciones/${id}/cerrar`, "admin");
+    expect(res.statusCode).toBe(409);
+    expect(res.json().motivos).toEqual([
+      "Falta el número de contenedor",
+      "1 finca no tiene chequeo satelital verde: XXX (sin chequeo)",
+    ]);
+    expect(repo.exportaciones[0].estado).toBe("abierta");
+  });
+
+  it("cierra un paquete completo, encola su attestation y después solo acepta la DDS", async () => {
+    const { app, repo, id } = await preparar({ contenedor: "CSQU3054383" });
+    const res = await pedir(app, "POST", `/v1/exportaciones/${id}/cerrar`, "admin");
+    expect(res.statusCode).toBe(200);
+    expect(res.json().estado).toBe("cerrada");
+    expect(repo.colaAttestations).toEqual([`Exportacion:${id}`]);
+    expect((await pedir(app, "POST", `/v1/exportaciones/${id}/cerrar`, "admin")).statusCode).toBe(409);
+    expect((await pedir(app, "PATCH", `/v1/exportaciones/${id}`, "admin", { ddsRef: "26NI000123" })).statusCode).toBe(200);
+    expect((await pedir(app, "PATCH", `/v1/exportaciones/${id}`, "admin", { destino: "Amberes" })).statusCode).toBe(409);
+  });
+
+  it("solo administradores y solo contenedores de la organización", async () => {
+    const { app, id } = await preparar();
+    expect((await pedir(app, "GET", `/v1/exportaciones/${id}/pdf`, "tecnico")).statusCode).toBe(403);
+    const otro = "77777777-7777-4777-8777-777777777777";
+    expect((await pedir(app, "GET", `/v1/exportaciones/${otro}/geojson`, "admin")).statusCode).toBe(404);
+    expect((await pedir(app, "POST", `/v1/exportaciones/${otro}/cerrar`, "admin")).statusCode).toBe(404);
   });
 });
 

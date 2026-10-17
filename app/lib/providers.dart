@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/database.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
+import 'services/compartir_service.dart';
 import 'services/fincas_service.dart';
 import 'services/fotos_service.dart';
 import 'services/mapas_service.dart';
@@ -168,6 +169,11 @@ final lotesProvider = FutureProvider.autoDispose<List<Lote>>(
 /// Contenedores de exportación (solo administradores; requiere señal).
 final exportacionesProvider = FutureProvider.autoDispose<List<Exportacion>>(
   (ref) => ref.watch(apiProvider).exportaciones(),
+);
+
+/// Comparte archivos del paquete EUDR (PDF, GeoJSON) con otras apps.
+final compartidorProvider = Provider<Compartidor>(
+  (ref) => CompartidorSistema(),
 );
 
 /// Equipo de la organización (solo administradores; requiere señal).

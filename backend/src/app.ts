@@ -5,6 +5,7 @@ import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type Veri
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
 import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
 import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
+import { geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
 
@@ -431,6 +432,58 @@ export function buildApp({
     if (r === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
     if (r === "cerrada") return reply.code(409).send(respuestaCerrada);
     return (await repo.listarExportaciones(admin.organizacionId)).find((e) => e.id === req.params.id);
+  });
+
+  /** Paquete del contenedor (solo administradores), o `null` si ya se respondió 404. */
+  async function paquete(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const admin = await activo(req, reply, true);
+    if (!admin) return null;
+    const p = z.uuid().safeParse(req.params.id).success
+      ? await repo.paqueteExportacion(admin.organizacionId, req.params.id)
+      : null;
+    if (!p) {
+      reply.code(404).send({ error: "no_encontrada" });
+      return null;
+    }
+    return { admin, p };
+  }
+  const nombreArchivo = (codigo: string) => codigo.replace(/[^A-Za-z0-9._-]+/g, "_");
+
+  /** Geolocalización de las fincas de origen para la DDS en TRACES. */
+  app.get<{ Params: { id: string }; Querystring: { productores?: string } }>(
+    "/v1/exportaciones/:id/geojson",
+    async (req, reply) => {
+      const r = await paquete(req, reply);
+      if (!r) return;
+      return reply
+        .header("content-type", "application/geo+json")
+        .header("content-disposition", `attachment; filename="${nombreArchivo(r.p.exportacion.codigo)}.geojson"`)
+        .send(geojsonTraces(r.p.fincas, { incluirProductor: req.query.productores === "1" }));
+    },
+  );
+
+  /** Resumen para el comprador (sin datos personales de los productores). */
+  app.get<{ Params: { id: string } }>("/v1/exportaciones/:id/pdf", async (req, reply) => {
+    const r = await paquete(req, reply);
+    if (!r) return;
+    return reply
+      .header("content-type", "application/pdf")
+      .header("content-disposition", `attachment; filename="Paquete-EUDR-${nombreArchivo(r.p.exportacion.codigo)}.pdf"`)
+      .send(await pdfPaquete(r.p));
+  });
+
+  /** Cierra el paquete EUDR: exige número de contenedor y todas las fincas en verde. */
+  app.post<{ Params: { id: string } }>("/v1/exportaciones/:id/cerrar", async (req, reply) => {
+    const r = await paquete(req, reply);
+    if (!r) return;
+    if (r.p.exportacion.estado === "cerrada") return reply.code(409).send(respuestaCerrada);
+    const motivos = motivosNoCierre(r.p);
+    if (motivos.length > 0) {
+      return reply.code(409).send({ error: "incompleto", mensaje: `No se puede cerrar: ${motivos.join(". ")}.`, motivos });
+    }
+    const estado = await repo.cerrarExportacion(r.admin.organizacionId, req.params.id);
+    if (estado !== "cambiada") return reply.code(409).send(respuestaCerrada);
+    return (await repo.listarExportaciones(r.admin.organizacionId)).find((e) => e.id === req.params.id);
   });
 
   app.delete<{ Params: { id: string } }>("/v1/exportaciones/:id", async (req, reply) => {

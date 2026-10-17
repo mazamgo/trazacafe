@@ -84,6 +84,31 @@ export interface Exportacion {
 }
 
 export type ResultadoGuardarExportacion = "creada" | "codigo_repetido" | "lote_ocupado";
+
+/** Finca de origen de un contenedor, con lo que piden TRACES y el comprador. */
+export interface FincaDePaquete {
+  id: string;
+  nombre: string;
+  productorNombre: string;
+  comunidad: string | null;
+  /** GeoJSON del lindero vigente (punto si mide menos de 4 ha). */
+  geometria: { type: string; coordinates: unknown };
+  areaOficialHa: number;
+  version: number;
+  geoHash: string;
+  deforestacion: EstadoDeforestacion;
+  ultimoChequeo: string | null;
+  ultimaVisita: string | null;
+  attestationUid: string | null;
+  /** Kg de sus entregas que van en este contenedor. */
+  kgEntregados: number;
+}
+
+export interface Paquete {
+  organizacion: string;
+  exportacion: Exportacion;
+  fincas: FincaDePaquete[];
+}
 export type ResultadoCambiarExportacion = "cambiada" | "no_encontrada" | "cerrada";
 
 export interface Temporada {
@@ -226,6 +251,10 @@ export interface Repo {
   actualizarExportacion(organizacionId: string, id: string, cambios: CambiosExportacion): Promise<ResultadoCambiarExportacion>;
   /** Deshace un contenedor abierto; sus lotes quedan libres. */
   eliminarExportacion(organizacionId: string, id: string): Promise<ResultadoCambiarExportacion>;
+  /** Contenedor con sus fincas de origen, para el paquete EUDR; `null` si no es de la organización. */
+  paqueteExportacion(organizacionId: string, id: string): Promise<Paquete | null>;
+  /** Pasa un contenedor abierto a cerrado y encola su attestation. */
+  cerrarExportacion(organizacionId: string, id: string): Promise<ResultadoCambiarExportacion>;
 
   /** Todo lo de la organización, para que cada celular vea lo del equipo. */
   datosOrganizacion(organizacionId: string): Promise<DatosOrganizacion>;
@@ -796,13 +825,18 @@ export class PgRepo implements Repo {
       ddsRef: "dds_ref",
     };
     const campos = (Object.keys(c) as (keyof CambiosExportacion)[]).filter((k) => c[k] !== undefined);
-    const sets = campos.map((k, i) => `${columnas[k]} = $${i + 3}`).join(", ");
+    const sets = campos.map((k, i) => `${columnas[k]} = $${i + 4}`).join(", ");
+    // La referencia de la DDS llega después del paquete EUDR: se puede anotar
+    // con el contenedor cerrado mientras su attestation no se haya firmado.
+    const soloDds = campos.every((k) => k === "ddsRef");
     const { rows } = await this.pool.query<{ estado: string; cambiada: boolean }>(
-      `WITH actual AS (SELECT id, estado FROM exportaciones WHERE id = $1 AND organizacion_id = $2),
+      `WITH actual AS (SELECT id, estado, attestation_uid FROM exportaciones WHERE id = $1 AND organizacion_id = $2),
             cambio AS (UPDATE exportaciones SET ${sets}
-                       WHERE id = (SELECT id FROM actual WHERE estado = 'abierta') RETURNING id)
+                       WHERE id = (SELECT id FROM actual
+                                   WHERE estado = 'abierta' OR ($3 AND attestation_uid IS NULL))
+                       RETURNING id)
        SELECT a.estado, EXISTS (SELECT 1 FROM cambio) AS cambiada FROM actual a`,
-      [id, organizacionId, ...campos.map((k) => c[k] ?? null)],
+      [id, organizacionId, soloDds, ...campos.map((k) => c[k] ?? null)],
     );
     if (rows.length === 0) return "no_encontrada";
     return rows[0].cambiada ? "cambiada" : "cerrada";
@@ -823,6 +857,62 @@ export class PgRepo implements Repo {
       }
       await client.query("DELETE FROM exportacion_lotes WHERE exportacion_id = $1", [id]);
       await client.query("DELETE FROM exportaciones WHERE id = $1", [id]);
+      await client.query("COMMIT");
+      return "cambiada";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async paqueteExportacion(organizacionId: string, id: string): Promise<Paquete | null> {
+    const exportacion = (await this.listarExportaciones(organizacionId)).find((x) => x.id === id);
+    if (!exportacion) return null;
+    const organizacion = (await this.organizacion(organizacionId))!.nombre;
+    const { rows } = await this.pool.query(
+      `WITH entregas_x AS (
+         SELECT e.finca_id, sum(e.kg)::float8 AS kg
+         FROM exportacion_lotes el JOIN lote_entregas le ON le.lote_id = el.lote_id
+         JOIN entregas e ON e.id = le.entrega_id
+         WHERE el.exportacion_id = $1
+         GROUP BY e.finca_id)
+       SELECT f.id, f.nombre, p.nombre AS "productorNombre", p.comunidad,
+              ST_AsGeoJSON(f.geom, 8)::json AS geometria, f.area_oficial_ha::float8 AS "areaOficialHa",
+              f.version_actual AS version, f.geo_hash AS "geoHash", f.deforestacion,
+              (SELECT max(c.fecha) FROM chequeos_deforestacion c WHERE c.finca_id = f.id) AS "ultimoChequeo",
+              (SELECT max(v.fecha) FROM verificaciones v WHERE v.finca_id = f.id) AS "ultimaVisita",
+              f.attestation_uid AS "attestationUid", x.kg AS "kgEntregados"
+       FROM entregas_x x JOIN fincas f ON f.id = x.finca_id JOIN productores p ON p.id = f.productor_id
+       ORDER BY f.nombre`,
+      [id],
+    );
+    const iso = (d: Date | null) => (d ? new Date(d).toISOString() : null);
+    return {
+      organizacion,
+      exportacion,
+      fincas: rows.map((f) => ({ ...f, ultimoChequeo: iso(f.ultimoChequeo), ultimaVisita: iso(f.ultimaVisita) })),
+    };
+  }
+
+  async cerrarExportacion(organizacionId: string, id: string): Promise<ResultadoCambiarExportacion> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const r = await client.query(
+        "UPDATE exportaciones SET estado = 'cerrada' WHERE id = $1 AND organizacion_id = $2 AND estado = 'abierta'",
+        [id, organizacionId],
+      );
+      if (r.rowCount === 0) {
+        await client.query("ROLLBACK");
+        const existe = await this.pool.query("SELECT 1 FROM exportaciones WHERE id = $1 AND organizacion_id = $2", [id, organizacionId]);
+        return existe.rowCount === 0 ? "no_encontrada" : "cerrada";
+      }
+      await client.query(
+        "INSERT INTO attestations_pendientes (esquema, entidad_id) VALUES ('Exportacion', $1) ON CONFLICT DO NOTHING",
+        [id],
+      );
       await client.query("COMMIT");
       return "cambiada";
     } catch (e) {

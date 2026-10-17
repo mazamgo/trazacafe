@@ -168,6 +168,7 @@ class Exportacion {
     required this.fechaEmbarque,
     required this.ddsRef,
     required this.abierta,
+    required this.atestada,
     required this.kg,
     required this.lotes,
     required this.entregas,
@@ -190,6 +191,7 @@ class Exportacion {
           : DateTime.parse(j['fechaEmbarque'] as String),
       ddsRef: j['ddsRef'] as String?,
       abierta: j['estado'] == 'abierta',
+      atestada: j['attestationUid'] != null,
       kg: (j['kg'] as num).toDouble(),
       lotes: [
         for (final l in (j['lotes'] as List).cast<Map>())
@@ -222,6 +224,9 @@ class Exportacion {
 
   /// Abierta: se puede editar o deshacer.
   final bool abierta;
+
+  /// Ya está en la blockchain: ni la DDS se puede cambiar.
+  final bool atestada;
   final double kg;
   final List<({String codigo, double kg, String estado, String temporada})>
   lotes;
@@ -403,6 +408,31 @@ class ApiClient {
     ),
   );
 
+  /// Cierra el paquete EUDR. La API responde 409 con los motivos si falta
+  /// el número de contenedor o hay fincas sin chequeo satelital verde.
+  Future<Exportacion> cerrarExportacion(String id) async =>
+      Exportacion.desdeJson(
+        await _pedir(
+          'POST',
+          '/v1/exportaciones/${Uri.encodeComponent(id)}/cerrar',
+          const <String, dynamic>{},
+        ),
+      );
+
+  /// GeoJSON de las fincas de origen para la DDS en TRACES. Los nombres de
+  /// los productores (datos personales) solo van si [conProductores].
+  Future<List<int>> geojsonExportacion(
+    String id, {
+    bool conProductores = false,
+  }) => _descargar(
+    '/v1/exportaciones/${Uri.encodeComponent(id)}/geojson'
+    '${conProductores ? '?productores=1' : ''}',
+  );
+
+  /// PDF del paquete EUDR para el comprador.
+  Future<List<int>> pdfExportacion(String id) =>
+      _descargar('/v1/exportaciones/${Uri.encodeComponent(id)}/pdf');
+
   /// Deshace un contenedor abierto; sus lotes quedan libres.
   Future<void> eliminarExportacion(String id) =>
       _pedir('DELETE', '/v1/exportaciones/${Uri.encodeComponent(id)}');
@@ -420,6 +450,22 @@ class ApiClient {
 
   Future<void> quitarAcceso(String email) =>
       _pedir('DELETE', '/v1/invitaciones/${Uri.encodeComponent(email)}');
+
+  /// GET de un archivo (PDF, GeoJSON): devuelve los bytes tal cual.
+  Future<List<int>> _descargar(String ruta) async {
+    final t = await token();
+    if (t == null) throw ApiError(401, 'Inicia sesión para continuar.');
+    final req = http.Request('GET', _base.resolve(ruta))
+      ..headers['Authorization'] = 'Bearer $t';
+    final res = await http.Response.fromStream(await _cliente.send(req));
+    if (res.statusCode >= 300) {
+      final json = res.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(res.body) as Map<String, dynamic>;
+      throw ApiError(res.statusCode, _mensaje(res.statusCode, json));
+    }
+    return res.bodyBytes;
+  }
 
   Future<Map<String, dynamic>> _pedir(
     String metodo,

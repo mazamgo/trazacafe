@@ -101,7 +101,10 @@ Es la parte que **paga el cliente**.
 - **Lotes: hechos** (migración 009, pantalla Lotes para administradores). Detalle de reglas y avisos en `infra/README.md` §4f.
 - Los factores de rendimiento por estado (`cultivos.json`) son aproximados y se validan con el piloto.
 - **Contenedores: hechos** (migración 010, pantalla Contenedores). Detalle en `infra/README.md` §4g.
-- Siguen el paquete EUDR (cierre del contenedor, GeoJSON para TRACES y PDF), las attestations y el verificador.
+- **Paquete EUDR: hecho**: GeoJSON para TRACES, PDF para el comprador y cierre del contenedor (detalle en `infra/README.md` §4h).
+  - Falta validar el GeoJSON en el entorno de aceptación de TRACES.
+  - Ningún contenedor se puede cerrar mientras no haya chequeos satelitales en verde (key de GFW).
+- Siguen las attestations (Cloud KMS, registro de esquemas, worker) y el verificador público.
 
 - **Lotes** (beneficio o centro de acopio):
   - Agrupar entregas de un mismo cultivo y temporada.
