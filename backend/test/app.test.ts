@@ -2,6 +2,7 @@ import { geoHash, type Coordenada } from "@trazacafe/eudr-eas-schemas";
 import { describe, expect, it } from "vitest";
 import { rutaFoto, sha256Hex, type Almacen } from "../src/almacen.ts";
 import { buildApp } from "../src/app.ts";
+import type { ColaAttestations, RedEAS } from "../src/atestador.ts";
 import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
 import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/deforestacion.ts";
 import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "../src/exportaciones.ts";
@@ -315,7 +316,10 @@ class SateliteFalso implements FuenteSatelital {
   }
 }
 
-function crearApp({ conSatelite = true } = {}) {
+function crearApp({
+  conSatelite = true,
+  atestador = null,
+}: { conSatelite?: boolean; atestador?: { cola: ColaAttestations; red: RedEAS } | null } = {}) {
   const repo = new RepoMemoria();
   const identidad = new IdentidadFalsa();
   const almacen = new AlmacenMemoria();
@@ -327,6 +331,7 @@ function crearApp({ conSatelite = true } = {}) {
     satelite: conSatelite ? satelite : null,
     verificarToken: async (t) => usuarios[t] ?? null,
     verificarTarea: async (t) => t === "oidc-scheduler",
+    atestador,
   });
   return { app, repo, identidad, almacen, satelite };
 }
@@ -987,6 +992,40 @@ describe("paquete EUDR del contenedor", () => {
     const otro = "77777777-7777-4777-8777-777777777777";
     expect((await pedir(app, "GET", `/v1/exportaciones/${otro}/geojson`, "admin")).statusCode).toBe(404);
     expect((await pedir(app, "POST", `/v1/exportaciones/${otro}/cerrar`, "admin")).statusCode).toBe(404);
+  });
+});
+
+describe("POST /v1/tareas/attestations", () => {
+  const tarea = (app: App, token?: string) =>
+    app.inject({ method: "POST", url: "/v1/tareas/attestations", headers: token ? { authorization: `Bearer ${token}` } : {} });
+
+  it("solo la llama Cloud Scheduler con su token", async () => {
+    const { app } = crearApp();
+    expect((await tarea(app)).statusCode).toBe(401);
+    expect((await tarea(app, "admin")).statusCode).toBe(401);
+  });
+
+  it("sin clave de firma responde 503", async () => {
+    const { app } = crearApp();
+    const res = await tarea(app, "oidc-scheduler");
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error).toBe("sin_atestador");
+  });
+
+  it("firma la cola y devuelve el resumen", async () => {
+    const cola: ColaAttestations = {
+      listos: async (ola) =>
+        ola === 1
+          ? [{ esquema: "Finca", entidadId: "f1", version: 1, colaId: 1, solicitud: { esquema: "Finca", refUID: `0x${"0".repeat(64)}`, data: "0x01" } }]
+          : [],
+      guardar: async () => {},
+      fallo: async () => {},
+    };
+    const red: RedEAS = { nombre: "optimism-sepolia", atestar: async () => ({ uids: [`0x${"a".repeat(64)}`], txHash: `0x${"b".repeat(64)}` }) };
+    const { app } = crearApp({ atestador: { cola, red } });
+    const res = await tarea(app, "oidc-scheduler");
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ firmadas: { Finca: 1 }, transacciones: [`0x${"b".repeat(64)}`], error: null });
   });
 });
 

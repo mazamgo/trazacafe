@@ -104,7 +104,10 @@ Es la parte que **paga el cliente**.
 - **Paquete EUDR: hecho**: GeoJSON para TRACES, PDF para el comprador y cierre del contenedor (detalle en `infra/README.md` §4h).
   - Falta validar el GeoJSON en el entorno de aceptación de TRACES.
   - Ningún contenedor se puede cerrar mientras no haya chequeos satelitales en verde (key de GFW).
-- Siguen las attestations (Cloud KMS, registro de esquemas, worker) y el verificador público.
+- **Attestations: código hecho**: firma con Cloud KMS, worker en cuatro olas, migración 011 y esquema `Chequeo` separado de `Finca`. Detalle en `infra/README.md` §3.
+  - La clave HSM ya está creada (dirección `0xBFC2333a01536EdFDB3e6aB987c544CDeAC8CB99`).
+  - Faltan: ETH de prueba, registrar los esquemas en OP Sepolia, aplicar la 011, desplegar y programar el worker.
+- Sigue el verificador público.
 
 - **Lotes** (beneficio o centro de acopio):
   - Agrupar entregas de un mismo cultivo y temporada.

@@ -57,7 +57,28 @@ gcloud kms keys create atestador --keyring=trazacafe --location=$REGION `
   --purpose=asymmetric-signing --default-algorithm=ec-sign-secp256k1-sha256 --protection-level=hsm
 ```
 
-La dirección Ethereum de la clave se deriva de su clave pública (lo hará el worker en la semana 4). Esa dirección necesita un poco de ETH en OP para pagar el gas.
+- **Costo:** unos US$2.50 al mes por la versión de clave HSM, más las firmas (pocas al día).
+- **Permisos:** la cuenta de servicio de la API necesita `roles/cloudkms.signerVerifier` y `roles/cloudkms.publicKeyViewer` sobre la clave.
+- **Dirección:** la dirección Ethereum se deriva de la clave pública (`backend/src/kms.ts`); `npm run registrar-esquemas -- --direccion` la muestra junto con su saldo. Esa dirección necesita un poco de ETH en OP para el gas: en Sepolia, de un faucet.
+
+### Attestations (Fase 2)
+
+1. **Registrar los esquemas** con la misma clave: `npm run registrar-esquemas` (OP Sepolia) o `-- --red optimism` (OP Mainnet).
+2. **Configurar la API** con `KMS_KEY_VERSION` (`projects/…/cryptoKeyVersions/1`), `EAS_RED` (`optimism-sepolia` u `optimism`) y, opcional, `RPC_URL`.
+3. **Programar el worker:** Cloud Scheduler llama cada hora a `POST /v1/tareas/attestations` con el mismo token OIDC que el chequeo satelital (`backend/src/atestador.ts`).
+
+El worker firma en cuatro olas, una transacción por ola, para que cada attestation pueda apuntar a la anterior:
+
+| Ola | Qué firma | A qué apunta |
+|---|---|---|
+| 1 | Versiones del lindero (`Finca`) | La versión anterior |
+| 2 | `Chequeo` satelital, `Verificacion` (visita) y `Entrega` | Su versión de finca |
+| 3 | `Lote` | Lleva los UIDs de sus entregas |
+| 4 | `Exportacion` | Lleva los UIDs de sus lotes; solo cerrada y con la referencia de la DDS |
+
+- **Fallos:** si una ola falla, se reintenta a los 15 minutos.
+- **Registro:** lo firmado queda en la tabla `attestaciones` (red y transacción).
+- **Privacidad:** en la blockchain solo van ids, hashes, cantidades y textos de catálogo, nunca nombres de personas.
 
 ## 4. Firebase (login y hosting del verificador)
 

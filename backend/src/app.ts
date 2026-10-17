@@ -2,6 +2,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
+import { procesarCola, type ColaAttestations, type RedEAS } from "./atestador.ts";
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
 import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
 import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
@@ -27,6 +28,7 @@ export function buildApp({
   almacen,
   satelite,
   verificarTarea,
+  atestador = null,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
@@ -35,6 +37,8 @@ export function buildApp({
   /** `null` mientras no haya API key de Global Forest Watch. */
   satelite: FuenteSatelital | null;
   verificarTarea: VerificarTarea;
+  /** `null` mientras no haya clave de firma en Cloud KMS. */
+  atestador?: { cola: ColaAttestations; red: RedEAS } | null;
 }) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -192,6 +196,19 @@ export function buildApp({
       }
     }
     return resultados;
+  });
+
+  /**
+   * Firma en la blockchain lo que está en cola (Cloud Scheduler, cada hora):
+   * fincas, chequeos, visitas, entregas, lotes y contenedores, en ese orden.
+   */
+  app.post("/v1/tareas/attestations", async (req, reply) => {
+    const token = req.headers.authorization?.replace(/^Bearer /, "");
+    if (!token || !(await verificarTarea(token))) return reply.code(401).send({ error: "No autorizado" });
+    if (!atestador) return reply.code(503).send({ error: "sin_atestador", mensaje: "Falta KMS_KEY_VERSION." });
+    const resumen = await procesarCola(atestador.cola, atestador.red);
+    if (resumen.error) req.log.error({ error: resumen.error }, "attestations: falló una ola");
+    return resumen;
   });
 
   /** Revisar una finca ahora (p. ej. después de una denuncia). Solo administradores. */

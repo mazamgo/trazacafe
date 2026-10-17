@@ -1,7 +1,12 @@
 {
   "Finca": {
-    "descripcion": "Versión del lindero de una parcela: hash de la geolocalización y resultado del chequeo de deforestación (EUDR). refUID = attestation de la versión anterior.",
-    "schema": "bytes32 fincaId,uint16 version,string cultivo,bytes32 geoHash,uint32 areaHaX100,bool deforestacionOK,string fuenteChequeo,bytes32 docsHash",
+    "descripcion": "Versión del lindero de una parcela: hash de la geolocalización, área oficial y hash de sus fotos y documentos (EUDR). refUID = attestation de la versión anterior.",
+    "schema": "bytes32 fincaId,uint16 version,string cultivo,bytes32 geoHash,uint32 areaHaX100,bytes32 docsHash",
+    "revocable": true
+  },
+  "Chequeo": {
+    "descripcion": "Chequeo satelital de deforestación de una versión del lindero en una temporada (corte 31/12/2020). refUID = attestation de esa versión de la Finca.",
+    "schema": "bytes32 fincaUID,string temporada,string resultado,string fuente,uint32 areaAfectadaM2,uint64 fecha",
     "revocable": true
   },
   "Verificacion": {
@@ -11,17 +16,17 @@
   },
   "Entrega": {
     "descripcion": "Entrega de café o cacao de una finca al beneficio o centro de acopio. refUID = attestation de la Finca.",
-    "schema": "bytes32 entregaId,bytes32 fincaUID,string cultivo,uint32 kg,uint64 fecha,string estado",
+    "schema": "bytes32 entregaId,bytes32 fincaUID,string cultivo,uint32 kgX100,uint64 fecha,string estado",
     "revocable": true
   },
   "Lote": {
     "descripcion": "Lote del beneficio o centro de acopio (p. ej. café pergamino o cacao seco) formado por entregas de un cultivo y una temporada.",
-    "schema": "bytes32 loteId,string cultivo,string temporada,bytes32[] entregasUIDs,uint32 kg,string estado,string beneficio,string proceso",
+    "schema": "bytes32 loteId,string cultivo,string temporada,bytes32[] entregasUIDs,uint32 kgX100,string estado,string beneficio,string proceso",
     "revocable": true
   },
   "Exportacion": {
     "descripcion": "Contenedor de exportación con sus lotes y la referencia de la DDS en TRACES.",
-    "schema": "bytes32 exportacionId,string cultivo,bytes32[] lotesUIDs,uint32 kg,string contenedor,string destino,string ddsRef",
+    "schema": "bytes32 exportacionId,string cultivo,bytes32[] lotesUIDs,uint32 kgX100,string contenedor,string destino,string ddsRef",
     "revocable": true
   }
 }

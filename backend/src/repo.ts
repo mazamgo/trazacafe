@@ -1089,7 +1089,8 @@ export class PgRepo implements Repo {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (finca_id, temporada_id, version_finca) DO UPDATE SET
            fecha = now(), fuente = EXCLUDED.fuente, alertas = EXCLUDED.alertas,
-           area_afectada_ha = EXCLUDED.area_afectada_ha, resultado = EXCLUDED.resultado, detalle = EXCLUDED.detalle`,
+           area_afectada_ha = EXCLUDED.area_afectada_ha, resultado = EXCLUDED.resultado, detalle = EXCLUDED.detalle,
+           attestation_uid = NULL`,
         [c.fincaId, c.temporadaId, c.version, c.fuente, c.alertas, c.areaAfectadaHa, c.resultado, JSON.stringify(c.detalle)],
       );
       // Solo si el chequeo es del lindero vigente cambia el estado de la finca.

@@ -59,8 +59,6 @@ export interface DatosFinca {
   cultivo: string;
   geoHash: Hex;
   areaHa: number;
-  deforestacionOK: boolean;
-  fuenteChequeo: string;
   docsHash: Hex;
 }
 
@@ -71,11 +69,22 @@ export function codificarFinca(d: DatosFinca): Hex {
     d.cultivo,
     d.geoHash,
     Math.round(d.areaHa * 100),
-    d.deforestacionOK,
-    d.fuenteChequeo,
     d.docsHash,
   ]);
 }
+
+/**
+ * Huella de varios hashes (p. ej. las fotos de una finca): SHA-256 de los
+ * hashes en minúsculas, ordenados y unidos por comas. Sin hashes, cero.
+ */
+export function hashDeHashes(hashes: string[]): Hex {
+  if (hashes.length === 0) return `0x${"0".repeat(64)}`;
+  const texto = hashes.map((h) => h.toLowerCase()).sort().join(",");
+  return `0x${createHash("sha256").update(texto, "utf8").digest("hex")}`;
+}
+
+/** Kg con dos decimales como entero (345.5 kg → 34550), para los esquemas. */
+export const kgX100 = (kg: number) => Math.round(kg * 100);
 
 /** Coordenada GeoJSON: [lon, lat]. */
 export type Coordenada = [number, number];

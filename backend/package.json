@@ -9,11 +9,13 @@
     "start": "node --import tsx src/server.ts",
     "migrate": "node --env-file-if-exists=.env --import tsx scripts/migrate.ts",
     "crear-organizacion": "node --env-file-if-exists=.env --import tsx scripts/crear-organizacion.ts",
+    "registrar-esquemas": "node --env-file-if-exists=.env --import tsx scripts/registrar-esquemas.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@google-cloud/cloud-sql-connector": "^1.12.1",
+    "@google-cloud/kms": "^6.3.0",
     "@trazacafe/eudr-eas-schemas": "*",
     "fastify": "^5.0.0",
     "firebase-admin": "^13.0.0",
@@ -21,9 +23,11 @@
     "pdfkit": "^0.20.2",
     "pg": "^8.13.0",
     "tsx": "^4.0.0",
+    "viem": "^2.57.7",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@noble/curves": "^1.9.1",
     "@types/node": "^24.0.0",
     "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.11.0",

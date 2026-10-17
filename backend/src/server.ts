@@ -6,6 +6,9 @@ import type { Almacen } from "./almacen.ts";
 import { buildApp, type VerificarTarea } from "./app.ts";
 import { GlobalForestWatch } from "./deforestacion.ts";
 import type { Identidad, Rol, VerificarToken } from "./auth.ts";
+import { optimism, optimismSepolia } from "viem/chains";
+import { ColaPg, EasViem } from "./atestador.ts";
+import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { PgRepo } from "./repo.ts";
 
@@ -78,6 +81,19 @@ const verificarTarea: VerificarTarea = async (token) => {
 const satelite = process.env.GFW_API_KEY ? new GlobalForestWatch(process.env.GFW_API_KEY) : null;
 
 const { pool } = await crearPool();
-const app = buildApp({ repo: new PgRepo(pool), verificarToken, identidad, almacen, satelite, verificarTarea });
+
+// Attestations: clave en Cloud KMS y red EAS_RED (optimism-sepolia u optimism).
+const atestador = process.env.KMS_KEY_VERSION
+  ? {
+      cola: new ColaPg(pool),
+      red: new EasViem(
+        await cuentaKms(process.env.KMS_KEY_VERSION),
+        process.env.EAS_RED === "optimism" ? optimism : optimismSepolia,
+        process.env.RPC_URL,
+      ),
+    }
+  : null;
+
+const app = buildApp({ repo: new PgRepo(pool), verificarToken, identidad, almacen, satelite, verificarTarea, atestador });
 
 await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 8080) });
