@@ -76,6 +76,16 @@ class RepoMemoria implements Repo {
     this.fincas.delete(fincaId);
     return { estado: "eliminada", archivos: f.archivos ?? [] };
   }
+  /** Fincas para cambiar de cultivo: cultivo actual y si tienen entregas. */
+  cultivoFincas = new Map<string, { cultivo: string; conEntregas?: boolean; atestada?: boolean }>();
+  async cambiarCultivoFinca(organizacionId: string, fincaId: string, cultivo: string) {
+    const f = this.cultivoFincas.get(fincaId);
+    if (!f || organizacionId !== ORG) return "no_encontrada" as const;
+    if (f.conEntregas) return "con_entregas" as const;
+    if (f.atestada) return "atestada" as const;
+    f.cultivo = cultivo;
+    return "cambiado" as const;
+  }
   org: Organizacion = { id: ORG, nombre: "Prueba", tipo: "cooperativa", cultivos: ["cafe"] };
   /** Cultivos que ya tienen fincas (no se pueden quitar). */
   cultivosConFincas: string[] = [];
@@ -617,6 +627,43 @@ describe("cultivos", () => {
     expect(cacao.statusCode).toBe(201);
     expect(cacao.json().cultivo).toBe("cacao");
     expect((await pedir(app, "POST", "/v1/temporadas", "admin", { ...t, nombre: "x", cultivo: "cacao" })).statusCode).toBe(409);
+  });
+});
+
+describe("PUT /v1/fincas/:id/cultivo", () => {
+  const id = "3f2b8c1e-9a4d-4e7f-8b21-0c5d6e7f8a90";
+
+  it("cambia el cultivo de una finca sin entregas", async () => {
+    const { app, repo } = crearApp();
+    repo.org.cultivos = ["cafe", "cacao"];
+    repo.cultivoFincas.set(id, { cultivo: "cafe" });
+    const res = await pedir(app, "PUT", `/v1/fincas/${id}/cultivo`, "tecnico", { cultivo: "cacao" });
+    expect(res.statusCode).toBe(200);
+    expect(repo.cultivoFincas.get(id)?.cultivo).toBe("cacao");
+  });
+
+  it("no lo cambia si la finca tiene entregas o ya está atestada", async () => {
+    const { app, repo } = crearApp();
+    repo.org.cultivos = ["cafe", "cacao"];
+    repo.cultivoFincas.set(id, { cultivo: "cafe", conEntregas: true });
+    const conEntregas = await pedir(app, "PUT", `/v1/fincas/${id}/cultivo`, "tecnico", { cultivo: "cacao" });
+    expect(conEntregas.statusCode).toBe(409);
+    expect(conEntregas.json().mensaje).toContain("entregas");
+    repo.cultivoFincas.set(id, { cultivo: "cafe", atestada: true });
+    expect((await pedir(app, "PUT", `/v1/fincas/${id}/cultivo`, "tecnico", { cultivo: "cacao" })).statusCode).toBe(409);
+    expect(repo.cultivoFincas.get(id)?.cultivo).toBe("cafe");
+  });
+
+  it("rechaza un cultivo que la organización no tiene o que no existe, y fincas ajenas", async () => {
+    const { app, repo } = crearApp();
+    repo.cultivoFincas.set(id, { cultivo: "cafe" });
+    const sinCacao = await pedir(app, "PUT", `/v1/fincas/${id}/cultivo`, "tecnico", { cultivo: "cacao" });
+    expect(sinCacao.statusCode).toBe(422);
+    expect(sinCacao.json().mensaje).toContain("Cultivos");
+    expect((await pedir(app, "PUT", `/v1/fincas/${id}/cultivo`, "tecnico", { cultivo: "soya" })).statusCode).toBe(422);
+    repo.org.cultivos = ["cafe", "cacao"];
+    const otra = "11111111-2222-4333-8444-555555555555";
+    expect((await pedir(app, "PUT", `/v1/fincas/${otra}/cultivo`, "tecnico", { cultivo: "cacao" })).statusCode).toBe(404);
   });
 });
 

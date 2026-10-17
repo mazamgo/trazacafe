@@ -4,7 +4,7 @@ import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
-import { cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
+import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
 
 const invitacionSchema = z.object({
   email: z.email().transform((e) => e.toLowerCase()),
@@ -151,7 +151,7 @@ export function buildApp({
     if (!datos.success) {
       return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
     }
-    const { cultivos } = await repo.organizacion(admin.organizacionId);
+    const cultivos = (await repo.organizacion(admin.organizacionId))?.cultivos ?? [];
     if (datos.data.cultivo && !cultivos.includes(datos.data.cultivo)) {
       return reply.code(422).send({
         error: "datos_invalidos",
@@ -259,6 +259,36 @@ export function buildApp({
     // huérfano en Storage, que no expone nada (solo lo lee la organización).
     await Promise.allSettled(r.archivos.map((a) => almacen.borrar(a)));
     return reply.code(204).send();
+  });
+
+  /** Cambia el cultivo de una finca mientras no tenga entregas. */
+  app.put<{ Params: { id: string } }>("/v1/fincas/:id/cultivo", async (req, reply) => {
+    const usuario = await activo(req, reply);
+    if (!usuario) return;
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrada" });
+    const datos = cambioCultivoSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const org = await repo.organizacion(usuario.organizacionId);
+    if (!org?.cultivos.includes(datos.data.cultivo)) {
+      return reply.code(422).send({
+        error: "datos_invalidos",
+        mensaje: `La organización no trabaja ${datos.data.cultivo}; actívelo primero en Cultivos.`,
+      });
+    }
+    const r = await repo.cambiarCultivoFinca(usuario.organizacionId, req.params.id, datos.data.cultivo);
+    if (r === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
+    if (r === "con_entregas") {
+      return reply.code(409).send({
+        error: "con_entregas",
+        mensaje: "La finca ya tiene entregas registradas con los estados de su cultivo; no se puede cambiar.",
+      });
+    }
+    if (r === "atestada") {
+      return reply.code(409).send({ error: "atestada", mensaje: "La finca ya está en la blockchain; no se puede cambiar su cultivo." });
+    }
+    return { cultivo: datos.data.cultivo };
   });
 
   app.get("/v1/invitaciones", async (req, reply) => {

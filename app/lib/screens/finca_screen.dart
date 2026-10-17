@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../data/database.dart';
 import '../domain/cultivos.dart';
 import '../providers.dart';
+import '../services/fincas_service.dart';
 import '../widgets/seccion_fotos.dart';
 import 'verificacion_screen.dart';
 
@@ -91,6 +92,56 @@ class FincaScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _cambiarCultivo(
+    BuildContext context,
+    WidgetRef ref,
+    Finca finca,
+  ) async {
+    final cultivos =
+        ref.read(cultivosOrganizacionProvider).value ?? const <String>[];
+    final nuevo = await showDialog<String>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        title: const Text('Cultivo de la finca'),
+        children: [
+          for (final cultivo in cultivos.map(cultivoDe))
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, cultivo.id),
+              child: Row(
+                children: [
+                  Icon(cultivo.icono, color: cultivo.colorUi),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(cultivo.nombre)),
+                  if (cultivo.id == finca.cultivo) const Icon(Icons.check),
+                ],
+              ),
+            ),
+          if (finca.sincronizado)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 0),
+              child: Text('Necesitas señal: la finca ya se envió.'),
+            ),
+        ],
+      ),
+    );
+    if (nuevo == null || nuevo == finca.cultivo || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(fincasServiceProvider).cambiarCultivo(finca, nuevo);
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(
+            'La finca ahora es de ${cultivoDe(nuevo).nombre.toLowerCase()}.',
+          ),
+        ),
+      );
+    } catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo cambiar el cultivo: $e')),
+      );
+    }
+  }
+
   void _abrirVisita(BuildContext context, Finca finca) => Navigator.of(
     context,
   ).push(MaterialPageRoute(builder: (_) => VerificacionScreen(finca: finca)));
@@ -135,7 +186,22 @@ class FincaScreen extends ConsumerWidget {
                 bottom: 96 + MediaQuery.paddingOf(context).bottom,
               ),
               children: [
-                _Resumen(finca: finca, cultivo: cultivo, esAdmin: esAdmin),
+                _Resumen(
+                  finca: finca,
+                  cultivo: cultivo,
+                  esAdmin: esAdmin,
+                  onCambiarCultivo:
+                      FincasService.sePuedeCambiarCultivo(
+                            finca,
+                            tieneEntregas: entregas.isNotEmpty,
+                          ) &&
+                          (ref.watch(cultivosOrganizacionProvider).value ??
+                                      const [])
+                                  .length >
+                              1
+                      ? () => _cambiarCultivo(context, ref, finca)
+                      : null,
+                ),
                 _TarjetaVerificacion(
                   temporada: actual,
                   visitas: visitas,
@@ -229,11 +295,16 @@ class _Resumen extends ConsumerWidget {
     required this.finca,
     required this.cultivo,
     required this.esAdmin,
+    this.onCambiarCultivo,
   });
 
   final Finca finca;
   final Cultivo cultivo;
   final bool esAdmin;
+
+  /// `null` si el cultivo ya no se puede cambiar (tiene entregas) o la
+  /// organización trabaja un solo cultivo.
+  final VoidCallback? onCambiarCultivo;
 
   static const _satelite = {
     'verde': (
@@ -288,6 +359,12 @@ class _Resumen extends ConsumerWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                const Spacer(),
+                if (onCambiarCultivo != null)
+                  TextButton(
+                    onPressed: onCambiarCultivo,
+                    child: const Text('Cambiar cultivo'),
+                  ),
               ],
             ),
             const SizedBox(height: 4),

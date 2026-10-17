@@ -151,14 +151,15 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 
 - **Datos:** `organizaciones.cultivos`, `fincas.cultivo` y `temporadas.cultivo` (migración `008_cultivos.sql`, aplicada el 16/10/2026). Las fincas anteriores quedaron como café.
 - **Validación:** la API rechaza (422) las fincas de un cultivo que la organización no tiene activado y las entregas cuyo estado no corresponde al cultivo de su finca (por ejemplo, cacao en `uva`).
-- **App:** el selector Café | Cacao aparece en **Nueva finca** solo cuando la organización tiene activado más de un cultivo. Por ahora, el cultivo de una finca ya registrada no se puede cambiar.
+- **App:** **Nueva finca** siempre muestra el cultivo. Con un solo cultivo activado aparece fijo, y al administrador se le indica dónde activar más. Con varios, se elige con el selector Café | Cacao.
+- **Cambiar cultivo:** en el detalle de la finca, solo mientras no tenga entregas ni esté atestada (`PUT /v1/fincas/:id/cultivo`; necesita señal si la finca ya se envió). Las visitas pasan a la temporada del cultivo nuevo.
 - **Attestations:** los esquemas `Finca` y `Entrega` incluyen `cultivo`. Todavía no están registrados en la blockchain.
 
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints:
 - Acceso y sincronización: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, versiones de lindero, visitas, entregas, fotos), `GET /v1/datos` (todo lo de la organización, con sus cultivos), `POST /v1/fotos/:id/subida`.
-- Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`.
+- Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`, `PUT /v1/fincas/:id/cultivo`.
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`.

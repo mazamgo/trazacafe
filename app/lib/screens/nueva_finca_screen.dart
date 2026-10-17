@@ -244,8 +244,14 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                 ],
               ),
             ),
-          // Solo se pregunta si la organización trabaja más de un cultivo.
-          if (!widget.esLindero && cultivos.length > 1)
+          // El cultivo siempre se ve; solo se elige si la organización
+          // trabaja más de uno.
+          if (!widget.esLindero && cultivos.length == 1)
+            _CultivoUnico(
+              cultivo: cultivoDe(cultivos.single),
+              esAdmin: ref.watch(sesionProvider).value?.esAdmin ?? false,
+            )
+          else if (!widget.esLindero)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: SegmentedButton<String>(
@@ -414,6 +420,46 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Cultivo fijo cuando la organización trabaja uno solo. Al administrador le
+/// indica dónde activar otros.
+class _CultivoUnico extends StatelessWidget {
+  const _CultivoUnico({required this.cultivo, required this.esAdmin});
+
+  final Cultivo cultivo;
+  final bool esAdmin;
+
+  @override
+  Widget build(BuildContext context) {
+    final pequeno = Theme.of(context).textTheme.bodySmall;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Row(
+        children: [
+          Icon(cultivo.icono, color: cultivo.colorUi, size: 20),
+          const SizedBox(width: 6),
+          Text(
+            'Cultivo: ${cultivo.nombre}',
+            style: TextStyle(
+              color: cultivo.colorUi,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (esAdmin) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Activa más cultivos en ⋮ → Cultivos',
+                style: pequeno,
+                textAlign: TextAlign.end,
+              ),
+            ),
+          ],
         ],
       ),
     );

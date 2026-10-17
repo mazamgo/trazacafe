@@ -353,6 +353,24 @@ class AppDatabase extends _$AppDatabase {
     }
   });
 
+  /// Cambia el cultivo de la finca y vuelve a asignar sus visitas a la
+  /// temporada que les toca con el cultivo nuevo (igual que la API).
+  Future<void> cambiarCultivoLocal(String fincaId, String cultivo) =>
+      transaction(() async {
+        await (update(fincas)..where((f) => f.id.equals(fincaId))).write(
+          FincasCompanion(cultivo: Value(cultivo)),
+        );
+        final visitas = await (select(
+          verificaciones,
+        )..where((v) => v.fincaId.equals(fincaId))).get();
+        for (final v in visitas) {
+          final t = await temporadaDe(v.fecha, cultivo: cultivo);
+          await (update(verificaciones)..where((x) => x.id.equals(v.id))).write(
+            VerificacionesCompanion(temporadaId: Value(t?.id)),
+          );
+        }
+      });
+
   Stream<List<ProductorConFincas>> observarProductores() {
     final conteo = fincas.id.count();
     final query =

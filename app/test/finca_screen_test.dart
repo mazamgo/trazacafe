@@ -6,6 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trazacafe/data/database.dart';
 import 'package:trazacafe/providers.dart';
 import 'package:trazacafe/screens/finca_screen.dart';
+import 'package:trazacafe/services/auth_service.dart';
+
+import 'fakes.dart';
 
 /// En pruebas de widgets el tiempo es simulado, pero drift trabaja con tiempo
 /// real: las operaciones de base van dentro de `runAsync` y se le da a la
@@ -28,6 +31,8 @@ void main() {
     bool visitaHecha = false,
     String deforestacion = 'pendiente',
     String cultivo = 'cafe',
+    List<String> cultivosOrganizacion = const ['cafe'],
+    ApiFalsa? api,
     Future<void> Function()? antes,
   }) async {
     // Pantalla alta para que toda la lista quede a la vista.
@@ -68,11 +73,20 @@ void main() {
               sincronizado: const Value(true),
             ));
       }
+      for (final c in cultivosOrganizacion) {
+        await db.into(db.cultivosOrganizacion).insert(CultivosOrganizacionCompanion.insert(id: c));
+      }
       await antes?.call();
     });
     addTearDown(() => tester.runAsync(db.close));
     await tester.pumpWidget(ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        if (api != null)
+          apiProvider.overrideWithValue(api.cliente(AuthFalso(
+            inicial: const Sesion(uid: 'u1', email: 't@coop.org', organizacionId: 'org', rol: 'tecnico'),
+          ))),
+      ],
       child: const MaterialApp(home: FincaScreen(fincaId: 'f1')),
     ));
     await esperar(tester);
@@ -158,6 +172,40 @@ void main() {
 
     expect((await entregas(tester)).single.estado, 'fermentado');
     expect(find.textContaining('80 kg · Fermentado'), findsOneWidget);
+  });
+
+  testWidgets('cambia el cultivo de una finca sin entregas (en la API y en el celular)', (tester) async {
+    final api = ApiFalsa({'PUT /v1/fincas/f1/cultivo': (200, {'cultivo': 'cacao'})});
+    await abrir(tester, cultivosOrganizacion: ['cafe', 'cacao'], api: api);
+    await esperar(tester); // la lista de cultivos llega en otro stream
+    await tester.tap(find.text('Cambiar cultivo'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Necesitas señal: la finca ya se envió.'), findsOneWidget);
+    await tester.tap(find.text('Cacao'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await esperar(tester);
+    await esperar(tester);
+
+    expect(api.peticiones.single.method, 'PUT');
+    final f = (await tester.runAsync(() => db.select(db.fincas).getSingle()))!;
+    expect(f.cultivo, 'cacao');
+    await tester.pump(const Duration(seconds: 1)); // se termina de cerrar el diálogo
+    expect(find.text('Cacao'), findsOneWidget);
+    expect(find.text('La finca ahora es de cacao.'), findsOneWidget);
+  });
+
+  testWidgets('no ofrece cambiar el cultivo con entregas o con un solo cultivo', (tester) async {
+    await abrir(tester, cultivosOrganizacion: ['cafe', 'cacao'], antes: () async {
+      await db.into(db.entregas).insert(EntregasCompanion.insert(id: 'e1', fincaId: 'f1', kg: 10, estado: 'uva', fecha: hoy));
+    });
+    expect(find.text('Cambiar cultivo'), findsNothing);
+  });
+
+  testWidgets('con un solo cultivo en la organización no hay a qué cambiar', (tester) async {
+    await abrir(tester);
+    expect(find.text('Café'), findsOneWidget);
+    expect(find.text('Cambiar cultivo'), findsNothing);
   });
 
   testWidgets('agrupa las entregas por temporada con el total de kg', (tester) async {

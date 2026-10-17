@@ -13,6 +13,17 @@ class FincasService {
   /// Una finca atestada ya está en la blockchain: no se borra, se revoca.
   static bool sePuedeEliminar(Finca f) => f.attestationUid == null;
 
+  /// Solo sin entregas: las entregas usan los estados del cultivo de la finca.
+  static bool sePuedeCambiarCultivo(Finca f, {required bool tieneEntregas}) =>
+      f.attestationUid == null && !tieneEntregas;
+
+  /// Cambia el cultivo. Si la finca ya se había enviado, primero lo cambia
+  /// en la API (necesita señal); si la API lo rechaza, el celular no cambia.
+  Future<void> cambiarCultivo(Finca f, String cultivo) async {
+    if (f.sincronizado) await _api.cambiarCultivoFinca(f.id, cultivo);
+    await _db.cambiarCultivoLocal(f.id, cultivo);
+  }
+
   /// Borra la finca. Si ya se había enviado, primero la borra en la API (y
   /// para eso necesita señal); si la API falla, la finca se queda en el
   /// celular para no dejar ambos lados distintos.

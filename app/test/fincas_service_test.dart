@@ -73,6 +73,40 @@ void main() {
     expect(await db.select(db.fincas).get(), hasLength(1));
   });
 
+  test('el cultivo de una finca sin enviar cambia solo en el celular', () async {
+    final api = ApiFalsa({});
+    await servicio(api).cambiarCultivo(await crearFinca(), 'cacao');
+    expect((await db.select(db.fincas).get()).single.cultivo, 'cacao');
+    expect(api.peticiones, isEmpty);
+  });
+
+  test('en una finca enviada, si la API rechaza el cambio, el celular no cambia', () async {
+    final api = ApiFalsa({
+      'PUT /v1/fincas/f1/cultivo': (409, {'error': 'con_entregas', 'mensaje': 'La finca ya tiene entregas registradas.'}),
+    });
+    final f = await crearFinca(sincronizado: true);
+    await expectLater(
+      servicio(api).cambiarCultivo(f, 'cacao'),
+      throwsA(isA<ApiError>().having((e) => e.mensaje, 'mensaje', contains('entregas'))),
+    );
+    expect((await db.select(db.fincas).get()).single.cultivo, 'cafe');
+  });
+
+  test('al cambiar el cultivo, las visitas pasan a la temporada del cultivo nuevo', () async {
+    await db.into(db.temporadas).insert(TemporadasCompanion.insert(
+          id: 'general', nombre: 'General', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 9, 30)));
+    await db.into(db.temporadas).insert(TemporadasCompanion.insert(
+          id: 'cacao', nombre: 'Cacao', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 3, 31), cultivo: const Value('cacao')));
+    final f = await crearFinca(sincronizado: true);
+    await db.into(db.verificaciones).insert(VerificacionesCompanion.insert(
+          id: 'v1', fincaId: 'f1', temporadaId: const Value('general'), fecha: DateTime(2026, 10, 10), versionFinca: 1));
+    final api = ApiFalsa({'PUT /v1/fincas/f1/cultivo': (200, {'cultivo': 'cacao'})});
+    await servicio(api).cambiarCultivo(f, 'cacao');
+    expect((await db.select(db.verificaciones).get()).single.temporadaId, 'cacao');
+    expect(FincasService.sePuedeCambiarCultivo(f, tieneEntregas: true), isFalse);
+    expect(FincasService.sePuedeCambiarCultivo(f, tieneEntregas: false), isTrue);
+  });
+
   test('una finca atestada no se puede borrar', () async {
     final f = await crearFinca(sincronizado: true, attestationUid: '0xabc');
     expect(FincasService.sePuedeEliminar(f), isFalse);

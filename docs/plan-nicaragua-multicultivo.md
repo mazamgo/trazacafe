@@ -65,10 +65,10 @@
 ## Fase 1 — Multicultivo: café y cacao (~3 semanas) — **hecha el 16/10/2026**
 **Estado:**
 - La migración 008 está aplicada en Cloud SQL, la API desplegada (revisión `trazacafe-api-00006`) y el APK probado en el Samsung con cacao activado.
-- **Pendiente menor:**
-  - mostrar siempre el selector de cultivo en Nueva finca, con un aviso cuando hay un solo cultivo;
-  - permitir cambiar el cultivo de una finca mientras no tenga entregas;
-  - revisar en Cloud SQL una finca de cacao con entrega `fermentado` hecha desde el celular.
+- **Hecho después (API revisión `trazacafe-api-00007`):**
+  - el cultivo siempre visible en Nueva finca;
+  - «Cambiar cultivo» en fincas sin entregas.
+- **Pendiente menor:** revisar en Cloud SQL una finca de cacao con entrega `fermentado` hecha desde el celular.
 
 **Diseño:** el **cultivo es un dato de la finca**. Cada cultivo trae su configuración desde un archivo compartido entre la API y la app (como `test-vectors.json`), así que agregar otro cultivo es mayormente configuración.
 

@@ -132,6 +132,8 @@ export const temporadaSchema = z
   })
   .refine((t) => t.inicio < t.fin, { path: ["fin"], message: "La temporada debe terminar después de empezar" });
 
+export const cambioCultivoSchema = z.object({ cultivo: z.enum(ID_CULTIVOS) });
+
 export const cultivosOrganizacionSchema = z.object({
   cultivos: z.array(z.enum(ID_CULTIVOS)).min(1, "La organización debe tener al menos un cultivo"),
 });

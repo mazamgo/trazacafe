@@ -26,6 +26,8 @@ export interface ResultadoEliminarFinca {
   archivos: string[];
 }
 
+export type ResultadoCambiarCultivo = "cambiado" | "no_encontrada" | "con_entregas" | "atestada";
+
 export interface Temporada {
   id: string;
   nombre: string;
@@ -130,6 +132,13 @@ export interface Repo {
    * attestation (semana 4). Devuelve las rutas en Storage de las fotos.
    */
   eliminarFinca(organizacionId: string, fincaId: string): Promise<ResultadoEliminarFinca>;
+
+  /**
+   * Cambia el cultivo de una finca que todavía no tiene entregas ni está
+   * atestada (las entregas usan los estados de su cultivo). Las visitas se
+   * reasignan a la temporada que les toca con el cultivo nuevo.
+   */
+  cambiarCultivoFinca(organizacionId: string, fincaId: string, cultivo: string): Promise<ResultadoCambiarCultivo>;
 
   /** Todo lo de la organización, para que cada celular vea lo del equipo. */
   datosOrganizacion(organizacionId: string): Promise<DatosOrganizacion>;
@@ -436,6 +445,39 @@ export class PgRepo implements Repo {
       await client.query("DELETE FROM fincas WHERE id = $1", [fincaId]);
       await client.query("COMMIT");
       return { estado: "eliminada", archivos: fotos.rows.flatMap((f) => (f.storage_path ? [f.storage_path] : [])) };
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async cambiarCultivoFinca(organizacionId: string, fincaId: string, cultivo: string): Promise<ResultadoCambiarCultivo> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query<{ atestada: boolean; con_entregas: boolean }>(
+        `SELECT EXISTS (SELECT 1 FROM fincas_versiones fv WHERE fv.finca_id = f.id AND fv.attestation_uid IS NOT NULL)
+                OR f.attestation_uid IS NOT NULL AS atestada,
+                EXISTS (SELECT 1 FROM entregas e WHERE e.finca_id = f.id) AS con_entregas
+         FROM fincas f JOIN productores p ON p.id = f.productor_id
+         WHERE f.id = $1 AND p.organizacion_id = $2 FOR UPDATE OF f`,
+        [fincaId, organizacionId],
+      );
+      const r = rows[0];
+      const estado: ResultadoCambiarCultivo = !r ? "no_encontrada" : r.con_entregas ? "con_entregas" : r.atestada ? "atestada" : "cambiado";
+      if (estado !== "cambiado") {
+        await client.query("ROLLBACK");
+        return estado;
+      }
+      await client.query("UPDATE fincas SET cultivo = $2 WHERE id = $1", [fincaId, cultivo]);
+      await client.query(
+        `UPDATE verificaciones SET temporada_id = ${TEMPORADA_DE("$2", "fecha", "$1")} WHERE finca_id = $1`,
+        [fincaId, organizacionId],
+      );
+      await client.query("COMMIT");
+      return "cambiado";
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;

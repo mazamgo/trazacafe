@@ -69,6 +69,14 @@ class ApiClient {
     const <String, dynamic>{},
   );
 
+  /// Cambia el cultivo de una finca ya enviada. La API lo rechaza (409) si
+  /// la finca ya tiene entregas o está atestada.
+  Future<void> cambiarCultivoFinca(String fincaId, String cultivo) => _pedir(
+    'PUT',
+    '/v1/fincas/${Uri.encodeComponent(fincaId)}/cultivo',
+    {'cultivo': cultivo},
+  );
+
   /// Productores, fincas y entregas de toda la organización.
   Future<Map<String, dynamic>> datos() => _pedir('GET', '/v1/datos');
 
