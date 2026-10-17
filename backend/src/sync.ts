@@ -1,4 +1,11 @@
-import { geoHash, problemaPoligono, type Coordenada, type ProblemaPoligono } from "@trazacafe/eudr-eas-schemas";
+import {
+  geoHash,
+  ID_CULTIVOS,
+  problemaPoligono,
+  TODOS_LOS_ESTADOS,
+  type Coordenada,
+  type ProblemaPoligono,
+} from "@trazacafe/eudr-eas-schemas";
 import { z } from "zod";
 
 const UMBRAL_POLIGONO_HA = 4;
@@ -56,6 +63,8 @@ export const fincaSchema = z
     id: z.uuid(),
     productorId: z.uuid(),
     nombre: z.string().min(1),
+    // Las apps anteriores al multicultivo no lo mandan: eran todas de café.
+    cultivo: z.enum(ID_CULTIVOS).default("cafe"),
     coordenadas: z.array(coordenada).min(1),
     areaHa: z.number().positive(),
     geoHash: z.string().regex(/^0x[0-9a-f]{64}$/),
@@ -90,7 +99,8 @@ export const entregaSchema = z.object({
   fincaId: z.uuid(),
   // Un camión grande lleva ~15 t; más que eso en una entrega es un error de digitación.
   kg: z.number().positive().max(20_000),
-  estado: z.enum(["uva", "pergamino"]),
+  // Que el estado corresponda al cultivo de la finca se revisa al guardar.
+  estado: z.enum(TODOS_LOS_ESTADOS as [string, ...string[]]),
   fecha: fechaPasada("la entrega"),
 });
 
@@ -117,8 +127,14 @@ export const temporadaSchema = z
     nombre: z.string().trim().min(1).max(40),
     inicio: z.iso.date(),
     fin: z.iso.date(),
+    /** Vacío = la temporada aplica a todos los cultivos de la organización. */
+    cultivo: z.enum(ID_CULTIVOS).nullish(),
   })
   .refine((t) => t.inicio < t.fin, { path: ["fin"], message: "La temporada debe terminar después de empezar" });
+
+export const cultivosOrganizacionSchema = z.object({
+  cultivos: z.array(z.enum(ID_CULTIVOS)).min(1, "La organización debe tener al menos un cultivo"),
+});
 
 export type Productor = z.infer<typeof productorSchema>;
 export type FincaSync = z.infer<typeof fincaSchema>;

@@ -7,12 +7,14 @@ import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/defores
 import {
   AccesoDenegado,
   aGeometria,
+  DatosInvalidos,
   desdeGeometria,
   VersionDesfasada,
   type Chequeo,
   type DatosOrganizacion,
   type FincaPorRevisar,
   type Invitacion,
+  type Organizacion,
   type Repo,
   type ResultadoEliminarFinca,
   type Temporada,
@@ -74,11 +76,29 @@ class RepoMemoria implements Repo {
     this.fincas.delete(fincaId);
     return { estado: "eliminada", archivos: f.archivos ?? [] };
   }
-  datos: DatosOrganizacion = { temporadas: [], productores: [], fincas: [], verificaciones: [], entregas: [] };
+  org: Organizacion = { id: ORG, nombre: "Prueba", tipo: "cooperativa", cultivos: ["cafe"] };
+  /** Cultivos que ya tienen fincas (no se pueden quitar). */
+  cultivosConFincas: string[] = [];
+  async organizacion(organizacionId: string) {
+    return organizacionId === ORG ? this.org : null;
+  }
+  async actualizarCultivos(_: string, cultivos: string[]) {
+    const bloqueados = this.cultivosConFincas.filter((c) => !cultivos.includes(c));
+    if (bloqueados.length === 0) this.org = { ...this.org, cultivos };
+    return bloqueados;
+  }
+  datos: DatosOrganizacion = {
+    organizacion: this.org,
+    temporadas: [],
+    productores: [],
+    fincas: [],
+    verificaciones: [],
+    entregas: [],
+  };
   async datosOrganizacion(organizacionId: string): Promise<DatosOrganizacion> {
     return organizacionId === ORG
       ? this.datos
-      : { temporadas: [], productores: [], fincas: [], verificaciones: [], entregas: [] };
+      : { organizacion: this.org, temporadas: [], productores: [], fincas: [], verificaciones: [], entregas: [] };
   }
   temporadas: (Temporada & { organizacionId: string })[] = [];
   async listarTemporadas(organizacionId: string) {
@@ -86,11 +106,15 @@ class RepoMemoria implements Repo {
   }
   async crearTemporada(organizacionId: string, t: TemporadaNueva & { id: string }) {
     const traslapa = this.temporadas.some(
-      (x) => x.organizacionId === organizacionId && x.inicio <= t.fin && t.inicio <= x.fin,
+      (x) =>
+        x.organizacionId === organizacionId &&
+        (x.cultivo ?? null) === (t.cultivo ?? null) &&
+        x.inicio <= t.fin &&
+        t.inicio <= x.fin,
     );
     if (traslapa) return null;
-    this.temporadas.push({ ...t, organizacionId });
-    return { id: t.id, nombre: t.nombre, inicio: t.inicio, fin: t.fin };
+    this.temporadas.push({ ...t, cultivo: t.cultivo ?? null, organizacionId });
+    return { id: t.id, nombre: t.nombre, inicio: t.inicio, fin: t.fin, cultivo: t.cultivo ?? null };
   }
   porRevisar: FincaPorRevisar[] = [];
   chequeos: Chequeo[] = [];
@@ -182,7 +206,7 @@ function crearApp({ conSatelite = true } = {}) {
 
 type App = ReturnType<typeof crearApp>["app"];
 
-const pedir = (app: App, method: "GET" | "POST" | "DELETE", url: string, token: string, payload?: unknown) =>
+const pedir = (app: App, method: "GET" | "POST" | "PUT" | "DELETE", url: string, token: string, payload?: unknown) =>
   app.inject({ method, url, headers: { authorization: `Bearer ${token}` }, payload: payload as object });
 
 describe("POST /v1/sync", () => {
@@ -404,7 +428,7 @@ describe("entregas en /v1/sync", () => {
   it.each([
     ["kg en cero", { kg: 0 }],
     ["más de 20 toneladas", { kg: 25_000 }],
-    ["estado desconocido", { estado: "oro" }],
+    ["estado desconocido", { estado: "tostado" }],
     ["fecha en el futuro", { fecha: new Date(Date.now() + 3 * 24 * 3600_000).toISOString() }],
     ["fecha sin zona horaria válida", { fecha: "16/10/2026" }],
   ])("rechaza %s", async (_, cambio) => {
@@ -527,6 +551,72 @@ describe("visitas y linderos nuevos en /v1/sync", () => {
       sha256: `0x${"ef".repeat(32)}`,
     };
     expect((await pedir(app, "POST", "/v1/sync", "tecnico", { verificaciones: [visita], fotos: [foto] })).statusCode).toBe(200);
+  });
+});
+
+describe("cultivos", () => {
+  it("una finca sin cultivo se toma como café (apps anteriores)", async () => {
+    const { app, repo } = crearApp();
+    await pedir(app, "POST", "/v1/sync", "tecnico", { fincas: [finca] });
+    expect(repo.sync[0].datos.fincas[0].cultivo).toBe("cafe");
+  });
+
+  it("acepta una finca de cacao y rechaza un cultivo desconocido", async () => {
+    const { app, repo } = crearApp();
+    const res = await pedir(app, "POST", "/v1/sync", "tecnico", { fincas: [{ ...finca, cultivo: "cacao" }] });
+    expect(res.statusCode).toBe(200);
+    expect(repo.sync[0].datos.fincas[0].cultivo).toBe("cacao");
+    expect((await pedir(app, "POST", "/v1/sync", "tecnico", { fincas: [{ ...finca, cultivo: "soya" }] })).statusCode).toBe(422);
+  });
+
+  it("acepta estados de cacao en el formato y rechaza estados inexistentes", async () => {
+    const { app } = crearApp();
+    const entrega = { id: "5d1c9e2a-7b3f-4a6d-9e8c-1f2a3b4c5d6e", fincaId: finca.id, kg: 80, fecha: "2026-10-16T08:00:00Z" };
+    expect((await pedir(app, "POST", "/v1/sync", "tecnico", { entregas: [{ ...entrega, estado: "fermentado" }] })).statusCode).toBe(200);
+    expect((await pedir(app, "POST", "/v1/sync", "tecnico", { entregas: [{ ...entrega, estado: "tostado" }] })).statusCode).toBe(422);
+  });
+
+  it("un estado que no es del cultivo de la finca (cacao en uva) da 422 con el motivo", async () => {
+    const { app, repo } = crearApp();
+    repo.fallarSync = new DatosInvalidos('"uva" no es un estado de Cacao; use baba, fermentado, seco.');
+    const res = await pedir(app, "POST", "/v1/sync", "tecnico", {
+      entregas: [{ id: "5d1c9e2a-7b3f-4a6d-9e8c-1f2a3b4c5d6e", fincaId: finca.id, kg: 80, estado: "uva", fecha: "2026-10-16T08:00:00Z" }],
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().mensaje).toContain("Cacao");
+  });
+
+  it("el administrador cambia los cultivos de la organización", async () => {
+    const { app, repo } = crearApp();
+    const res = await pedir(app, "PUT", "/v1/organizacion/cultivos", "admin", { cultivos: ["cafe", "cacao"] });
+    expect(res.statusCode).toBe(200);
+    expect(repo.org.cultivos).toEqual(["cafe", "cacao"]);
+    expect((await pedir(app, "GET", "/v1/organizacion", "tecnico")).json().cultivos).toEqual(["cafe", "cacao"]);
+  });
+
+  it("no deja quitar un cultivo que ya tiene fincas, ni dejar la lista vacía", async () => {
+    const { app, repo } = crearApp();
+    repo.cultivosConFincas = ["cafe"];
+    const res = await pedir(app, "PUT", "/v1/organizacion/cultivos", "admin", { cultivos: ["cacao"] });
+    expect(res.statusCode).toBe(409);
+    expect(repo.org.cultivos).toEqual(["cafe"]);
+    expect((await pedir(app, "PUT", "/v1/organizacion/cultivos", "admin", { cultivos: [] })).statusCode).toBe(422);
+    expect((await pedir(app, "PUT", "/v1/organizacion/cultivos", "tecnico", { cultivos: ["cacao"] })).statusCode).toBe(403);
+  });
+
+  it("una temporada de cacao no choca con una general en las mismas fechas", async () => {
+    const { app, repo } = crearApp();
+    const t = { nombre: "2026/27", inicio: "2026-10-01", fin: "2027-09-30" };
+    expect((await pedir(app, "POST", "/v1/temporadas", "admin", t)).statusCode).toBe(201);
+    // Primero hay que activar el cacao en la organización.
+    const sinCacao = await pedir(app, "POST", "/v1/temporadas", "admin", { ...t, nombre: "Cacao", cultivo: "cacao" });
+    expect(sinCacao.statusCode).toBe(422);
+    expect(sinCacao.json().mensaje).toContain("Cultivos");
+    repo.org.cultivos = ["cafe", "cacao"];
+    const cacao = await pedir(app, "POST", "/v1/temporadas", "admin", { ...t, nombre: "Cacao principal", cultivo: "cacao" });
+    expect(cacao.statusCode).toBe(201);
+    expect(cacao.json().cultivo).toBe("cacao");
+    expect((await pedir(app, "POST", "/v1/temporadas", "admin", { ...t, nombre: "x", cultivo: "cacao" })).statusCode).toBe(409);
   });
 });
 

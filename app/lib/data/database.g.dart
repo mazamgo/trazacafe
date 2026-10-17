@@ -518,6 +518,18 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _cultivoMeta = const VerificationMeta(
+    'cultivo',
+  );
+  @override
+  late final GeneratedColumn<String> cultivo = GeneratedColumn<String>(
+    'cultivo',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('cafe'),
+  );
   static const VerificationMeta _coordenadasJsonMeta = const VerificationMeta(
     'coordenadasJson',
   );
@@ -639,6 +651,7 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
     id,
     productorId,
     nombre,
+    cultivo,
     coordenadasJson,
     areaHa,
     areaOficialHa,
@@ -685,6 +698,12 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
       );
     } else if (isInserting) {
       context.missing(_nombreMeta);
+    }
+    if (data.containsKey('cultivo')) {
+      context.handle(
+        _cultivoMeta,
+        cultivo.isAcceptableOrUnknown(data['cultivo']!, _cultivoMeta),
+      );
     }
     if (data.containsKey('coordenadas_json')) {
       context.handle(
@@ -791,6 +810,10 @@ class $FincasTable extends Fincas with TableInfo<$FincasTable, Finca> {
         DriftSqlType.string,
         data['${effectivePrefix}nombre'],
       )!,
+      cultivo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cultivo'],
+      )!,
       coordenadasJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}coordenadas_json'],
@@ -845,6 +868,10 @@ class Finca extends DataClass implements Insertable<Finca> {
   final String productorId;
   final String nombre;
 
+  /// Id de `schemas/cultivos.json` (`cafe`, `cacao`). Define los estados de
+  /// sus entregas y qué temporada les toca.
+  final String cultivo;
+
   /// Coordenadas en GeoJSON: `[[lon, lat], ...]`. Un solo punto si la finca
   /// mide menos de 4 ha; polígono cerrado si mide 4 ha o más (regla EUDR).
   final String coordenadasJson;
@@ -872,6 +899,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     required this.id,
     required this.productorId,
     required this.nombre,
+    required this.cultivo,
     required this.coordenadasJson,
     required this.areaHa,
     this.areaOficialHa,
@@ -889,6 +917,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     map['id'] = Variable<String>(id);
     map['productor_id'] = Variable<String>(productorId);
     map['nombre'] = Variable<String>(nombre);
+    map['cultivo'] = Variable<String>(cultivo);
     map['coordenadas_json'] = Variable<String>(coordenadasJson);
     map['area_ha'] = Variable<double>(areaHa);
     if (!nullToAbsent || areaOficialHa != null) {
@@ -913,6 +942,7 @@ class Finca extends DataClass implements Insertable<Finca> {
       id: Value(id),
       productorId: Value(productorId),
       nombre: Value(nombre),
+      cultivo: Value(cultivo),
       coordenadasJson: Value(coordenadasJson),
       areaHa: Value(areaHa),
       areaOficialHa: areaOficialHa == null && nullToAbsent
@@ -941,6 +971,7 @@ class Finca extends DataClass implements Insertable<Finca> {
       id: serializer.fromJson<String>(json['id']),
       productorId: serializer.fromJson<String>(json['productorId']),
       nombre: serializer.fromJson<String>(json['nombre']),
+      cultivo: serializer.fromJson<String>(json['cultivo']),
       coordenadasJson: serializer.fromJson<String>(json['coordenadasJson']),
       areaHa: serializer.fromJson<double>(json['areaHa']),
       areaOficialHa: serializer.fromJson<double?>(json['areaOficialHa']),
@@ -960,6 +991,7 @@ class Finca extends DataClass implements Insertable<Finca> {
       'id': serializer.toJson<String>(id),
       'productorId': serializer.toJson<String>(productorId),
       'nombre': serializer.toJson<String>(nombre),
+      'cultivo': serializer.toJson<String>(cultivo),
       'coordenadasJson': serializer.toJson<String>(coordenadasJson),
       'areaHa': serializer.toJson<double>(areaHa),
       'areaOficialHa': serializer.toJson<double?>(areaOficialHa),
@@ -977,6 +1009,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     String? id,
     String? productorId,
     String? nombre,
+    String? cultivo,
     String? coordenadasJson,
     double? areaHa,
     Value<double?> areaOficialHa = const Value.absent(),
@@ -991,6 +1024,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     id: id ?? this.id,
     productorId: productorId ?? this.productorId,
     nombre: nombre ?? this.nombre,
+    cultivo: cultivo ?? this.cultivo,
     coordenadasJson: coordenadasJson ?? this.coordenadasJson,
     areaHa: areaHa ?? this.areaHa,
     areaOficialHa: areaOficialHa.present
@@ -1015,6 +1049,7 @@ class Finca extends DataClass implements Insertable<Finca> {
           ? data.productorId.value
           : this.productorId,
       nombre: data.nombre.present ? data.nombre.value : this.nombre,
+      cultivo: data.cultivo.present ? data.cultivo.value : this.cultivo,
       coordenadasJson: data.coordenadasJson.present
           ? data.coordenadasJson.value
           : this.coordenadasJson,
@@ -1046,6 +1081,7 @@ class Finca extends DataClass implements Insertable<Finca> {
           ..write('id: $id, ')
           ..write('productorId: $productorId, ')
           ..write('nombre: $nombre, ')
+          ..write('cultivo: $cultivo, ')
           ..write('coordenadasJson: $coordenadasJson, ')
           ..write('areaHa: $areaHa, ')
           ..write('areaOficialHa: $areaOficialHa, ')
@@ -1065,6 +1101,7 @@ class Finca extends DataClass implements Insertable<Finca> {
     id,
     productorId,
     nombre,
+    cultivo,
     coordenadasJson,
     areaHa,
     areaOficialHa,
@@ -1083,6 +1120,7 @@ class Finca extends DataClass implements Insertable<Finca> {
           other.id == this.id &&
           other.productorId == this.productorId &&
           other.nombre == this.nombre &&
+          other.cultivo == this.cultivo &&
           other.coordenadasJson == this.coordenadasJson &&
           other.areaHa == this.areaHa &&
           other.areaOficialHa == this.areaOficialHa &&
@@ -1099,6 +1137,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
   final Value<String> id;
   final Value<String> productorId;
   final Value<String> nombre;
+  final Value<String> cultivo;
   final Value<String> coordenadasJson;
   final Value<double> areaHa;
   final Value<double?> areaOficialHa;
@@ -1114,6 +1153,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     this.id = const Value.absent(),
     this.productorId = const Value.absent(),
     this.nombre = const Value.absent(),
+    this.cultivo = const Value.absent(),
     this.coordenadasJson = const Value.absent(),
     this.areaHa = const Value.absent(),
     this.areaOficialHa = const Value.absent(),
@@ -1130,6 +1170,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     required String id,
     required String productorId,
     required String nombre,
+    this.cultivo = const Value.absent(),
     required String coordenadasJson,
     required double areaHa,
     this.areaOficialHa = const Value.absent(),
@@ -1151,6 +1192,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     Expression<String>? id,
     Expression<String>? productorId,
     Expression<String>? nombre,
+    Expression<String>? cultivo,
     Expression<String>? coordenadasJson,
     Expression<double>? areaHa,
     Expression<double>? areaOficialHa,
@@ -1167,6 +1209,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
       if (id != null) 'id': id,
       if (productorId != null) 'productor_id': productorId,
       if (nombre != null) 'nombre': nombre,
+      if (cultivo != null) 'cultivo': cultivo,
       if (coordenadasJson != null) 'coordenadas_json': coordenadasJson,
       if (areaHa != null) 'area_ha': areaHa,
       if (areaOficialHa != null) 'area_oficial_ha': areaOficialHa,
@@ -1185,6 +1228,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     Value<String>? id,
     Value<String>? productorId,
     Value<String>? nombre,
+    Value<String>? cultivo,
     Value<String>? coordenadasJson,
     Value<double>? areaHa,
     Value<double?>? areaOficialHa,
@@ -1201,6 +1245,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
       id: id ?? this.id,
       productorId: productorId ?? this.productorId,
       nombre: nombre ?? this.nombre,
+      cultivo: cultivo ?? this.cultivo,
       coordenadasJson: coordenadasJson ?? this.coordenadasJson,
       areaHa: areaHa ?? this.areaHa,
       areaOficialHa: areaOficialHa ?? this.areaOficialHa,
@@ -1226,6 +1271,9 @@ class FincasCompanion extends UpdateCompanion<Finca> {
     }
     if (nombre.present) {
       map['nombre'] = Variable<String>(nombre.value);
+    }
+    if (cultivo.present) {
+      map['cultivo'] = Variable<String>(cultivo.value);
     }
     if (coordenadasJson.present) {
       map['coordenadas_json'] = Variable<String>(coordenadasJson.value);
@@ -1269,6 +1317,7 @@ class FincasCompanion extends UpdateCompanion<Finca> {
           ..write('id: $id, ')
           ..write('productorId: $productorId, ')
           ..write('nombre: $nombre, ')
+          ..write('cultivo: $cultivo, ')
           ..write('coordenadasJson: $coordenadasJson, ')
           ..write('areaHa: $areaHa, ')
           ..write('areaOficialHa: $areaOficialHa, ')
@@ -1327,8 +1376,19 @@ class $TemporadasTable extends Temporadas
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _cultivoMeta = const VerificationMeta(
+    'cultivo',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, nombre, inicio, fin];
+  late final GeneratedColumn<String> cultivo = GeneratedColumn<String>(
+    'cultivo',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, nombre, inicio, fin, cultivo];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1370,6 +1430,12 @@ class $TemporadasTable extends Temporadas
     } else if (isInserting) {
       context.missing(_finMeta);
     }
+    if (data.containsKey('cultivo')) {
+      context.handle(
+        _cultivoMeta,
+        cultivo.isAcceptableOrUnknown(data['cultivo']!, _cultivoMeta),
+      );
+    }
     return context;
   }
 
@@ -1395,6 +1461,10 @@ class $TemporadasTable extends Temporadas
         DriftSqlType.dateTime,
         data['${effectivePrefix}fin'],
       )!,
+      cultivo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cultivo'],
+      ),
     );
   }
 
@@ -1411,11 +1481,15 @@ class Temporada extends DataClass implements Insertable<Temporada> {
   /// Días de calendario en Nicaragua, ambos incluidos.
   final DateTime inicio;
   final DateTime fin;
+
+  /// Cultivo al que aplica; `null` = a todos los de la organización.
+  final String? cultivo;
   const Temporada({
     required this.id,
     required this.nombre,
     required this.inicio,
     required this.fin,
+    this.cultivo,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1424,6 +1498,9 @@ class Temporada extends DataClass implements Insertable<Temporada> {
     map['nombre'] = Variable<String>(nombre);
     map['inicio'] = Variable<DateTime>(inicio);
     map['fin'] = Variable<DateTime>(fin);
+    if (!nullToAbsent || cultivo != null) {
+      map['cultivo'] = Variable<String>(cultivo);
+    }
     return map;
   }
 
@@ -1433,6 +1510,9 @@ class Temporada extends DataClass implements Insertable<Temporada> {
       nombre: Value(nombre),
       inicio: Value(inicio),
       fin: Value(fin),
+      cultivo: cultivo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cultivo),
     );
   }
 
@@ -1446,6 +1526,7 @@ class Temporada extends DataClass implements Insertable<Temporada> {
       nombre: serializer.fromJson<String>(json['nombre']),
       inicio: serializer.fromJson<DateTime>(json['inicio']),
       fin: serializer.fromJson<DateTime>(json['fin']),
+      cultivo: serializer.fromJson<String?>(json['cultivo']),
     );
   }
   @override
@@ -1456,6 +1537,7 @@ class Temporada extends DataClass implements Insertable<Temporada> {
       'nombre': serializer.toJson<String>(nombre),
       'inicio': serializer.toJson<DateTime>(inicio),
       'fin': serializer.toJson<DateTime>(fin),
+      'cultivo': serializer.toJson<String?>(cultivo),
     };
   }
 
@@ -1464,11 +1546,13 @@ class Temporada extends DataClass implements Insertable<Temporada> {
     String? nombre,
     DateTime? inicio,
     DateTime? fin,
+    Value<String?> cultivo = const Value.absent(),
   }) => Temporada(
     id: id ?? this.id,
     nombre: nombre ?? this.nombre,
     inicio: inicio ?? this.inicio,
     fin: fin ?? this.fin,
+    cultivo: cultivo.present ? cultivo.value : this.cultivo,
   );
   Temporada copyWithCompanion(TemporadasCompanion data) {
     return Temporada(
@@ -1476,6 +1560,7 @@ class Temporada extends DataClass implements Insertable<Temporada> {
       nombre: data.nombre.present ? data.nombre.value : this.nombre,
       inicio: data.inicio.present ? data.inicio.value : this.inicio,
       fin: data.fin.present ? data.fin.value : this.fin,
+      cultivo: data.cultivo.present ? data.cultivo.value : this.cultivo,
     );
   }
 
@@ -1485,13 +1570,14 @@ class Temporada extends DataClass implements Insertable<Temporada> {
           ..write('id: $id, ')
           ..write('nombre: $nombre, ')
           ..write('inicio: $inicio, ')
-          ..write('fin: $fin')
+          ..write('fin: $fin, ')
+          ..write('cultivo: $cultivo')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, nombre, inicio, fin);
+  int get hashCode => Object.hash(id, nombre, inicio, fin, cultivo);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1499,7 +1585,8 @@ class Temporada extends DataClass implements Insertable<Temporada> {
           other.id == this.id &&
           other.nombre == this.nombre &&
           other.inicio == this.inicio &&
-          other.fin == this.fin);
+          other.fin == this.fin &&
+          other.cultivo == this.cultivo);
 }
 
 class TemporadasCompanion extends UpdateCompanion<Temporada> {
@@ -1507,12 +1594,14 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
   final Value<String> nombre;
   final Value<DateTime> inicio;
   final Value<DateTime> fin;
+  final Value<String?> cultivo;
   final Value<int> rowid;
   const TemporadasCompanion({
     this.id = const Value.absent(),
     this.nombre = const Value.absent(),
     this.inicio = const Value.absent(),
     this.fin = const Value.absent(),
+    this.cultivo = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TemporadasCompanion.insert({
@@ -1520,6 +1609,7 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
     required String nombre,
     required DateTime inicio,
     required DateTime fin,
+    this.cultivo = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        nombre = Value(nombre),
@@ -1530,6 +1620,7 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
     Expression<String>? nombre,
     Expression<DateTime>? inicio,
     Expression<DateTime>? fin,
+    Expression<String>? cultivo,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1537,6 +1628,7 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
       if (nombre != null) 'nombre': nombre,
       if (inicio != null) 'inicio': inicio,
       if (fin != null) 'fin': fin,
+      if (cultivo != null) 'cultivo': cultivo,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1546,6 +1638,7 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
     Value<String>? nombre,
     Value<DateTime>? inicio,
     Value<DateTime>? fin,
+    Value<String?>? cultivo,
     Value<int>? rowid,
   }) {
     return TemporadasCompanion(
@@ -1553,6 +1646,7 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
       nombre: nombre ?? this.nombre,
       inicio: inicio ?? this.inicio,
       fin: fin ?? this.fin,
+      cultivo: cultivo ?? this.cultivo,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1572,6 +1666,9 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
     if (fin.present) {
       map['fin'] = Variable<DateTime>(fin.value);
     }
+    if (cultivo.present) {
+      map['cultivo'] = Variable<String>(cultivo.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1585,6 +1682,176 @@ class TemporadasCompanion extends UpdateCompanion<Temporada> {
           ..write('nombre: $nombre, ')
           ..write('inicio: $inicio, ')
           ..write('fin: $fin, ')
+          ..write('cultivo: $cultivo, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CultivosOrganizacionTable extends CultivosOrganizacion
+    with TableInfo<$CultivosOrganizacionTable, CultivosOrganizacionData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CultivosOrganizacionTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cultivos_organizacion';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CultivosOrganizacionData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CultivosOrganizacionData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CultivosOrganizacionData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+    );
+  }
+
+  @override
+  $CultivosOrganizacionTable createAlias(String alias) {
+    return $CultivosOrganizacionTable(attachedDatabase, alias);
+  }
+}
+
+class CultivosOrganizacionData extends DataClass
+    implements Insertable<CultivosOrganizacionData> {
+  final String id;
+  const CultivosOrganizacionData({required this.id});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    return map;
+  }
+
+  CultivosOrganizacionCompanion toCompanion(bool nullToAbsent) {
+    return CultivosOrganizacionCompanion(id: Value(id));
+  }
+
+  factory CultivosOrganizacionData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CultivosOrganizacionData(
+      id: serializer.fromJson<String>(json['id']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'id': serializer.toJson<String>(id)};
+  }
+
+  CultivosOrganizacionData copyWith({String? id}) =>
+      CultivosOrganizacionData(id: id ?? this.id);
+  CultivosOrganizacionData copyWithCompanion(
+    CultivosOrganizacionCompanion data,
+  ) {
+    return CultivosOrganizacionData(
+      id: data.id.present ? data.id.value : this.id,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CultivosOrganizacionData(')
+          ..write('id: $id')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CultivosOrganizacionData && other.id == this.id);
+}
+
+class CultivosOrganizacionCompanion
+    extends UpdateCompanion<CultivosOrganizacionData> {
+  final Value<String> id;
+  final Value<int> rowid;
+  const CultivosOrganizacionCompanion({
+    this.id = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CultivosOrganizacionCompanion.insert({
+    required String id,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id);
+  static Insertable<CultivosOrganizacionData> custom({
+    Expression<String>? id,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CultivosOrganizacionCompanion copyWith({
+    Value<String>? id,
+    Value<int>? rowid,
+  }) {
+    return CultivosOrganizacionCompanion(
+      id: id ?? this.id,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CultivosOrganizacionCompanion(')
+          ..write('id: $id, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2861,7 +3128,7 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   final String? temporadaId;
   final double kg;
 
-  /// `uva` (café maduro) o `pergamino`.
+  /// Uno de los estados del cultivo de la finca (`cultivos.json`).
   final String estado;
   final DateTime fecha;
   final String? attestationUid;
@@ -3750,6 +4017,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ProductoresTable productores = $ProductoresTable(this);
   late final $FincasTable fincas = $FincasTable(this);
   late final $TemporadasTable temporadas = $TemporadasTable(this);
+  late final $CultivosOrganizacionTable cultivosOrganizacion =
+      $CultivosOrganizacionTable(this);
   late final $VersionesFincaTable versionesFinca = $VersionesFincaTable(this);
   late final $VerificacionesTable verificaciones = $VerificacionesTable(this);
   late final $EntregasTable entregas = $EntregasTable(this);
@@ -3762,6 +4031,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     productores,
     fincas,
     temporadas,
+    cultivosOrganizacion,
     versionesFinca,
     verificaciones,
     entregas,
@@ -4119,6 +4389,7 @@ typedef $$FincasTableCreateCompanionBuilder = FincasCompanion Function({
   required String id,
   required String productorId,
   required String nombre,
+  Value<String> cultivo,
   required String coordenadasJson,
   required double areaHa,
   Value<double?> areaOficialHa,
@@ -4135,6 +4406,7 @@ typedef $$FincasTableUpdateCompanionBuilder = FincasCompanion Function({
   Value<String> id,
   Value<String> productorId,
   Value<String> nombre,
+  Value<String> cultivo,
   Value<String> coordenadasJson,
   Value<double> areaHa,
   Value<double?> areaOficialHa,
@@ -4241,6 +4513,11 @@ class $$FincasTableFilterComposer
 
   ColumnFilters<String> get nombre => $composableBuilder(
     column: $table.nombre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cultivo => $composableBuilder(
+    column: $table.cultivo,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4412,6 +4689,11 @@ class $$FincasTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get cultivo => $composableBuilder(
+    column: $table.cultivo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get coordenadasJson => $composableBuilder(
     column: $table.coordenadasJson,
     builder: (column) => ColumnOrderings(column),
@@ -4500,6 +4782,9 @@ class $$FincasTableAnnotationComposer
 
   GeneratedColumn<String> get nombre =>
       $composableBuilder(column: $table.nombre, builder: (column) => column);
+
+  GeneratedColumn<String> get cultivo =>
+      $composableBuilder(column: $table.cultivo, builder: (column) => column);
 
   GeneratedColumn<String> get coordenadasJson => $composableBuilder(
     column: $table.coordenadasJson,
@@ -4678,6 +4963,7 @@ class $$FincasTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> productorId = const Value.absent(),
                 Value<String> nombre = const Value.absent(),
+                Value<String> cultivo = const Value.absent(),
                 Value<String> coordenadasJson = const Value.absent(),
                 Value<double> areaHa = const Value.absent(),
                 Value<double?> areaOficialHa = const Value.absent(),
@@ -4693,6 +4979,7 @@ class $$FincasTableTableManager
                 id: id,
                 productorId: productorId,
                 nombre: nombre,
+                cultivo: cultivo,
                 coordenadasJson: coordenadasJson,
                 areaHa: areaHa,
                 areaOficialHa: areaOficialHa,
@@ -4710,6 +4997,7 @@ class $$FincasTableTableManager
                 required String id,
                 required String productorId,
                 required String nombre,
+                Value<String> cultivo = const Value.absent(),
                 required String coordenadasJson,
                 required double areaHa,
                 Value<double?> areaOficialHa = const Value.absent(),
@@ -4725,6 +5013,7 @@ class $$FincasTableTableManager
                 id: id,
                 productorId: productorId,
                 nombre: nombre,
+                cultivo: cultivo,
                 coordenadasJson: coordenadasJson,
                 areaHa: areaHa,
                 areaOficialHa: areaOficialHa,
@@ -4882,6 +5171,7 @@ typedef $$TemporadasTableCreateCompanionBuilder = TemporadasCompanion Function({
   required String nombre,
   required DateTime inicio,
   required DateTime fin,
+  Value<String?> cultivo,
   Value<int> rowid,
 });
 typedef $$TemporadasTableUpdateCompanionBuilder = TemporadasCompanion Function({
@@ -4889,6 +5179,7 @@ typedef $$TemporadasTableUpdateCompanionBuilder = TemporadasCompanion Function({
   Value<String> nombre,
   Value<DateTime> inicio,
   Value<DateTime> fin,
+  Value<String?> cultivo,
   Value<int> rowid,
 });
 
@@ -4918,6 +5209,11 @@ class $$TemporadasTableFilterComposer
 
   ColumnFilters<DateTime> get fin => $composableBuilder(
     column: $table.fin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cultivo => $composableBuilder(
+    column: $table.cultivo,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4950,6 +5246,11 @@ class $$TemporadasTableOrderingComposer
     column: $table.fin,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get cultivo => $composableBuilder(
+    column: $table.cultivo,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TemporadasTableAnnotationComposer
@@ -4972,6 +5273,9 @@ class $$TemporadasTableAnnotationComposer
 
   GeneratedColumn<DateTime> get fin =>
       $composableBuilder(column: $table.fin, builder: (column) => column);
+
+  GeneratedColumn<String> get cultivo =>
+      $composableBuilder(column: $table.cultivo, builder: (column) => column);
 }
 
 class $$TemporadasTableTableManager
@@ -5009,12 +5313,14 @@ class $$TemporadasTableTableManager
                 Value<String> nombre = const Value.absent(),
                 Value<DateTime> inicio = const Value.absent(),
                 Value<DateTime> fin = const Value.absent(),
+                Value<String?> cultivo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TemporadasCompanion(
                 id: id,
                 nombre: nombre,
                 inicio: inicio,
                 fin: fin,
+                cultivo: cultivo,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5023,12 +5329,14 @@ class $$TemporadasTableTableManager
                 required String nombre,
                 required DateTime inicio,
                 required DateTime fin,
+                Value<String?> cultivo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TemporadasCompanion.insert(
                 id: id,
                 nombre: nombre,
                 inicio: inicio,
                 fin: fin,
+                cultivo: cultivo,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5060,6 +5368,150 @@ typedef $$TemporadasTableProcessedTableManager =
       $$TemporadasTableUpdateCompanionBuilder,
       (Temporada, BaseReferences<_$AppDatabase, $TemporadasTable, Temporada>),
       Temporada,
+      PrefetchHooks Function()
+    >;
+typedef $$CultivosOrganizacionTableCreateCompanionBuilder =
+    CultivosOrganizacionCompanion Function({
+      required String id,
+      Value<int> rowid,
+    });
+typedef $$CultivosOrganizacionTableUpdateCompanionBuilder =
+    CultivosOrganizacionCompanion Function({
+      Value<String> id,
+      Value<int> rowid,
+    });
+
+class $$CultivosOrganizacionTableFilterComposer
+    extends Composer<_$AppDatabase, $CultivosOrganizacionTable> {
+  $$CultivosOrganizacionTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CultivosOrganizacionTableOrderingComposer
+    extends Composer<_$AppDatabase, $CultivosOrganizacionTable> {
+  $$CultivosOrganizacionTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CultivosOrganizacionTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CultivosOrganizacionTable> {
+  $$CultivosOrganizacionTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+}
+
+class $$CultivosOrganizacionTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CultivosOrganizacionTable,
+          CultivosOrganizacionData,
+          $$CultivosOrganizacionTableFilterComposer,
+          $$CultivosOrganizacionTableOrderingComposer,
+          $$CultivosOrganizacionTableAnnotationComposer,
+          $$CultivosOrganizacionTableCreateCompanionBuilder,
+          $$CultivosOrganizacionTableUpdateCompanionBuilder,
+          (
+            CultivosOrganizacionData,
+            BaseReferences<
+              _$AppDatabase,
+              $CultivosOrganizacionTable,
+              CultivosOrganizacionData
+            >,
+          ),
+          CultivosOrganizacionData,
+          PrefetchHooks Function()
+        > {
+  $$CultivosOrganizacionTableTableManager(
+    _$AppDatabase db,
+    $CultivosOrganizacionTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CultivosOrganizacionTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CultivosOrganizacionTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CultivosOrganizacionTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => CultivosOrganizacionCompanion(id: id, rowid: rowid),
+          createCompanionCallback: ({
+            required String id,
+            Value<int> rowid = const Value.absent(),
+          }) => CultivosOrganizacionCompanion.insert(id: id, rowid: rowid),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CultivosOrganizacionTable,
+                    CultivosOrganizacionData
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CultivosOrganizacionTable,
+                    CultivosOrganizacionData
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CultivosOrganizacionTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CultivosOrganizacionTable,
+      CultivosOrganizacionData,
+      $$CultivosOrganizacionTableFilterComposer,
+      $$CultivosOrganizacionTableOrderingComposer,
+      $$CultivosOrganizacionTableAnnotationComposer,
+      $$CultivosOrganizacionTableCreateCompanionBuilder,
+      $$CultivosOrganizacionTableUpdateCompanionBuilder,
+      (
+        CultivosOrganizacionData,
+        BaseReferences<
+          _$AppDatabase,
+          $CultivosOrganizacionTable,
+          CultivosOrganizacionData
+        >,
+      ),
+      CultivosOrganizacionData,
       PrefetchHooks Function()
     >;
 typedef $$VersionesFincaTableCreateCompanionBuilder =
@@ -6501,6 +6953,8 @@ class $AppDatabaseManager {
       $$FincasTableTableManager(_db, _db.fincas);
   $$TemporadasTableTableManager get temporadas =>
       $$TemporadasTableTableManager(_db, _db.temporadas);
+  $$CultivosOrganizacionTableTableManager get cultivosOrganizacion =>
+      $$CultivosOrganizacionTableTableManager(_db, _db.cultivosOrganizacion);
   $$VersionesFincaTableTableManager get versionesFinca =>
       $$VersionesFincaTableTableManager(_db, _db.versionesFinca);
   $$VerificacionesTableTableManager get verificaciones =>

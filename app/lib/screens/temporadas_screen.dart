@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/database.dart';
+import '../domain/cultivos.dart';
 import '../providers.dart';
 import 'finca_screen.dart' show fecha;
 
 /// Temporadas de cosecha de la organización. Solo el administrador crea;
-/// crear requiere señal (las temporadas viven en el servidor).
+/// crear requiere señal (las temporadas viven en el servidor). Una temporada
+/// puede ser de un solo cultivo (p. ej. la cosecha de cacao) o de todos.
 class TemporadasScreen extends ConsumerWidget {
   const TemporadasScreen({super.key});
 
   Future<void> _crear(BuildContext context, WidgetRef ref) async {
-    final datos = await showDialog<(String, DateTime, DateTime)>(
+    final datos = await showDialog<(String, DateTime, DateTime, String?)>(
       context: context,
-      builder: (_) => const _DialogoTemporada(),
+      builder: (_) => _DialogoTemporada(
+        cultivos:
+            ref.read(cultivosOrganizacionProvider).value ??
+            const [cultivoPorDefecto],
+      ),
     );
     if (datos == null || !context.mounted) return;
     final mensajero = ScaffoldMessenger.of(context);
@@ -21,7 +28,12 @@ class TemporadasScreen extends ConsumerWidget {
     try {
       await ref
           .read(apiProvider)
-          .crearTemporada(datos.$1, iso(datos.$2), iso(datos.$3));
+          .crearTemporada(
+            datos.$1,
+            iso(datos.$2),
+            iso(datos.$3),
+            cultivo: datos.$4,
+          );
       await ref.read(syncServiceProvider).sincronizar();
       mensajero.showSnackBar(
         SnackBar(content: Text('Temporada ${datos.$1} creada.')),
@@ -34,7 +46,12 @@ class TemporadasScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final temporadas = ref.watch(temporadasProvider).value ?? const [];
-    final actual = ref.watch(temporadaActualProvider);
+    final hoy = DateTime.now();
+    final dia = DateTime(hoy.year, hoy.month, hoy.day);
+    // Puede haber más de una vigente (una general y otra de cacao).
+    bool vigente(Temporada t) => !dia.isBefore(t.inicio) && !dia.isAfter(t.fin);
+    final variosCultivos =
+        (ref.watch(cultivosOrganizacionProvider).value?.length ?? 1) > 1;
     final esAdmin = ref.watch(sesionProvider).value?.esAdmin ?? false;
 
     return Scaffold(
@@ -54,12 +71,22 @@ class TemporadasScreen extends ConsumerWidget {
               children: [
                 for (final t in temporadas)
                   ListTile(
-                    leading: Icon(
-                      t.id == actual?.id ? Icons.today : Icons.event_note,
-                    ),
+                    leading: t.cultivo == null
+                        ? Icon(vigente(t) ? Icons.today : Icons.event_note)
+                        : Icon(
+                            cultivoDe(t.cultivo!).icono,
+                            color: cultivoDe(t.cultivo!).colorUi,
+                          ),
                     title: Text(t.nombre),
-                    subtitle: Text('${fecha(t.inicio)} – ${fecha(t.fin)}'),
-                    trailing: t.id == actual?.id
+                    subtitle: Text(
+                      '${fecha(t.inicio)} – ${fecha(t.fin)}'
+                      '${t.cultivo != null
+                          ? ' · solo ${cultivoDe(t.cultivo!).nombre.toLowerCase()}'
+                          : variosCultivos
+                          ? ' · todos los cultivos'
+                          : ''}',
+                    ),
+                    trailing: vigente(t)
                         ? const Chip(label: Text('Actual'))
                         : null,
                   ),
@@ -77,7 +104,10 @@ class TemporadasScreen extends ConsumerWidget {
 }
 
 class _DialogoTemporada extends StatefulWidget {
-  const _DialogoTemporada();
+  const _DialogoTemporada({required this.cultivos});
+
+  /// Cultivos de la organización.
+  final List<String> cultivos;
 
   @override
   State<_DialogoTemporada> createState() => _DialogoTemporadaState();
@@ -87,6 +117,9 @@ class _DialogoTemporadaState extends State<_DialogoTemporada> {
   late DateTime _inicio;
   late DateTime _fin;
   late final TextEditingController _nombre;
+
+  /// `null` = todos los cultivos.
+  String? _cultivo;
 
   @override
   void initState() {
@@ -131,6 +164,23 @@ class _DialogoTemporadaState extends State<_DialogoTemporada> {
             ),
             onChanged: (_) => setState(() {}),
           ),
+          if (widget.cultivos.length > 1)
+            DropdownButtonFormField<String?>(
+              initialValue: _cultivo,
+              decoration: const InputDecoration(labelText: 'Cultivo'),
+              items: [
+                const DropdownMenuItem(
+                  value: null,
+                  child: Text('Todos los cultivos'),
+                ),
+                for (final c in widget.cultivos.map(cultivoDe))
+                  DropdownMenuItem(
+                    value: c.id,
+                    child: Text('Solo ${c.nombre}'),
+                  ),
+              ],
+              onChanged: (c) => setState(() => _cultivo = c),
+            ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Inicio'),
@@ -157,8 +207,12 @@ class _DialogoTemporadaState extends State<_DialogoTemporada> {
         ),
         FilledButton(
           onPressed: valido
-              ? () =>
-                    Navigator.pop(context, (_nombre.text.trim(), _inicio, _fin))
+              ? () => Navigator.pop(context, (
+                  _nombre.text.trim(),
+                  _inicio,
+                  _fin,
+                  _cultivo,
+                ))
               : null,
           child: const Text('Crear'),
         ),

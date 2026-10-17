@@ -1,7 +1,7 @@
 {
   "Finca": {
     "descripcion": "Versión del lindero de una parcela: hash de la geolocalización y resultado del chequeo de deforestación (EUDR). refUID = attestation de la versión anterior.",
-    "schema": "bytes32 fincaId,uint16 version,bytes32 geoHash,uint32 areaHaX100,bool deforestacionOK,string fuenteChequeo,bytes32 docsHash",
+    "schema": "bytes32 fincaId,uint16 version,string cultivo,bytes32 geoHash,uint32 areaHaX100,bool deforestacionOK,string fuenteChequeo,bytes32 docsHash",
     "revocable": true
   },
   "Verificacion": {
@@ -10,8 +10,8 @@
     "revocable": true
   },
   "Entrega": {
-    "descripcion": "Entrega de café de una finca al beneficio húmedo. refUID = attestation de la Finca.",
-    "schema": "bytes32 entregaId,bytes32 fincaUID,uint32 kg,uint64 fecha,string estado",
+    "descripcion": "Entrega de café o cacao de una finca al beneficio o centro de acopio. refUID = attestation de la Finca.",
+    "schema": "bytes32 entregaId,bytes32 fincaUID,string cultivo,uint32 kg,uint64 fecha,string estado",
     "revocable": true
   },
   "Lote": {

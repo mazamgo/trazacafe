@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trazacafe/providers.dart';
 import 'package:trazacafe/screens/nueva_finca_screen.dart';
 import 'package:trazacafe/screens/nuevo_productor_screen.dart';
 
@@ -17,7 +18,10 @@ void main() {
       ..padding = const FakeViewPadding(bottom: barra)
       ..viewPadding = const FakeViewPadding(bottom: barra);
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(ProviderScope(child: MaterialApp(home: pantalla)));
+    await tester.pumpWidget(ProviderScope(
+      overrides: [cultivosOrganizacionProvider.overrideWith((ref) => Stream.value(['cafe']))],
+      child: MaterialApp(home: pantalla),
+    ));
     await tester.pump();
   }
 

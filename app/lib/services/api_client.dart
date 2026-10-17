@@ -44,12 +44,23 @@ class ApiClient {
       _pedir('POST', '/v1/sync', payload);
 
   /// Crea una temporada de cosecha (solo administradores). Fechas `AAAA-MM-DD`.
-  Future<void> crearTemporada(String nombre, String inicio, String fin) =>
-      _pedir('POST', '/v1/temporadas', {
-        'nombre': nombre,
-        'inicio': inicio,
-        'fin': fin,
-      });
+  /// Sin [cultivo], aplica a todos los cultivos de la organización.
+  Future<void> crearTemporada(
+    String nombre,
+    String inicio,
+    String fin, {
+    String? cultivo,
+  }) => _pedir('POST', '/v1/temporadas', {
+    'nombre': nombre,
+    'inicio': inicio,
+    'fin': fin,
+    'cultivo': ?cultivo,
+  });
+
+  /// Cambia los cultivos de la organización (solo administradores). La API
+  /// no deja quitar uno que ya tiene fincas (409).
+  Future<void> actualizarCultivos(List<String> cultivos) =>
+      _pedir('PUT', '/v1/organizacion/cultivos', {'cultivos': cultivos});
 
   /// Revisa la finca por satélite ahora mismo (solo administradores).
   Future<Map<String, dynamic>> chequearFinca(String fincaId) => _pedir(

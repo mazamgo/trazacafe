@@ -13,6 +13,7 @@
       "id": "3f2b8c1e-9a4d-4e7f-8b21-0c5d6e7f8a90",
       "productorId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
       "nombre": "La Esperanza",
+      "cultivo": "cafe",
       "coordenadas": [
         [-86.0023, 13.091],
         [-86.0013, 13.091],

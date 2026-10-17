@@ -92,7 +92,7 @@ Cualquier cuenta de Google puede abrir la app, pero solo los correos invitados r
 
 | Rol | Puede |
 |---|---|
-| `admin` | Invitar y quitar personas (pantalla **Equipo**), todo lo del técnico |
+| `admin` | Invitar y quitar personas (pantalla **Equipo**), elegir los cultivos (**Cultivos**), crear temporadas, todo lo del técnico |
 | `tecnico` | Registrar productores, fincas, fotos y sincronizar |
 
 Organización de prueba ya creada: **GoProduction (pruebas)**, con `mauricio.zambrana.g@gmail.com` invitado como administrador.
@@ -101,8 +101,10 @@ Para una organización nueva (cooperativa, exportadora o beneficio de café o ca
 
 ```powershell
 cd backend
-npm run crear-organizacion -- --nombre "Cooperativa Ejemplo R.L." --admin gerente@gmail.com
+npm run crear-organizacion -- --nombre "Cooperativa Ejemplo R.L." --admin gerente@gmail.com --cultivos cafe,cacao
 ```
+
+`--cultivos` es opcional (por defecto, solo `cafe`). El administrador puede cambiarlos después desde la app (menú ⋮ → **Cultivos**), pero no puede quitar un cultivo que ya tiene fincas.
 
 El administrador entra con "Entrar con Google" usando ese correo y desde **Equipo** invita a sus técnicos. Quitar a alguien le borra los permisos y cierra sus sesiones al instante (la API verifica tokens revocados). Necesita la base de datos (paso 2).
 
@@ -129,7 +131,7 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 
 ## 4d. Temporadas, visitas y chequeo satelital
 
-- **Temporadas:** cada organización crea las suyas (menú ⋮ → Temporadas, solo administradores). No pueden traslaparse. Las entregas y visitas que llegan sin temporada se asignan solas al crearla.
+- **Temporadas:** cada organización crea las suyas (menú ⋮ → Temporadas, solo administradores). Una temporada puede ser para **todos los cultivos** o **solo para uno** (por ejemplo, la cosecha de cacao). No pueden traslaparse dentro del mismo cultivo, pero una de cacao sí puede cruzarse con la general. Si existen las dos, las entregas y visitas de cacao van a la de cacao. Las entregas y visitas que llegan sin temporada se asignan solas al crearla.
 - **Visita de verificación:** al menos una foto y, si cambió el lindero, uno nuevo. El lindero anterior queda en `fincas_versiones` y cada versión se atesta con su propio número.
 - **Aviso:** si la finca no tiene visita en la temporada actual, o está en rojo, la app avisa al registrar una entrega. En la semana 4, el lote de exportación rechazará esas entregas.
 - **Chequeo satelital** (`backend/src/deforestacion.ts`): consulta la Data API de Global Forest Watch.
@@ -145,9 +147,21 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 
   Sin la key, la tarea responde 503 y no marca ninguna finca. La key vence al año: vuelve a correr el script.
 
+## 4e. Cultivos (café y cacao)
+
+- **Datos:** `organizaciones.cultivos`, `fincas.cultivo` y `temporadas.cultivo` (migración `008_cultivos.sql`, aplicada el 16/10/2026). Las fincas anteriores quedaron como café.
+- **Validación:** la API rechaza (422) las fincas de un cultivo que la organización no tiene activado y las entregas cuyo estado no corresponde al cultivo de su finca (por ejemplo, cacao en `uva`).
+- **App:** el selector Café | Cacao aparece en **Nueva finca** solo cuando la organización tiene activado más de un cultivo. Por ahora, el cultivo de una finca ya registrada no se puede cambiar.
+- **Attestations:** los esquemas `Finca` y `Entrega` incluyen `cultivo`. Todavía no están registrados en la blockchain.
+
 ## 5. Backend en Cloud Run (ya hecho)
 
-Endpoints: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, entregas, fotos), `GET /v1/datos` (todo lo de la organización), `POST /v1/fotos/:id/subida`, `DELETE /v1/fincas/:id`, `GET|POST|DELETE /v1/invitaciones`.
+Endpoints:
+- Acceso y sincronización: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, versiones de lindero, visitas, entregas, fotos), `GET /v1/datos` (todo lo de la organización, con sus cultivos), `POST /v1/fotos/:id/subida`.
+- Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`.
+- Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
+- Equipo: `GET|POST|DELETE /v1/invitaciones`.
+- Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`.
 
 **URL de la API:** https://trazacafe-api-85528878949.us-east4.run.app
 

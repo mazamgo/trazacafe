@@ -48,6 +48,6 @@ void main() {
     expect(find.text('Consentimiento de datos'), findsOneWidget);
     expect(find.text('Todas las fotos están guardadas en el servidor ✓'), findsOneWidget);
     expect(find.text('Leona II'), findsOneWidget);
-    expect(find.text('1.92 ha'), findsOneWidget);
+    expect(find.text('Café · 1.92 ha'), findsOneWidget);
   });
 }

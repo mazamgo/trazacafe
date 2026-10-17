@@ -11,6 +11,8 @@ import {
 } from "viem";
 import definiciones from "../schemas.json" with { type: "json" };
 
+export * from "./cultivos.ts";
+
 export type NombreEsquema = keyof typeof definiciones;
 
 export interface Esquema {
@@ -53,6 +55,8 @@ export interface DatosFinca {
   fincaId: string;
   /** Versión del lindero (1 la primera; sube con cada lindero nuevo). */
   version: number;
+  /** Id de cultivos.json (`cafe`, `cacao`). */
+  cultivo: string;
   geoHash: Hex;
   areaHa: number;
   deforestacionOK: boolean;
@@ -64,6 +68,7 @@ export function codificarFinca(d: DatosFinca): Hex {
   return codificar("Finca", [
     uuidABytes32(d.fincaId),
     d.version,
+    d.cultivo,
     d.geoHash,
     Math.round(d.areaHa * 100),
     d.deforestacionOK,

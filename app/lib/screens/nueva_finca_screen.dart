@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/database.dart';
+import '../domain/cultivos.dart';
 import '../domain/geo.dart';
 import '../providers.dart';
 import '../services/fotos_service.dart';
@@ -46,6 +48,14 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
   final _puntos = <LatLng>[];
   final _fotos = <FotoTomada>[];
   bool _guardando = false;
+
+  /// Elegido por el técnico; `null` = el primero de la organización.
+  String? _cultivoElegido;
+
+  List<String> get _cultivosOrg =>
+      ref.read(cultivosOrganizacionProvider).value ?? const [cultivoPorDefecto];
+
+  String get _cultivo => _cultivoElegido ?? _cultivosOrg.first;
 
   final _areaDeclaradaCtrl = TextEditingController();
 
@@ -143,6 +153,7 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
               id: fincaId,
               productorId: widget.productorId!,
               nombre: _fincaCtrl.text.trim(),
+              cultivo: Value(_cultivo),
               coordenadasJson: aGeoJsonCoords(_puntos),
               areaHa: area,
               geoHash: geoHash(_puntos),
@@ -178,6 +189,9 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
         ? Colors.yellowAccent
         : Colors.red.shade600;
     final sesionMapa = ref.watch(sesionMapaProvider).value;
+    final cultivos =
+        ref.watch(cultivosOrganizacionProvider).value ??
+        const [cultivoPorDefecto];
 
     final anterior = widget.linderoAnterior;
     // En modo lindero, el mapa arranca sobre la finca.
@@ -228,6 +242,24 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          // Solo se pregunta si la organización trabaja más de un cultivo.
+          if (!widget.esLindero && cultivos.length > 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: SegmentedButton<String>(
+                segments: [
+                  for (final c in cultivos.map(cultivoDe))
+                    ButtonSegment(
+                      value: c.id,
+                      icon: Icon(c.icono, color: c.colorUi),
+                      label: Text(c.nombre),
+                    ),
+                ],
+                selected: {_cultivo},
+                onSelectionChanged: (s) =>
+                    setState(() => _cultivoElegido = s.first),
               ),
             ),
           Expanded(

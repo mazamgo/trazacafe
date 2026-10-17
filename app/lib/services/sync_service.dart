@@ -121,6 +121,7 @@ class SyncService {
           'id': f.id,
           'productorId': f.productorId,
           'nombre': f.nombre,
+          'cultivo': f.cultivo,
           'coordenadas': jsonDecode(f.coordenadasJson),
           'areaHa': f.areaHa,
           'geoHash': f.geoHash,
@@ -183,7 +184,9 @@ class SyncService {
       return DateTime(p[0], p[1], p[2]);
     }
 
+    final cultivos = (d['organizacion'] as Map?)?['cultivos'] as List?;
     return DatosServidor(
+      cultivos: cultivos?.cast<String>(),
       temporadas: [
         for (final t in lista('temporadas'))
           TemporadasCompanion(
@@ -191,6 +194,7 @@ class SyncService {
             nombre: Value(t['nombre'] as String),
             inicio: Value(dia(t['inicio']!)),
             fin: Value(dia(t['fin']!)),
+            cultivo: Value(t['cultivo'] as String?),
           ),
       ],
       verificaciones: [
@@ -223,6 +227,7 @@ class SyncService {
             id: Value(f['id'] as String),
             productorId: Value(f['productorId'] as String),
             nombre: Value(f['nombre'] as String),
+            cultivo: Value((f['cultivo'] as String?) ?? 'cafe'),
             coordenadasJson: Value(jsonEncode(f['coordenadas'])),
             areaHa: Value((f['areaHa'] as num).toDouble()),
             areaOficialHa: Value((f['areaOficialHa'] as num?)?.toDouble()),

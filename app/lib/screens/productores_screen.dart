@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
+import 'cultivos_screen.dart';
 import 'equipo_screen.dart';
 import 'nuevo_productor_screen.dart';
 import 'productor_screen.dart';
@@ -43,6 +44,13 @@ class ProductoresScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const EquipoScreen()),
                   ),
                   child: const Text('Equipo'),
+                ),
+              if (sesion?.esAdmin ?? false)
+                PopupMenuItem(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CultivosScreen()),
+                  ),
+                  child: const Text('Cultivos'),
                 ),
               PopupMenuItem(
                 onTap: () => ref.read(authServiceProvider).cerrarSesion(),

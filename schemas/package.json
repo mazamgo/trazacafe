@@ -7,12 +7,14 @@
   "exports": {
     ".": "./src/index.ts",
     "./schemas.json": "./schemas.json",
+    "./cultivos.json": "./cultivos.json",
     "./test-vectors.json": "./test-vectors.json",
     "./fixtures/*": "./fixtures/*"
   },
   "scripts": {
     "register": "node --env-file-if-exists=.env --import tsx scripts/register.ts",
     "vectors": "tsx scripts/vectors.ts",
+    "cultivos-dart": "tsx scripts/cultivos-dart.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

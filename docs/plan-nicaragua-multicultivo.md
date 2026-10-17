@@ -1,0 +1,200 @@
+# Plan: TrazaCafé rentable en Nicaragua (café y cacao) y luego la región
+
+> Planes anteriores: `docs/plan-mvp-trazabilidad-cafe.md` (MVP original). Lo de temporadas y visitas ya está hecho (commit 33c9641).
+
+## Contexto
+**Objetivo:** que el proyecto sea rentable, empezando solo en Nicaragua y con dos cultivos (café y cacao). Después, expandirse a otros países.
+
+**Lo que se sabe del mercado:**
+- Fairtrade ya regala el mapeo de parcelas a las cooperativas certificadas.
+- osapiens, Koltiva y otras plataformas venden a importadores grandes.
+- En Nicaragua no hay una plataforma dominante.
+- El valor diferencial de TrazaCafé es la **cadena de custodia después del acopio** (finca → entrega → lote → contenedor), funcionar sin señal y en español, la verificación por temporada, la prueba pública en blockchain y el soporte local.
+
+**Decisiones del usuario:**
+- Cultivos: **café y cacao**.
+- **Todavía no hay piloto** (hay que conseguirlo).
+- La **empresa legal** entra como tarea del plan.
+
+**Fechas que mandan:**
+- 30/12/2026: el EUDR aplica a operadores grandes y medianos.
+- Enero de 2027: Fairtrade exige el 100 % de la geolocalización de las cooperativas.
+- Mediados de enero de 2027: termina la prueba gratis de Cloud SQL (empezó el 15/10/2026).
+- 30/06/2027: el EUDR aplica a micro y pequeñas empresas.
+
+## Lo que ya tenemos (hecho y en producción de pruebas)
+- **App Android sin señal:** productores con foto del consentimiento, fincas con polígono validado (cruces, regla de 4 ha) y mapa satelital de Google, fotos subidas con hash verificado, entregas, temporadas, visita de verificación con historial del lindero y aviso al registrar entregas.
+- **Acceso:** login con Google, acceso por invitación, roles de administrador y técnico, pantallas Equipo y Temporadas, y descarga de los datos del equipo.
+- **API en Cloud Run** con Cloud SQL (PostGIS) por IAM, Storage con reglas por organización, área oficial calculada por PostGIS, chequeo satelital (GFW) con tarea diaria en Scheduler y API keys restringidas.
+- **Esquemas EAS** (Finca con versión, Verificación, Entrega, Lote, Exportación), todavía sin registrar en la blockchain.
+
+## Pendientes conocidos (se integran en las fases)
+- Key de Global Forest Watch (cuenta con correo y contraseña; correo a gfw@wri.org enviado).
+- Lotes, exportaciones, paquete EUDR, firma con Cloud KMS y attestations (era la semana 4).
+- Riesgo de celular compartido entre organizaciones.
+- Prueba de Equipo intermitente.
+- Publicación en Play Store.
+- Entorno de producción.
+- Verificador web en Firebase Hosting.
+
+---
+
+## Fase 0 — Negocio y piloto (en paralelo a todo, desde ya)
+1. **Conseguir 1 o 2 pilotos:**
+   - Entrevistas a 6–8 organizaciones:
+     - café en Jinotega, Matagalpa y Nueva Segovia;
+     - cacao en Waslala, Matiguás y Río San Juan;
+     - priorizar las **no certificadas Fairtrade** y las exportadoras privadas.
+   - Demo con el APK actual.
+   - Meta: **una carta de intención** con precio acordado y un contenedor de prueba antes de marzo de 2027.
+2. **Validar precios** (hipótesis de partida):
+   - US$2–4 por productor al año;
+   - US$30–80 por contenedor;
+   - mapeo de campo cobrado por finca.
+   - Pedir 1 o 2 cotizaciones de competidores comerciales como referencia.
+3. **Empresa legal (bloquea facturar, recibir fondos y publicar en Play Store como empresa):**
+   - Elegir con un abogado entre GoProduction en Nicaragua o una entidad en Costa Rica, Panamá o EE.UU. (banca, KYC de Optimism y facturar a compradores de la UE).
+   - Abrir cuenta para cobrar en USD.
+4. **Documentos legales:**
+   - Contrato de servicio con la organización.
+   - Acuerdo de tratamiento de datos (Ley 787).
+   - Política de privacidad y términos para Play Store.
+   - Formato de consentimiento del productor (impreso, el que se fotografía en la app).
+5. **Financiamiento complementario (no es la base del negocio):** Optimism Grants o Retro Funding (con el código abierto), Celo, BID Lab y programas de la UE de apoyo al EUDR.
+
+## Fase 1 — Multicultivo: café y cacao (~3 semanas) — **hecha el 16/10/2026**
+**Estado:**
+- La migración 008 está aplicada en Cloud SQL, la API desplegada (revisión `trazacafe-api-00006`) y el APK probado en el Samsung con cacao activado.
+- **Pendiente menor:**
+  - mostrar siempre el selector de cultivo en Nueva finca, con un aviso cuando hay un solo cultivo;
+  - permitir cambiar el cultivo de una finca mientras no tenga entregas;
+  - revisar en Cloud SQL una finca de cacao con entrega `fermentado` hecha desde el celular.
+
+**Diseño:** el **cultivo es un dato de la finca**. Cada cultivo trae su configuración desde un archivo compartido entre la API y la app (como `test-vectors.json`), así que agregar otro cultivo es mayormente configuración.
+
+- **Nuevo `schemas/cultivos.json`:**
+  - `cafe`: estados `uva`, `pergamino`, `oro`; código HS 0901; máximo por entrega 20 t.
+  - `cacao`: estados `baba`, `fermentado`, `seco`; código HS 1801; dos cosechas al año.
+  - Los consumen `schemas/src/index.ts` (TypeScript) y un generador para Dart, igual que los vectores, con prueba de contrato en ambos lados.
+- **Migración `008_cultivos.sql`:**
+  - `organizaciones.cultivos text[]`;
+  - `fincas.cultivo` (las fincas actuales quedan como `cafe`);
+  - `temporadas.cultivo` opcional: vacío = todos los cultivos; permite cosechas de cacao separadas. La restricción de no traslape pasa a ser por organización **y cultivo**.
+  - Las entregas toman el cultivo de su finca.
+- **API** (`backend/src/sync.ts`, `repo.ts`):
+  - valida que el `estado` de cada entrega exista para el cultivo de su finca;
+  - `GET /v1/datos` devuelve el cultivo;
+  - las temporadas se pueden crear por cultivo.
+- **Esquemas EAS:** `Finca` y `Entrega` incluyen `cultivo` (aún no se registran, así que no hay costo).
+- **App** (base local v5):
+  - selector de cultivo en Nueva finca;
+  - formulario de entrega con los estados del cultivo;
+  - ícono y color por cultivo en las listas;
+  - entregas agrupadas por temporada y cultivo;
+  - la organización elige sus cultivos.
+- **Decisión de marca:** se mantiene **TrazaCafé** para Nicaragua. Si el cacao pesa mucho en las ventas, evaluar un nombre más general antes de salir a otros países.
+
+## Fase 2 — Del campo al contenedor: el paquete EUDR (~4 semanas, prioridad comercial)
+Es la parte que **paga el cliente**.
+
+- **Lotes** (beneficio o centro de acopio):
+  - Agrupar entregas de un mismo cultivo y temporada.
+  - **Control de volumen:** kg del lote frente a la suma de las entregas, y kg por finca frente a un rendimiento razonable por hectárea; si se excede, aviso.
+  - **Reglas de exclusión:** no entran entregas de fincas en rojo ni de fincas sin visita en la temporada (lo que quedó preparado).
+- **Exportaciones (contenedores):** agrupar lotes, con destino, comprador y número de contenedor.
+- **Paquete EUDR:**
+  - GeoJSON de **todas las fincas de origen** del contenedor en el formato de la DDS de TRACES;
+  - PDF con el resumen para el comprador: fincas, áreas oficiales, estado satelital, visitas y attestations;
+  - exportación compatible con Fairtrace y osapiens (CSV o GeoJSON) para cooperativas que ya los usan.
+- **Attestations en la blockchain:**
+  - clave secp256k1 en **Cloud KMS** (la clave nunca sale de Google);
+  - registrar los esquemas en OP Sepolia y luego en OP Mainnet (`schemas/scripts/register.ts`);
+  - worker en Cloud Run que procesa `attestations_pendientes` con `multiAttest` y encadena con `refUID` (versión de finca → visita → entrega → lote → exportación);
+  - fondear la dirección con un poco de ETH en OP.
+- **Verificador público** (Flutter Web en Firebase Hosting): QR del contenedor o del saco → cadena completa sin datos personales.
+
+## Fase 3 — Panel web para administradores (~3 semanas)
+- **Mismo código Flutter compilado para web,** con login de Google (la key de navegador ya está restringida por dominio).
+- **Pantallas:** lotes, contenedores, paquete EUDR, alertas satelitales, avance de visitas por temporada, equipo y temporadas.
+- **Reportes:** % de fincas verificadas, kg por cultivo y temporada, fincas en amarillo o rojo.
+
+## Fase 4 — Producción y lanzamiento en Nicaragua (~2–3 semanas, antes de que termine la prueba de Cloud SQL)
+- **Proyecto `trazacafe-prod`** separado del de pruebas: Cloud SQL pagado con respaldos y recuperación a un punto en el tiempo, alertas de monitoreo y de presupuesto, keys propias y bucket propio.
+- **Seguridad:**
+  - Firebase App Check con Play Integrity en la API;
+  - corregir el riesgo del celular compartido entre organizaciones;
+  - revisión de seguridad (permisos, reglas de Storage, endpoints).
+- **Play Store:**
+  - clave de subida;
+  - agregar el SHA-1 de Play App Signing a Firebase, a la key de Android y a la key de mapas (`--dart-define=ANDROID_CERT_SHA1`);
+  - ficha en español y política de privacidad;
+  - pruebas cerradas con el piloto.
+- **Calidad:**
+  - arreglar la prueba de Equipo intermitente;
+  - CI en GitHub Actions con las pruebas de Node y Flutter (`app/tool/probar.ps1`).
+- **Soporte:** guía de 1 página para técnicos, video corto, grupo de WhatsApp de soporte, y procedimiento de alta de una organización (`npm run crear-organizacion`).
+- **Mapas sin señal:** revisar los términos de Google y, si no permiten guardar zonas, ofrecer la descarga de mapas base de otra fuente para zonas sin cobertura.
+
+## Fase 5 — Rentabilidad en Nicaragua (desde el primer piloto)
+**Paquetes (hipótesis a validar en la Fase 0):**
+
+| Paquete | Para | Precio orientativo |
+|---|---|---|
+| Básico | Cooperativa de hasta 300 productores | US$2–4 por productor al año (mínimo ~US$50/mes) |
+| Exportador | Exportadora o beneficio | Suscripción + US$30–80 por contenedor con paquete EUDR |
+| Comprador | Importador o tostador de la UE | US$100–300/mes por el portal de sus proveedores |
+| Servicios | Cualquiera | Mapeo de fincas en campo (con GPS y drones de Nicarobótica), capacitación, limpieza de datos |
+
+**Costos estimados por mes:**
+- Infraestructura de producción: US$80–200 (Cloud SQL de pago, Storage, Cloud Run y mapas por encima de la cuota gratis).
+- El costo real es el equipo: 2–3 personas a tiempo parcial o completo en Nicaragua.
+
+**Punto de equilibrio orientativo:** con unos US$5,000 al mes de gasto (equipo de 2–3 personas e infraestructura), se necesitan unos **US$60,000 al año**. Por ejemplo:
+- 20 cooperativas × 400 productores × US$3 = US$24,000;
+- 2–3 exportadoras con unos 200 contenedores × US$50 = US$10,000 + suscripción;
+- servicios de mapeo y capacitación: US$15,000–25,000.
+
+Son hipótesis; la Fase 0 las confirma o corrige.
+
+**Métricas a seguir:**
+- organizaciones que pagan y productores activos;
+- contenedores con paquete EUDR;
+- renovación por temporada;
+- costo de incorporar cada organización.
+
+## Fase 6 — Expansión (después de tener clientes que paguen en Nicaragua)
+1. **Honduras y Guatemala** (café y cacao, español): configuración por país (cédula, documentos de tierra, requisitos de legalidad, ley de datos) y un socio local.
+2. **Colombia, Perú y Ecuador:** capas oficiales de deforestación de cada país junto con GFW (IDEAM, Geobosques, SAC) y la interoperabilidad con los sistemas nacionales.
+3. **Brasil:** portugués, integración con el CAR y PRODES/DETER.
+4. **Ganado:** otro modelo de datos (animales, traslados, guías), con un socio del sector.
+
+Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con varios cultivos y temporadas por cultivo.
+
+---
+
+## Calendario sugerido
+
+| Período | Técnico | Negocio |
+|---|---|---|
+| Nov 2026 | Fase 1 (multicultivo) + key de GFW | Fase 0: entrevistas, demo, abogado |
+| Nov–Dic 2026 | Fase 2 (lotes, contenedores, paquete EUDR, attestations) | Carta de intención del piloto |
+| Ene 2027 | Fase 4 (producción, Play Store) antes de que termine la prueba de Cloud SQL | Contratos y entidad legal |
+| Feb–Mar 2027 | Fase 3 (panel web) | Piloto con un contenedor real |
+| Abr–Jun 2027 | Ajustes con el piloto | 5–10 organizaciones antes del 30/06/2027 |
+| 2º semestre 2027 | — | Decidir el primer país de expansión |
+
+## Verificación por fase
+- **Fase 1:**
+  - pruebas de contrato del archivo de cultivos (TypeScript y Dart);
+  - la migración 008 ensayada en una transacción revertida y luego aplicada;
+  - una finca de cacao con entrega `fermentado` creada en el Samsung y revisada en Cloud SQL.
+- **Fase 2:**
+  - prueba de un contenedor completo de punta a punta en OP Sepolia: entregas → lote → contenedor → attestations encadenadas visibles en easscan;
+  - el GeoJSON validado contra el formato de TRACES;
+  - el PDF revisado con el piloto.
+- **Fase 3:** el panel probado con la cuenta de administrador y un técnico sin acceso al panel.
+- **Fase 4:**
+  - la app instalada desde Play (pruebas cerradas) con login y mapas funcionando con el SHA-1 de Play;
+  - App Check rechaza llamadas que no vienen de la app;
+  - CI en verde.
+- **Fase 5:** las métricas en el panel y la primera factura emitida.

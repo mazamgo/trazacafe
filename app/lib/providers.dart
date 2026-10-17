@@ -105,15 +105,46 @@ final temporadasProvider = StreamProvider<List<Temporada>>(
   (ref) => ref.watch(databaseProvider).observarTemporadas(),
 );
 
-/// Temporada que contiene hoy, o `null` si la organización no la ha creado.
-final temporadaActualProvider = Provider<Temporada?>((ref) {
-  final hoy = DateTime.now();
-  final dia = DateTime(hoy.year, hoy.month, hoy.day);
-  for (final t in ref.watch(temporadasProvider).value ?? const <Temporada>[]) {
-    if (!dia.isBefore(t.inicio) && !dia.isAfter(t.fin)) return t;
-  }
-  return null;
-});
+/// Temporada de [cultivo] que contiene [fecha]: la propia del cultivo gana
+/// sobre la general. Con [cultivo] `null`, cualquiera que contenga la fecha.
+Temporada? temporadaVigente(
+  Iterable<Temporada> temporadas,
+  DateTime fecha, {
+  String? cultivo,
+}) {
+  final dia = DateTime(fecha.year, fecha.month, fecha.day);
+  final vigentes = [
+    for (final t in temporadas)
+      if (!dia.isBefore(t.inicio) &&
+          !dia.isAfter(t.fin) &&
+          (cultivo == null || t.cultivo == null || t.cultivo == cultivo))
+        t,
+  ];
+  return vigentes.where((t) => t.cultivo != null).firstOrNull ??
+      vigentes.firstOrNull;
+}
+
+/// Alguna temporada que contiene hoy, o `null` si la organización no la ha creado.
+final temporadaActualProvider = Provider<Temporada?>(
+  (ref) => temporadaVigente(
+    ref.watch(temporadasProvider).value ?? const [],
+    DateTime.now(),
+  ),
+);
+
+/// Temporada de hoy para las fincas de un cultivo.
+final temporadaActualDeProvider = Provider.family<Temporada?, String>(
+  (ref, cultivo) => temporadaVigente(
+    ref.watch(temporadasProvider).value ?? const [],
+    DateTime.now(),
+    cultivo: cultivo,
+  ),
+);
+
+/// Cultivos con los que trabaja la organización (ids de `cultivos.json`).
+final cultivosOrganizacionProvider = StreamProvider<List<String>>(
+  (ref) => ref.watch(databaseProvider).observarCultivosOrganizacion(),
+);
 
 final verificacionesProvider =
     StreamProvider.family<List<Verificacion>, String>(

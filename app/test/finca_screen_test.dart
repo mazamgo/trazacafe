@@ -27,6 +27,7 @@ void main() {
     bool conTemporada = true,
     bool visitaHecha = false,
     String deforestacion = 'pendiente',
+    String cultivo = 'cafe',
     Future<void> Function()? antes,
   }) async {
     // Pantalla alta para que toda la lista quede a la vista.
@@ -41,6 +42,7 @@ void main() {
             id: 'f1',
             productorId: 'p1',
             nombre: 'Leona II',
+            cultivo: Value(cultivo),
             coordenadasJson: '[[-86.0,13.0]]',
             areaHa: 1.9266,
             geoHash: '0x00',
@@ -118,7 +120,7 @@ void main() {
 
     await tocarEntrega(tester);
     expect(find.text('Antes de registrar'), findsNothing);
-    expect(find.text('Nueva entrega'), findsOneWidget);
+    expect(find.text('Nueva entrega de café'), findsOneWidget);
   });
 
   testWidgets('una finca en rojo avisa aunque tenga la visita', (tester) async {
@@ -139,6 +141,23 @@ void main() {
     expect((e.kg, e.estado, e.temporadaId, e.sincronizado), (345.5, 'uva', 't1', false));
     expect(find.textContaining('345.5 kg · Uva'), findsOneWidget);
     expect(find.text('Actual · 1 entrega · 345.5 kg'), findsOneWidget);
+  });
+
+  testWidgets('en una finca de cacao la entrega usa los estados del cacao', (tester) async {
+    await abrir(tester, cultivo: 'cacao');
+    expect(find.text('Cacao'), findsOneWidget);
+    await abrirFormulario(tester);
+    expect(find.text('Nueva entrega de cacao'), findsOneWidget);
+    expect(find.text('Uva'), findsNothing);
+    await tester.enterText(find.widgetWithText(TextField, 'Kilos entregados'), '80');
+    await tester.tap(find.text('Fermentado'));
+    await tester.pump();
+    await tester.tap(find.text('Guardar entrega'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await esperar(tester);
+
+    expect((await entregas(tester)).single.estado, 'fermentado');
+    expect(find.textContaining('80 kg · Fermentado'), findsOneWidget);
   });
 
   testWidgets('agrupa las entregas por temporada con el total de kg', (tester) async {

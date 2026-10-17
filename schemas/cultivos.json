@@ -1,0 +1,24 @@
+{
+  "cafe": {
+    "nombre": "Café",
+    "codigoHS": "0901",
+    "color": "#6F4E37",
+    "estados": [
+      { "id": "uva", "nombre": "Uva (café maduro)", "corto": "Uva" },
+      { "id": "pergamino", "nombre": "Pergamino", "corto": "Pergamino" },
+      { "id": "oro", "nombre": "Oro (café verde)", "corto": "Oro" }
+    ],
+    "maxKgEntrega": 20000
+  },
+  "cacao": {
+    "nombre": "Cacao",
+    "codigoHS": "1801",
+    "color": "#8D5524",
+    "estados": [
+      { "id": "baba", "nombre": "En baba (fresco)", "corto": "Baba" },
+      { "id": "fermentado", "nombre": "Fermentado", "corto": "Fermentado" },
+      { "id": "seco", "nombre": "Seco", "corto": "Seco" }
+    ],
+    "maxKgEntrega": 20000
+  }
+}

@@ -46,9 +46,69 @@ void main() {
   const nuevo = (coordenadasJson: '[[-86.0,13.0],[-86.002,13.0],[-86.002,13.002]]', areaHa: 4.5, geoHash: '0xnuevo');
 
   test('la temporada se encuentra por día de calendario, incluidos los extremos', () async {
-    expect((await db.temporadaDe(DateTime(2026, 10, 1, 0, 5)))?.id, 't1');
-    expect((await db.temporadaDe(DateTime(2027, 9, 30, 23, 59)))?.id, 't1');
-    expect(await db.temporadaDe(DateTime(2026, 9, 30, 23, 59)), isNull);
+    expect((await db.temporadaDe(DateTime(2026, 10, 1, 0, 5), cultivo: 'cafe'))?.id, 't1');
+    expect((await db.temporadaDe(DateTime(2027, 9, 30, 23, 59), cultivo: 'cafe'))?.id, 't1');
+    expect(await db.temporadaDe(DateTime(2026, 9, 30, 23, 59), cultivo: 'cafe'), isNull);
+  });
+
+  Future<void> temporadaCacao() => db.into(db.temporadas).insert(TemporadasCompanion.insert(
+        id: 'cacao',
+        nombre: 'Cacao principal',
+        inicio: DateTime(2026, 10, 1),
+        fin: DateTime(2027, 3, 31),
+        cultivo: const Value('cacao'),
+      ));
+
+  test('una temporada propia del cultivo gana sobre la general; los demás cultivos usan la general', () async {
+    await temporadaCacao();
+    final dia = DateTime(2026, 11, 5);
+    expect((await db.temporadaDe(dia, cultivo: 'cacao'))?.id, 'cacao');
+    expect((await db.temporadaDe(dia, cultivo: 'cafe'))?.id, 't1');
+    // Fuera de la de cacao, el cacao vuelve a la general.
+    expect((await db.temporadaDe(DateTime(2027, 5, 1), cultivo: 'cacao'))?.id, 't1');
+  });
+
+  test('la visita de una finca de cacao toma la temporada de cacao', () async {
+    await temporadaCacao();
+    await db.into(db.fincas).insert(FincasCompanion.insert(
+          id: 'f1',
+          productorId: 'p1',
+          nombre: 'Cacaotal',
+          cultivo: const Value('cacao'),
+          coordenadasJson: '[[-86.0,13.0]]',
+          areaHa: 1.0,
+          geoHash: '0x0',
+        ));
+    final f = await (db.select(db.fincas)..where((x) => x.id.equals('f1'))).getSingle();
+    await db.guardarVisita(finca: f, visita: visita('v1'), fotosVisita: const []);
+    expect((await db.select(db.verificaciones).get()).single.temporadaId, 'cacao');
+    expect(await db.verificadaEnTemporadaActual('f1', hoy: DateTime(2026, 11, 1)), isTrue);
+    expect(SyncService.payload(await db.pendientes())['fincas'][0]['cultivo'], 'cacao');
+  });
+
+  test('la descarga guarda los cultivos de la organización y el cultivo de fincas y temporadas', () async {
+    expect(await db.observarCultivosOrganizacion().first, ['cafe'], reason: 'sin sincronizar, solo café');
+    await db.aplicarDatosServidor(SyncService.desdeServidor({
+      'organizacion': {'id': 'o', 'nombre': 'Coop', 'tipo': 'cooperativa', 'cultivos': ['cafe', 'cacao']},
+      'temporadas': [
+        {'id': 't2', 'nombre': 'Cacao', 'inicio': '2026-10-01', 'fin': '2027-03-31', 'cultivo': 'cacao'},
+      ],
+      'productores': [],
+      'fincas': [
+        {
+          'id': 'f9', 'productorId': 'p1', 'nombre': 'Cacaotal', 'cultivo': 'cacao', 'coordenadas': [[-86.0, 13.0]],
+          'areaHa': 1.0, 'geoHash': '0x0',
+        },
+      ],
+      'entregas': [],
+    }));
+    expect(await db.observarCultivosOrganizacion().first, unorderedEquals(['cafe', 'cacao']));
+    expect((await db.select(db.temporadas).get()).single.cultivo, 'cacao');
+    expect((await db.select(db.fincas).get()).single.cultivo, 'cacao');
+
+    // Una respuesta de la API anterior (sin organización) no borra los cultivos.
+    await db.aplicarDatosServidor(SyncService.desdeServidor({'productores': [], 'fincas': [], 'entregas': []}));
+    expect(await db.observarCultivosOrganizacion().first, unorderedEquals(['cafe', 'cacao']));
   });
 
   test('visita con lindero nuevo en una finca enviada: crea la versión 2 y conserva la 1 en el servidor', () async {
@@ -129,7 +189,34 @@ void main() {
     expect((await db.select(db.verificaciones).get()).single.id, 'v1', reason: 'la visita sin enviar se conserva');
   });
 
-  test('migra una base v3 (la del APK anterior) a v4 sin perder datos', () async {
+  test('migra una base v4 a v5: las fincas quedan como café y las temporadas para todos', () async {
+    final archivo = File('${Directory.systemTemp.path}/trazacafe_v4_${DateTime.now().microsecondsSinceEpoch}.sqlite');
+    final actual = AppDatabase(NativeDatabase(archivo));
+    await actual.into(actual.productores).insert(ProductoresCompanion.insert(id: 'p1', nombre: 'P'));
+    await actual.into(actual.fincas).insert(FincasCompanion.insert(
+          id: 'f1', productorId: 'p1', nombre: 'Leona II', coordenadasJson: '[[-86.0,13.0]]', areaHa: 1, geoHash: '0x0'));
+    await actual.into(actual.temporadas).insert(TemporadasCompanion.insert(
+          id: 't1', nombre: '2026/27', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 9, 30)));
+    for (final sql in [
+      'DROP TABLE cultivos_organizacion',
+      'ALTER TABLE fincas DROP COLUMN cultivo',
+      'ALTER TABLE temporadas DROP COLUMN cultivo',
+      'PRAGMA user_version = 4',
+    ]) {
+      await actual.customStatement(sql);
+    }
+    await actual.close();
+
+    final migrada = AppDatabase(NativeDatabase(archivo));
+    expect((await migrada.select(migrada.fincas).get()).single.cultivo, 'cafe');
+    expect((await migrada.select(migrada.temporadas).get()).single.cultivo, isNull);
+    expect(await migrada.observarCultivosOrganizacion().first, ['cafe']);
+    expect((await migrada.temporadaDe(DateTime(2026, 11, 1), cultivo: 'cafe'))?.id, 't1');
+    await migrada.close();
+    archivo.deleteSync();
+  });
+
+  test('migra una base v3 (la del APK anterior) a la actual sin perder datos', () async {
     final archivo = File('${Directory.systemTemp.path}/trazacafe_v3_${DateTime.now().microsecondsSinceEpoch}.sqlite');
     // Crea la base actual, la deja como estaba en v3 y la vuelve a abrir.
     final v4 = AppDatabase(NativeDatabase(archivo));
@@ -137,6 +224,8 @@ void main() {
     await v4.into(v4.fincas).insert(FincasCompanion.insert(
           id: 'f1', productorId: 'p1', nombre: 'Leona II', coordenadasJson: '[[-86.0,13.0]]', areaHa: 1, geoHash: '0x0'));
     for (final sql in [
+      'DROP TABLE cultivos_organizacion',
+      'ALTER TABLE fincas DROP COLUMN cultivo',
       'DROP TABLE temporadas',
       'DROP TABLE versiones_finca',
       'DROP TABLE verificaciones',
@@ -152,7 +241,7 @@ void main() {
 
     final migrada = AppDatabase(NativeDatabase(archivo));
     final f = (await migrada.select(migrada.fincas).get()).single;
-    expect((f.nombre, f.version, f.deforestacion), ('Leona II', 1, 'pendiente'));
+    expect((f.nombre, f.version, f.deforestacion, f.cultivo), ('Leona II', 1, 'pendiente', 'cafe'));
     expect(await migrada.select(migrada.temporadas).get(), isEmpty);
     expect(await migrada.select(migrada.verificaciones).get(), isEmpty);
     await migrada.close();

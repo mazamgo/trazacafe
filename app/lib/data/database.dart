@@ -28,6 +28,10 @@ class Fincas extends Table {
   TextColumn get productorId => text().references(Productores, #id)();
   TextColumn get nombre => text()();
 
+  /// Id de `schemas/cultivos.json` (`cafe`, `cacao`). Define los estados de
+  /// sus entregas y qué temporada les toca.
+  TextColumn get cultivo => text().withDefault(const Constant('cafe'))();
+
   /// Coordenadas en GeoJSON: `[[lon, lat], ...]`. Un solo punto si la finca
   /// mide menos de 4 ha; polígono cerrado si mide 4 ha o más (regla EUDR).
   TextColumn get coordenadasJson => text()();
@@ -65,6 +69,18 @@ class Temporadas extends Table {
   /// Días de calendario en Nicaragua, ambos incluidos.
   DateTimeColumn get inicio => dateTime()();
   DateTimeColumn get fin => dateTime()();
+
+  /// Cultivo al que aplica; `null` = a todos los de la organización.
+  TextColumn get cultivo => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Cultivos con los que trabaja la organización (llegan del servidor). Vacía
+/// mientras no se haya sincronizado: entonces se asume solo café.
+class CultivosOrganizacion extends Table {
+  TextColumn get id => text()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -110,7 +126,7 @@ class Entregas extends Table {
   TextColumn get temporadaId => text().nullable()();
   RealColumn get kg => real()();
 
-  /// `uva` (café maduro) o `pergamino`.
+  /// Uno de los estados del cultivo de la finca (`cultivos.json`).
   TextColumn get estado => text()();
   DateTimeColumn get fecha => dateTime()();
   TextColumn get attestationUid => text().nullable()();
@@ -182,6 +198,7 @@ class Pendientes {
     Productores,
     Fincas,
     Temporadas,
+    CultivosOrganizacion,
     VersionesFinca,
     Verificaciones,
     Entregas,
@@ -202,7 +219,7 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -224,19 +241,36 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(versionesFinca);
         await m.createTable(verificaciones);
       }
+      if (from < 5) {
+        await m.addColumn(fincas, fincas.cultivo);
+        // Si venía de v3, createTable(temporadas) ya la creó con la columna.
+        if (from >= 4) await m.addColumn(temporadas, temporadas.cultivo);
+        await m.createTable(cultivosOrganizacion);
+      }
     },
   );
 
-  /// Temporada que contiene [fecha] (por día de calendario), o `null`.
-  Future<Temporada?> temporadaDe(DateTime fecha) async {
-    final dia = DateTime(fecha.year, fecha.month, fecha.day);
-    return (select(temporadas)..where(
-          (t) =>
-              t.inicio.isSmallerOrEqualValue(dia) &
-              t.fin.isBiggerOrEqualValue(dia),
-        ))
-        .getSingleOrNull();
-  }
+  /// Temporada de [cultivo] que contiene [fecha] (por día de calendario), o
+  /// `null`. Si hay una propia del cultivo, gana sobre la general (igual que
+  /// `TEMPORADA_DE` en backend/src/repo.ts).
+  Future<Temporada?> temporadaDe(DateTime fecha, {required String cultivo}) =>
+      (select(temporadas)
+            ..where((t) {
+              final dia = DateTime(fecha.year, fecha.month, fecha.day);
+              return t.inicio.isSmallerOrEqualValue(dia) &
+                  t.fin.isBiggerOrEqualValue(dia) &
+                  (t.cultivo.isNull() | t.cultivo.equals(cultivo));
+            })
+            ..orderBy([(t) => OrderingTerm.asc(t.cultivo.isNull())])
+            ..limit(1))
+          .getSingleOrNull();
+
+  /// Cultivos de la organización; solo café hasta la primera sincronización.
+  Stream<List<String>> observarCultivosOrganizacion() =>
+      select(cultivosOrganizacion).watch().map(
+        (filas) =>
+            filas.isEmpty ? const ['cafe'] : [for (final f in filas) f.id],
+      );
 
   Stream<List<Temporada>> observarTemporadas() => (select(
     temporadas,
@@ -254,7 +288,11 @@ class AppDatabase extends _$AppDatabase {
     String fincaId, {
     DateTime? hoy,
   }) async {
-    final t = await temporadaDe(hoy ?? DateTime.now());
+    final finca = await (select(
+      fincas,
+    )..where((f) => f.id.equals(fincaId))).getSingleOrNull();
+    if (finca == null) return false;
+    final t = await temporadaDe(hoy ?? DateTime.now(), cultivo: finca.cultivo);
     if (t == null) return false;
     final v =
         await (select(verificaciones)
@@ -300,7 +338,10 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
     }
-    final temporada = await temporadaDe(visita.fecha.value);
+    final temporada = await temporadaDe(
+      visita.fecha.value,
+      cultivo: finca.cultivo,
+    );
     await into(verificaciones).insert(
       visita.copyWith(
         versionFinca: Value(version),
@@ -472,10 +513,18 @@ class AppDatabase extends _$AppDatabase {
       final visitasLocales = {for (final v in sinEnviar.verificaciones) v.id};
       final entregasLocales = {for (final e in sinEnviar.entregas) e.id};
 
-      // Las temporadas solo las define el servidor: se reemplazan todas.
+      // Las temporadas y los cultivos solo los define el servidor: se
+      // reemplazan todos.
       await delete(temporadas).go();
       for (final t in d.temporadas) {
         await into(temporadas).insert(t);
+      }
+      if (d.cultivos != null) {
+        await delete(cultivosOrganizacion).go();
+        for (final c in d.cultivos!) {
+          await into(cultivosOrganizacion)
+              .insert(CultivosOrganizacionCompanion.insert(id: c));
+        }
       }
       for (final p in d.productores) {
         if (productoresLocales.contains(p.id.value)) continue;
@@ -528,7 +577,11 @@ class DatosServidor {
     required this.fincas,
     required this.verificaciones,
     required this.entregas,
+    this.cultivos,
   });
+
+  /// Cultivos de la organización; `null` si la respuesta no los trae.
+  final List<String>? cultivos;
   final List<TemporadasCompanion> temporadas;
   final List<ProductoresCompanion> productores;
   final List<FincasCompanion> fincas;

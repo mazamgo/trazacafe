@@ -106,7 +106,9 @@ class _VerificacionScreenState extends ConsumerState<VerificacionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final temporada = ref.watch(temporadaActualProvider);
+    final temporada = ref.watch(
+      temporadaActualDeProvider(widget.finca.cultivo),
+    );
     final falta = _falta;
 
     return Scaffold(

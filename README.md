@@ -1,8 +1,10 @@
 # TrazaCafé
 
-Trazabilidad de café nicaragüense para el reglamento europeo contra la deforestación (EUDR). Cada paso de la cadena de custodia (finca → entrega → lote → exportación) se registra como *attestation* de [EAS](https://attest.org) en OP Mainnet. El comprador lo verifica escaneando un QR.
+Trazabilidad de café y cacao nicaragüenses para el reglamento europeo contra la deforestación (EUDR). Cada paso de la cadena de custodia (finca → entrega → lote → exportación) se registra como *attestation* de [EAS](https://attest.org) en OP Mainnet. El comprador lo verifica escaneando un QR.
 
-Plan completo: [docs/plan-mvp-trazabilidad-cafe.md](docs/plan-mvp-trazabilidad-cafe.md)
+Planes:
+- [docs/plan-nicaragua-multicultivo.md](docs/plan-nicaragua-multicultivo.md): plan vigente (rentable en Nicaragua con café y cacao, después la región).
+- [docs/plan-mvp-trazabilidad-cafe.md](docs/plan-mvp-trazabilidad-cafe.md): MVP original.
 
 ## Estructura
 
@@ -10,7 +12,7 @@ Plan completo: [docs/plan-mvp-trazabilidad-cafe.md](docs/plan-mvp-trazabilidad-c
 |---|---|
 | `app/` | App Flutter: app de campo Android (funciona sin internet) y verificador público (Flutter Web) |
 | `backend/` | API Node.js + TypeScript (Fastify) para Cloud Run y worker de attestations |
-| `schemas/` | Esquemas EAS (fuente única en `schemas.json`) y script para registrarlos |
+| `schemas/` | Contratos compartidos por la API y la app: esquemas EAS (`schemas.json`), cultivos (`cultivos.json`) y vectores de prueba |
 | `infra/` | Comandos de Google Cloud (Cloud SQL, Cloud Run, KMS, Firebase) |
 | `docs/` | Plan y documentación |
 
@@ -31,7 +33,14 @@ cd backend && npm install && npm test
 
 # Esquemas EAS (ver los strings sin registrar nada)
 cd schemas && npm install && npm run register -- --dry-run
+
+# Después de cambiar schemas/cultivos.json: regenerar la lista para la app
+npm run cultivos-dart --workspace schemas
 ```
+
+## Cultivos
+
+Cada finca es de un cultivo (`cafe` o `cacao`). La configuración (nombre, código HS, estados de entrega y máximo de kg por entrega) está en `schemas/cultivos.json`. La API la lee directamente y la app la recibe como código generado (`app/lib/domain/cultivos_generados.dart`). Pruebas de contrato en ambos lados verifican que coincidan. Agregar un cultivo es, sobre todo, agregarlo a ese archivo y regenerar.
 
 ## Privacidad
 

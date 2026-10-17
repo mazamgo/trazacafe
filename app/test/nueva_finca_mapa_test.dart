@@ -12,7 +12,10 @@ void main() {
   testWidgets('Nueva finca se dibuja con el mapa de Google', (tester) async {
     final sesion = SesionMapa('sesion-prueba', DateTime.now().add(const Duration(days: 10)));
     await tester.pumpWidget(ProviderScope(
-      overrides: [sesionMapaProvider.overrideWith((ref) async => sesion)],
+      overrides: [
+        sesionMapaProvider.overrideWith((ref) async => sesion),
+        cultivosOrganizacionProvider.overrideWith((ref) => Stream.value(['cafe'])),
+      ],
       child: const MaterialApp(home: NuevaFincaScreen(productorId: 'p1')),
     ));
     await tester.pump();
@@ -22,5 +25,23 @@ void main() {
     expect(find.byType(FlutterMap), findsOneWidget);
     expect(find.text('Guardar finca'), findsOneWidget);
     expect(find.textContaining('Google'), findsOneWidget);
+    expect(find.text('Cacao'), findsNothing, reason: 'con un solo cultivo no se pregunta');
+  });
+
+  testWidgets('si la organización trabaja café y cacao, pregunta el cultivo', (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        sesionMapaProvider.overrideWith((ref) async => null),
+        cultivosOrganizacionProvider.overrideWith((ref) => Stream.value(['cafe', 'cacao'])),
+      ],
+      child: const MaterialApp(home: NuevaFincaScreen(productorId: 'p1')),
+    ));
+    await tester.pump();
+    expect(find.text('Café'), findsOneWidget);
+    expect(find.text('Cacao'), findsOneWidget);
+    await tester.tap(find.text('Cacao'));
+    await tester.pump();
+    final boton = tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>));
+    expect(boton.selected, {'cacao'});
   });
 }

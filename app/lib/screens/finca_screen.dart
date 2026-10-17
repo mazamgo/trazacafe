@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/database.dart';
+import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../widgets/seccion_fotos.dart';
 import 'verificacion_screen.dart';
@@ -15,14 +16,12 @@ class FincaScreen extends ConsumerWidget {
 
   final String fincaId;
 
-  static const estados = {'uva': 'Uva (café maduro)', 'pergamino': 'Pergamino'};
-
   Future<void> _nuevaEntrega(
     BuildContext context,
     WidgetRef ref,
     Finca finca,
   ) async {
-    final actual = ref.read(temporadaActualProvider);
+    final actual = ref.read(temporadaActualDeProvider(finca.cultivo));
     final visitas =
         ref.read(verificacionesProvider(fincaId)).value ??
         const <Verificacion>[];
@@ -69,11 +68,17 @@ class FincaScreen extends ConsumerWidget {
     final entrega = await showModalBottomSheet<EntregasCompanion>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _FormularioEntrega(fincaId: fincaId),
+      builder: (_) => _FormularioEntrega(
+        fincaId: fincaId,
+        cultivo: cultivoDe(finca.cultivo),
+      ),
     );
     if (entrega == null) return;
     final db = ref.read(databaseProvider);
-    final temporada = await db.temporadaDe(entrega.fecha.value);
+    final temporada = await db.temporadaDe(
+      entrega.fecha.value,
+      cultivo: finca.cultivo,
+    );
     await db
         .into(db.entregas)
         .insert(entrega.copyWith(temporadaId: Value(temporada?.id)));
@@ -100,7 +105,8 @@ class FincaScreen extends ConsumerWidget {
         const <Verificacion>[];
     final temporadas =
         ref.watch(temporadasProvider).value ?? const <Temporada>[];
-    final actual = ref.watch(temporadaActualProvider);
+    final cultivo = cultivoDe(finca?.cultivo ?? cultivoPorDefecto);
+    final actual = ref.watch(temporadaActualDeProvider(cultivo.id));
     final esAdmin = ref.watch(sesionProvider).value?.esAdmin ?? false;
 
     // Entregas por temporada, en el orden de las temporadas (más reciente primero).
@@ -129,7 +135,7 @@ class FincaScreen extends ConsumerWidget {
                 bottom: 96 + MediaQuery.paddingOf(context).bottom,
               ),
               children: [
-                _Resumen(finca: finca, esAdmin: esAdmin),
+                _Resumen(finca: finca, cultivo: cultivo, esAdmin: esAdmin),
                 _TarjetaVerificacion(
                   temporada: actual,
                   visitas: visitas,
@@ -164,7 +170,7 @@ class FincaScreen extends ConsumerWidget {
                     ListTile(
                       leading: const Icon(Icons.local_shipping_outlined),
                       title: Text(
-                        '${_kg(e.kg)} kg · ${estados[e.estado] ?? e.estado}',
+                        '${_kg(e.kg)} kg · ${cultivo.nombreEstado(e.estado)}',
                       ),
                       subtitle: Text(fechaHora(e.fecha)),
                       trailing: Icon(
@@ -219,9 +225,14 @@ class _EncabezadoTemporada extends StatelessWidget {
 }
 
 class _Resumen extends ConsumerWidget {
-  const _Resumen({required this.finca, required this.esAdmin});
+  const _Resumen({
+    required this.finca,
+    required this.cultivo,
+    required this.esAdmin,
+  });
 
   final Finca finca;
+  final Cultivo cultivo;
   final bool esAdmin;
 
   static const _satelite = {
@@ -266,6 +277,20 @@ class _Resumen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Icon(cultivo.icono, color: cultivo.colorUi, size: 20),
+                const SizedBox(width: 6),
+                Text(
+                  cultivo.nombre,
+                  style: TextStyle(
+                    color: cultivo.colorUi,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             Text(
               oficial != null
                   ? '${oficial.toStringAsFixed(2)} ha (área oficial)'
@@ -390,9 +415,10 @@ class _TarjetaVerificacion extends StatelessWidget {
 }
 
 class _FormularioEntrega extends StatefulWidget {
-  const _FormularioEntrega({required this.fincaId});
+  const _FormularioEntrega({required this.fincaId, required this.cultivo});
 
   final String fincaId;
+  final Cultivo cultivo;
 
   @override
   State<_FormularioEntrega> createState() => _FormularioEntregaState();
@@ -400,12 +426,9 @@ class _FormularioEntrega extends StatefulWidget {
 
 class _FormularioEntregaState extends State<_FormularioEntrega> {
   final _kg = TextEditingController();
-  String _estado = 'uva';
+  late String _estado = widget.cultivo.estados.first.id;
   DateTime _fecha = DateTime.now();
   String? _error;
-
-  /// Mismo límite que la API (backend/src/sync.ts).
-  static const _maxKg = 20000;
 
   @override
   void dispose() {
@@ -442,9 +465,12 @@ class _FormularioEntregaState extends State<_FormularioEntrega> {
       setState(() => _error = 'Escribe los kilos entregados.');
       return;
     }
-    if (kg > _maxKg) {
+    // Mismo límite que la API (cultivos.json).
+    final maximo = widget.cultivo.maxKgEntrega;
+    if (kg > maximo) {
       setState(
-        () => _error = 'Más de 20,000 kg en una entrega parece un error.',
+        () => _error =
+            'Más de ${_miles(maximo)} kg en una entrega parece un error.',
       );
       return;
     }
@@ -472,7 +498,10 @@ class _FormularioEntregaState extends State<_FormularioEntrega> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Nueva entrega', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'Nueva entrega de ${widget.cultivo.nombre.toLowerCase()}',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _kg,
@@ -487,11 +516,8 @@ class _FormularioEntregaState extends State<_FormularioEntrega> {
           const SizedBox(height: 12),
           SegmentedButton<String>(
             segments: [
-              for (final e in FincaScreen.estados.entries)
-                ButtonSegment(
-                  value: e.key,
-                  label: Text(e.key == 'uva' ? 'Uva' : 'Pergamino'),
-                ),
+              for (final e in widget.cultivo.estados)
+                ButtonSegment(value: e.id, label: Text(e.corto)),
             ],
             selected: {_estado},
             onSelectionChanged: (s) => setState(() => _estado = s.first),
@@ -514,3 +540,7 @@ class _FormularioEntregaState extends State<_FormularioEntrega> {
     );
   }
 }
+
+/// 20000 → "20,000".
+String _miles(int n) =>
+    n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');

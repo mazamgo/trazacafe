@@ -3,8 +3,8 @@ import { z } from "zod";
 import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
-import { AccesoDenegado, VersionDesfasada, type Repo } from "./repo.ts";
-import { syncSchema, temporadaSchema } from "./sync.ts";
+import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
+import { cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
 
 const invitacionSchema = z.object({
   email: z.email().transform((e) => e.toLowerCase()),
@@ -95,6 +95,7 @@ export function buildApp({
       await repo.guardarSync(usuario, datos.data);
     } catch (e) {
       if (e instanceof AccesoDenegado) return reply.code(403).send({ error: e.message });
+      if (e instanceof DatosInvalidos) return reply.code(422).send({ error: "datos_invalidos", mensaje: e.message });
       if (e instanceof VersionDesfasada) {
         return reply.code(409).send({ error: "version_desfasada", mensaje: e.message });
       }
@@ -113,6 +114,30 @@ export function buildApp({
     };
   });
 
+  app.get("/v1/organizacion", async (req, reply) => {
+    const usuario = await activo(req, reply);
+    if (!usuario) return;
+    return repo.organizacion(usuario.organizacionId);
+  });
+
+  /** Solo administradores: con qué cultivos trabaja la organización. */
+  app.put("/v1/organizacion/cultivos", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    const datos = cultivosOrganizacionSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const conFincas = await repo.actualizarCultivos(admin.organizacionId, [...new Set(datos.data.cultivos)]);
+    if (conFincas.length > 0) {
+      return reply.code(409).send({
+        error: "cultivo_con_fincas",
+        mensaje: `No se puede quitar ${conFincas.join(", ")}: ya tiene fincas registradas.`,
+      });
+    }
+    return repo.organizacion(admin.organizacionId);
+  });
+
   app.get("/v1/temporadas", async (req, reply) => {
     const usuario = await activo(req, reply);
     if (!usuario) return;
@@ -125,6 +150,13 @@ export function buildApp({
     const datos = temporadaSchema.safeParse(req.body);
     if (!datos.success) {
       return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const { cultivos } = await repo.organizacion(admin.organizacionId);
+    if (datos.data.cultivo && !cultivos.includes(datos.data.cultivo)) {
+      return reply.code(422).send({
+        error: "datos_invalidos",
+        mensaje: `La organización no trabaja ${datos.data.cultivo}; actívelo primero en Cultivos.`,
+      });
     }
     const t = await repo.crearTemporada(admin.organizacionId, { ...datos.data, id: crypto.randomUUID() }, admin.uid);
     if (!t) {

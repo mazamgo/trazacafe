@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database.dart';
+import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../services/fincas_service.dart';
 import '../widgets/seccion_fotos.dart';
@@ -89,10 +90,12 @@ class ProductorScreen extends ConsumerWidget {
                       separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (_, i) {
                         final f = lista[i];
+                        final cultivo = cultivoDe(f.cultivo);
                         return ListTile(
-                          leading: const Icon(Icons.agriculture),
+                          leading: Icon(cultivo.icono, color: cultivo.colorUi),
                           title: Text(f.nombre),
                           subtitle: Text(
+                            '${cultivo.nombre} · '
                             '${(f.areaOficialHa ?? f.areaHa).toStringAsFixed(2)} ha',
                           ),
                           onTap: () => Navigator.of(context).push(
