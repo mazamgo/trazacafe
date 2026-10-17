@@ -1,6 +1,7 @@
 import { convertirKg, cultivo, estadoValido } from "@trazacafe/eudr-eas-schemas";
 import type pg from "pg";
 import type { Rol, UsuarioActivo } from "./auth.ts";
+import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "./exportaciones.ts";
 import type { Aviso, EntregaCandidata, LoteNuevo } from "./lotes.ts";
 import type { LoteSync, TemporadaNueva } from "./sync.ts";
 
@@ -45,6 +46,8 @@ export interface Lote {
   avisos: Aviso[];
   attestationUid: string | null;
   creadoEn: string;
+  /** Código del contenedor en que va, o `null`. */
+  exportacionCodigo: string | null;
   entregas: {
     id: string;
     fincaId: string;
@@ -60,6 +63,28 @@ export type DatosLote = LoteNuevo & { id: string; beneficio: string; kgEsperados
 
 export type ResultadoGuardarLote = "creado" | "codigo_repetido" | "entrega_ocupada";
 export type ResultadoEliminarLote = "eliminado" | "no_encontrado" | "atestado";
+
+/** Contenedor de exportación con sus lotes y el resumen para el paquete EUDR. */
+export interface Exportacion {
+  id: string;
+  codigo: string;
+  cultivo: string;
+  comprador: string;
+  destino: string;
+  contenedor: string | null;
+  fechaEmbarque: string | null;
+  ddsRef: string | null;
+  estado: "abierta" | "cerrada";
+  attestationUid: string | null;
+  creadoEn: string;
+  kg: number;
+  lotes: { id: string; codigo: string; kg: number; estado: string; temporadaNombre: string }[];
+  /** Fincas de origen de todas sus entregas. */
+  resumen: { entregas: number; fincas: number; areaOficialHa: number; fincasSinVerde: number };
+}
+
+export type ResultadoGuardarExportacion = "creada" | "codigo_repetido" | "lote_ocupado";
+export type ResultadoCambiarExportacion = "cambiada" | "no_encontrada" | "cerrada";
 
 export interface Temporada {
   id: string;
@@ -187,6 +212,20 @@ export interface Repo {
   listarLotes(organizacionId: string): Promise<Lote[]>;
   /** Deshace un lote que todavía no está en la blockchain; sus entregas quedan libres. */
   eliminarLote(organizacionId: string, loteId: string): Promise<ResultadoEliminarLote>;
+
+  /** Lotes de la organización con [ids], con el contenedor en que ya van. */
+  lotesCandidatos(organizacionId: string, ids: string[]): Promise<LoteCandidato[]>;
+  guardarExportacion(
+    organizacionId: string,
+    uid: string,
+    x: ExportacionNueva & { id: string; cultivo: string },
+  ): Promise<ResultadoGuardarExportacion>;
+  /** Del más reciente al más antiguo. */
+  listarExportaciones(organizacionId: string): Promise<Exportacion[]>;
+  /** Solo mientras el contenedor está abierto. */
+  actualizarExportacion(organizacionId: string, id: string, cambios: CambiosExportacion): Promise<ResultadoCambiarExportacion>;
+  /** Deshace un contenedor abierto; sus lotes quedan libres. */
+  eliminarExportacion(organizacionId: string, id: string): Promise<ResultadoCambiarExportacion>;
 
   /** Todo lo de la organización, para que cada celular vea lo del equipo. */
   datosOrganizacion(organizacionId: string): Promise<DatosOrganizacion>;
@@ -615,6 +654,8 @@ export class PgRepo implements Repo {
       `SELECT l.id, l.codigo, l.cultivo, l.temporada_id AS "temporadaId", t.nombre AS "temporadaNombre", l.estado,
               l.kg::float8 AS kg, l.kg_esperados::float8 AS "kgEsperados", l.beneficio, l.proceso, l.avisos,
               l.attestation_uid AS "attestationUid", l.creado_en AS "creadoEn",
+              (SELECT x.codigo FROM exportacion_lotes el JOIN exportaciones x ON x.id = el.exportacion_id
+                WHERE el.lote_id = l.id) AS "exportacionCodigo",
               coalesce(json_agg(json_build_object(
                 'id', e.id, 'fincaId', f.id, 'fincaNombre', f.nombre, 'productorNombre', p.nombre,
                 'kg', e.kg::float8, 'estado', e.estado, 'fecha', e.fecha
@@ -655,6 +696,135 @@ export class PgRepo implements Repo {
       await client.query("DELETE FROM lotes WHERE id = $1", [loteId]);
       await client.query("COMMIT");
       return "eliminado";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async lotesCandidatos(organizacionId: string, ids: string[]): Promise<LoteCandidato[]> {
+    const { rows } = await this.pool.query<LoteCandidato>(
+      `SELECT l.id, l.codigo, l.cultivo, x.codigo AS "exportacionCodigo"
+       FROM lotes l
+       LEFT JOIN exportacion_lotes el ON el.lote_id = l.id
+       LEFT JOIN exportaciones x ON x.id = el.exportacion_id
+       WHERE l.organizacion_id = $1 AND l.id = ANY($2::uuid[])`,
+      [organizacionId, ids],
+    );
+    return rows;
+  }
+
+  async guardarExportacion(
+    organizacionId: string,
+    uid: string,
+    x: ExportacionNueva & { id: string; cultivo: string },
+  ): Promise<ResultadoGuardarExportacion> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO exportaciones (id, organizacion_id, codigo, cultivo, comprador, destino, contenedor,
+                                    fecha_embarque, creado_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [x.id, organizacionId, x.codigo, x.cultivo, x.comprador, x.destino, x.contenedor ?? null,
+         x.fechaEmbarque ?? null, uid],
+      );
+      await client.query(
+        "INSERT INTO exportacion_lotes (exportacion_id, lote_id) SELECT $1, unnest($2::uuid[])",
+        [x.id, x.lotes],
+      );
+      await client.query("COMMIT");
+      return "creada";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      const restriccion = (e as { constraint?: string }).constraint;
+      if (restriccion === "exportaciones_codigo_unico") return "codigo_repetido";
+      if (restriccion === "exportacion_lotes_lote_unico") return "lote_ocupado";
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listarExportaciones(organizacionId: string): Promise<Exportacion[]> {
+    const { rows } = await this.pool.query(
+      `SELECT x.id, x.codigo, x.cultivo, x.comprador, x.destino, x.contenedor,
+              to_char(x.fecha_embarque, 'YYYY-MM-DD') AS "fechaEmbarque", x.dds_ref AS "ddsRef", x.estado,
+              x.attestation_uid AS "attestationUid", x.creado_en AS "creadoEn",
+              coalesce((SELECT sum(l.kg)::float8 FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
+                        WHERE el.exportacion_id = x.id), 0) AS kg,
+              coalesce((SELECT json_agg(json_build_object(
+                          'id', l.id, 'codigo', l.codigo, 'kg', l.kg::float8, 'estado', l.estado,
+                          'temporadaNombre', t.nombre) ORDER BY l.codigo)
+                        FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
+                        JOIN temporadas t ON t.id = l.temporada_id
+                        WHERE el.exportacion_id = x.id), '[]') AS lotes,
+              (SELECT json_build_object(
+                        'entregas', count(DISTINCT e.id),
+                        'fincas', count(DISTINCT f.id),
+                        'fincasSinVerde', count(DISTINCT f.id) FILTER (WHERE f.deforestacion <> 'verde'))
+               FROM exportacion_lotes el JOIN lote_entregas le ON le.lote_id = el.lote_id
+               JOIN entregas e ON e.id = le.entrega_id JOIN fincas f ON f.id = e.finca_id
+               WHERE el.exportacion_id = x.id) AS resumen,
+              (SELECT coalesce(sum(f.area_oficial_ha), 0)::float8 FROM fincas f WHERE f.id IN (
+                 SELECT e.finca_id FROM exportacion_lotes el JOIN lote_entregas le ON le.lote_id = el.lote_id
+                 JOIN entregas e ON e.id = le.entrega_id WHERE el.exportacion_id = x.id)) AS "areaOficialHa"
+       FROM exportaciones x
+       WHERE x.organizacion_id = $1
+       ORDER BY x.creado_en DESC`,
+      [organizacionId],
+    );
+    return rows.map(({ areaOficialHa, ...r }) => ({
+      ...r,
+      creadoEn: new Date(r.creadoEn).toISOString(),
+      resumen: { ...r.resumen, areaOficialHa },
+    }));
+  }
+
+  async actualizarExportacion(
+    organizacionId: string,
+    id: string,
+    c: CambiosExportacion,
+  ): Promise<ResultadoCambiarExportacion> {
+    const columnas: Record<keyof CambiosExportacion, string> = {
+      comprador: "comprador",
+      destino: "destino",
+      contenedor: "contenedor",
+      fechaEmbarque: "fecha_embarque",
+      ddsRef: "dds_ref",
+    };
+    const campos = (Object.keys(c) as (keyof CambiosExportacion)[]).filter((k) => c[k] !== undefined);
+    const sets = campos.map((k, i) => `${columnas[k]} = $${i + 3}`).join(", ");
+    const { rows } = await this.pool.query<{ estado: string; cambiada: boolean }>(
+      `WITH actual AS (SELECT id, estado FROM exportaciones WHERE id = $1 AND organizacion_id = $2),
+            cambio AS (UPDATE exportaciones SET ${sets}
+                       WHERE id = (SELECT id FROM actual WHERE estado = 'abierta') RETURNING id)
+       SELECT a.estado, EXISTS (SELECT 1 FROM cambio) AS cambiada FROM actual a`,
+      [id, organizacionId, ...campos.map((k) => c[k] ?? null)],
+    );
+    if (rows.length === 0) return "no_encontrada";
+    return rows[0].cambiada ? "cambiada" : "cerrada";
+  }
+
+  async eliminarExportacion(organizacionId: string, id: string): Promise<ResultadoCambiarExportacion> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query<{ abierta: boolean }>(
+        `SELECT estado = 'abierta' AND attestation_uid IS NULL AS abierta
+         FROM exportaciones WHERE id = $1 AND organizacion_id = $2 FOR UPDATE`,
+        [id, organizacionId],
+      );
+      if (rows.length === 0 || !rows[0].abierta) {
+        await client.query("ROLLBACK");
+        return rows.length === 0 ? "no_encontrada" : "cerrada";
+      }
+      await client.query("DELETE FROM exportacion_lotes WHERE exportacion_id = $1", [id]);
+      await client.query("DELETE FROM exportaciones WHERE id = $1", [id]);
+      await client.query("COMMIT");
+      return "cambiada";
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;

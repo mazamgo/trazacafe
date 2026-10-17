@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
+import 'contenedores_screen.dart';
 import 'cultivos_screen.dart';
 import 'equipo_screen.dart';
 import 'lotes_screen.dart';
@@ -59,6 +60,15 @@ class ProductoresScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const LotesScreen()),
                   ),
                   child: const Text('Lotes'),
+                ),
+              if (sesion?.esAdmin ?? false)
+                PopupMenuItem(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ContenedoresScreen(),
+                    ),
+                  ),
+                  child: const Text('Contenedores'),
                 ),
               PopupMenuItem(
                 onTap: () => ref.read(authServiceProvider).cerrarSesion(),

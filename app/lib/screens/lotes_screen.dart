@@ -139,7 +139,7 @@ class LotesScreen extends ConsumerWidget {
                     for (final l in lista)
                       _TarjetaLote(
                         lote: l,
-                        onDeshacer: l.atestado
+                        onDeshacer: l.atestado || l.exportacionCodigo != null
                             ? null
                             : () => _deshacer(context, ref, l),
                       ),
@@ -224,6 +224,8 @@ class _TarjetaLote extends StatelessWidget {
             ),
           if (lote.atestado)
             const Text('Registrado en la blockchain ✓')
+          else if (lote.exportacionCodigo != null)
+            Text('Va en el contenedor ${lote.exportacionCodigo}.')
           else
             Align(
               alignment: Alignment.centerRight,

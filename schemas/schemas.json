@@ -21,7 +21,7 @@
   },
   "Exportacion": {
     "descripcion": "Contenedor de exportación con sus lotes y la referencia de la DDS en TRACES.",
-    "schema": "bytes32 exportacionId,bytes32[] lotesUIDs,string contenedor,string destino,string ddsRef",
+    "schema": "bytes32 exportacionId,string cultivo,bytes32[] lotesUIDs,uint32 kg,string contenedor,string destino,string ddsRef",
     "revocable": true
   }
 }

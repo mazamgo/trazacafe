@@ -4,6 +4,7 @@ import { rutaFoto, sha256Hex, type Almacen } from "../src/almacen.ts";
 import { buildApp } from "../src/app.ts";
 import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
 import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/deforestacion.ts";
+import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "../src/exportaciones.ts";
 import type { EntregaCandidata } from "../src/lotes.ts";
 import {
   AccesoDenegado,
@@ -14,6 +15,7 @@ import {
   type Chequeo,
   type DatosLote,
   type DatosOrganizacion,
+  type Exportacion,
   type FincaPorRevisar,
   type Invitacion,
   type Lote,
@@ -113,8 +115,58 @@ class RepoMemoria implements Repo {
         avisos: l.avisos,
         attestationUid: null,
         creadoEn: "2026-10-16T20:00:00.000Z",
+        exportacionCodigo: null,
         entregas: [],
       }));
+  }
+  /** Lotes de ORG que pueden ir en contenedores. */
+  lotesLibres: LoteCandidato[] = [];
+  exportaciones: (ExportacionNueva & { id: string; cultivo: string; organizacionId: string; estado: "abierta" | "cerrada"; ddsRef?: string | null })[] = [];
+  async lotesCandidatos(organizacionId: string, ids: string[]) {
+    if (organizacionId !== ORG) return [];
+    return this.lotesLibres
+      .filter((l) => ids.includes(l.id))
+      .map((l) => ({ ...l, exportacionCodigo: l.exportacionCodigo ?? this.exportaciones.find((x) => x.lotes.includes(l.id))?.codigo ?? null }));
+  }
+  async guardarExportacion(organizacionId: string, _uid: string, x: ExportacionNueva & { id: string; cultivo: string }) {
+    if (this.exportaciones.some((e) => e.organizacionId === organizacionId && e.codigo === x.codigo)) return "codigo_repetido" as const;
+    if (this.exportaciones.some((e) => e.lotes.some((l) => x.lotes.includes(l)))) return "lote_ocupado" as const;
+    this.exportaciones.push({ ...x, organizacionId, estado: "abierta" });
+    return "creada" as const;
+  }
+  async listarExportaciones(organizacionId: string): Promise<Exportacion[]> {
+    return this.exportaciones
+      .filter((x) => x.organizacionId === organizacionId)
+      .map((x) => ({
+        id: x.id,
+        codigo: x.codigo,
+        cultivo: x.cultivo,
+        comprador: x.comprador,
+        destino: x.destino,
+        contenedor: x.contenedor ?? null,
+        fechaEmbarque: x.fechaEmbarque ?? null,
+        ddsRef: x.ddsRef ?? null,
+        estado: x.estado,
+        attestationUid: null,
+        creadoEn: "2026-10-16T20:00:00.000Z",
+        kg: 0,
+        lotes: [],
+        resumen: { entregas: 0, fincas: 0, areaOficialHa: 0, fincasSinVerde: 0 },
+      }));
+  }
+  async actualizarExportacion(organizacionId: string, id: string, c: CambiosExportacion) {
+    const x = this.exportaciones.find((e) => e.id === id && e.organizacionId === organizacionId);
+    if (!x) return "no_encontrada" as const;
+    if (x.estado === "cerrada") return "cerrada" as const;
+    Object.assign(x, c);
+    return "cambiada" as const;
+  }
+  async eliminarExportacion(organizacionId: string, id: string) {
+    const i = this.exportaciones.findIndex((e) => e.id === id && e.organizacionId === organizacionId);
+    if (i < 0) return "no_encontrada" as const;
+    if (this.exportaciones[i].estado === "cerrada") return "cerrada" as const;
+    this.exportaciones.splice(i, 1);
+    return "cambiada" as const;
   }
   async eliminarLote(organizacionId: string, loteId: string) {
     const i = this.lotes.findIndex((l) => l.id === loteId && l.organizacionId === organizacionId);
@@ -263,7 +315,7 @@ function crearApp({ conSatelite = true } = {}) {
 
 type App = ReturnType<typeof crearApp>["app"];
 
-const pedir = (app: App, method: "GET" | "POST" | "PUT" | "DELETE", url: string, token: string, payload?: unknown) =>
+const pedir = (app: App, method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: string, token: string, payload?: unknown) =>
   app.inject({ method, url, headers: { authorization: `Bearer ${token}` }, payload: payload as object });
 
 describe("POST /v1/sync", () => {
@@ -791,6 +843,68 @@ describe("/v1/lotes", () => {
     const res = await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "tecnico");
     expect(res.statusCode).toBe(409);
     expect(res.json().error).toBe("en_lote");
+  });
+});
+
+describe("/v1/exportaciones", () => {
+  const L1 = "55555555-5555-4555-8555-555555555551";
+  const L2 = "55555555-5555-4555-8555-555555555552";
+  const L3 = "55555555-5555-4555-8555-555555555553";
+  function preparar() {
+    const c = crearApp();
+    c.repo.lotesLibres.push(
+      { id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null },
+      { id: L2, codigo: "CAFE-002", cultivo: "cafe", exportacionCodigo: null },
+      { id: L3, codigo: "CACAO-001", cultivo: "cacao", exportacionCodigo: null },
+    );
+    return c;
+  }
+  const nueva = (lotes: string[], p: object = {}) => ({
+    codigo: "EXP-2026-001", comprador: "Tostador GmbH", destino: "Hamburgo, Alemania", lotes, ...p,
+  });
+
+  it("el administrador arma un contenedor con lotes de café; el cultivo sale de los lotes", async () => {
+    const { app, repo } = preparar();
+    const res = await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L1, L2], { contenedor: "csqu3054383" }));
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ codigo: "EXP-2026-001", cultivo: "cafe", contenedor: "CSQU3054383", estado: "abierta" });
+    expect(repo.exportaciones[0].lotes).toEqual([L1, L2]);
+    expect((await pedir(app, "GET", "/v1/exportaciones", "admin")).json().exportaciones).toHaveLength(1);
+  });
+
+  it("rechaza mezclar cultivos, lotes ya embarcados y números de contenedor inválidos", async () => {
+    const { app } = preparar();
+    const mezcla = await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L1, L3]));
+    expect(mezcla.statusCode).toBe(422);
+    expect(mezcla.json().mensaje).toContain("un solo cultivo");
+    expect((await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L1], { contenedor: "CSQU3054384" }))).statusCode).toBe(422);
+    expect((await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L1]))).statusCode).toBe(201);
+    const otraVez = await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L1], { codigo: "EXP-2026-002" }));
+    expect(otraVez.statusCode).toBe(422);
+    expect(otraVez.json().mensaje).toContain("EXP-2026-001");
+    expect((await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L2]))).statusCode).toBe(409);
+  });
+
+  it("completa el número de contenedor y la DDS después; cerrado ya no cambia", async () => {
+    const { app, repo } = preparar();
+    const id = (await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L1]))).json().id;
+    const res = await pedir(app, "PATCH", `/v1/exportaciones/${id}`, "admin", { contenedor: "CSQU3054383", ddsRef: "26NI000123" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ contenedor: "CSQU3054383", ddsRef: "26NI000123" });
+    expect((await pedir(app, "PATCH", `/v1/exportaciones/${id}`, "admin", {})).statusCode).toBe(422);
+    repo.exportaciones[0].estado = "cerrada";
+    expect((await pedir(app, "PATCH", `/v1/exportaciones/${id}`, "admin", { destino: "Amberes" })).statusCode).toBe(409);
+    expect((await pedir(app, "DELETE", `/v1/exportaciones/${id}`, "admin")).statusCode).toBe(409);
+  });
+
+  it("deshace un contenedor abierto y solo los administradores lo usan", async () => {
+    const { app, repo } = preparar();
+    const id = (await pedir(app, "POST", "/v1/exportaciones", "admin", nueva([L1]))).json().id;
+    expect((await pedir(app, "GET", "/v1/exportaciones", "tecnico")).statusCode).toBe(403);
+    expect((await pedir(app, "DELETE", `/v1/exportaciones/${id}`, "tecnico")).statusCode).toBe(403);
+    expect((await pedir(app, "DELETE", `/v1/exportaciones/${id}`, "admin")).statusCode).toBe(204);
+    expect(repo.exportaciones).toHaveLength(0);
+    expect((await pedir(app, "DELETE", `/v1/exportaciones/${id}`, "admin")).statusCode).toBe(404);
   });
 });
 

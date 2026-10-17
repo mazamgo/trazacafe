@@ -3,6 +3,7 @@ import { z } from "zod";
 import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
+import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
 import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
@@ -374,6 +375,71 @@ export function buildApp({
         mensaje: "El lote ya está en la blockchain o en un contenedor; no se puede deshacer.",
       });
     }
+    return reply.code(204).send();
+  });
+
+  /** Contenedores de exportación (solo administradores). */
+  app.get("/v1/exportaciones", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    return { exportaciones: await repo.listarExportaciones(admin.organizacionId) };
+  });
+
+  app.post("/v1/exportaciones", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    const datos = exportacionSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const x = datos.data;
+    const { cultivo, rechazos } = evaluarExportacion(x.lotes, await repo.lotesCandidatos(admin.organizacionId, x.lotes));
+    if (!cultivo) {
+      return reply.code(422).send({
+        error: "lotes_excluidos",
+        mensaje: `${rechazos.length === 1 ? "Un lote no puede" : `${rechazos.length} lotes no pueden`} ir en el contenedor: ${rechazos[0].motivo}.`,
+        rechazos,
+      });
+    }
+    const id = crypto.randomUUID();
+    const r = await repo.guardarExportacion(admin.organizacionId, admin.uid, { ...x, id, cultivo });
+    if (r === "codigo_repetido") {
+      return reply.code(409).send({ error: "codigo_repetido", mensaje: `Ya existe un contenedor con el código ${x.codigo}.` });
+    }
+    if (r === "lote_ocupado") {
+      return reply.code(409).send({ error: "lote_ocupado", mensaje: "Otra persona acaba de poner uno de esos lotes en otro contenedor." });
+    }
+    const exportacion = (await repo.listarExportaciones(admin.organizacionId)).find((e) => e.id === id);
+    return reply.code(201).send(exportacion);
+  });
+
+  const respuestaCerrada = {
+    error: "cerrada",
+    mensaje: "El contenedor ya está cerrado para el paquete EUDR; no se puede cambiar.",
+  };
+
+  /** Completa o corrige datos (número de contenedor, DDS...) mientras está abierto. */
+  app.patch<{ Params: { id: string } }>("/v1/exportaciones/:id", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrada" });
+    const cambios = cambiosExportacionSchema.safeParse(req.body);
+    if (!cambios.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: cambios.error.issues });
+    }
+    const r = await repo.actualizarExportacion(admin.organizacionId, req.params.id, cambios.data);
+    if (r === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
+    if (r === "cerrada") return reply.code(409).send(respuestaCerrada);
+    return (await repo.listarExportaciones(admin.organizacionId)).find((e) => e.id === req.params.id);
+  });
+
+  app.delete<{ Params: { id: string } }>("/v1/exportaciones/:id", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrada" });
+    const r = await repo.eliminarExportacion(admin.organizacionId, req.params.id);
+    if (r === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
+    if (r === "cerrada") return reply.code(409).send(respuestaCerrada);
     return reply.code(204).send();
   });
 

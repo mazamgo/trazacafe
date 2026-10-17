@@ -165,6 +165,11 @@ final lotesProvider = FutureProvider.autoDispose<List<Lote>>(
   (ref) => ref.watch(apiProvider).lotes(),
 );
 
+/// Contenedores de exportación (solo administradores; requiere señal).
+final exportacionesProvider = FutureProvider.autoDispose<List<Exportacion>>(
+  (ref) => ref.watch(apiProvider).exportaciones(),
+);
+
 /// Equipo de la organización (solo administradores; requiere señal).
 final invitacionesProvider = FutureProvider.autoDispose<List<Invitacion>>(
   (ref) => ref.watch(apiProvider).invitaciones(),

@@ -100,7 +100,8 @@ Es la parte que **paga el cliente**.
 **Avance:**
 - **Lotes: hechos** (migración 009, pantalla Lotes para administradores). Detalle de reglas y avisos en `infra/README.md` §4f.
 - Los factores de rendimiento por estado (`cultivos.json`) son aproximados y se validan con el piloto.
-- Siguen contenedores, paquete EUDR, attestations y verificador.
+- **Contenedores: hechos** (migración 010, pantalla Contenedores). Detalle en `infra/README.md` §4g.
+- Siguen el paquete EUDR (cierre del contenedor, GeoJSON para TRACES y PDF), las attestations y el verificador.
 
 - **Lotes** (beneficio o centro de acopio):
   - Agrupar entregas de un mismo cultivo y temporada.

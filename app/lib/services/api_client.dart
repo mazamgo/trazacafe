@@ -102,6 +102,7 @@ class Lote {
     required this.atestado,
     required this.creadoEn,
     required this.entregas,
+    this.exportacionCodigo,
   });
 
   factory Lote.desdeJson(Map<String, dynamic> j) => Lote(
@@ -119,6 +120,7 @@ class Lote {
         AvisoLote(a['codigo'] as String, a['mensaje'] as String),
     ],
     atestado: j['attestationUid'] != null,
+    exportacionCodigo: j['exportacionCodigo'] as String?,
     creadoEn: DateTime.parse(j['creadoEn'] as String).toLocal(),
     entregas: [
       for (final e in (j['entregas'] as List? ?? const []).cast<Map>())
@@ -147,8 +149,88 @@ class Lote {
 
   /// Ya está en la blockchain: no se puede deshacer.
   final bool atestado;
+
+  /// Contenedor en que va, o `null` si está libre.
+  final String? exportacionCodigo;
   final DateTime creadoEn;
   final List<EntregaDeLote> entregas;
+}
+
+/// Contenedor de exportación (`GET /v1/exportaciones`).
+class Exportacion {
+  Exportacion({
+    required this.id,
+    required this.codigo,
+    required this.cultivo,
+    required this.comprador,
+    required this.destino,
+    required this.contenedor,
+    required this.fechaEmbarque,
+    required this.ddsRef,
+    required this.abierta,
+    required this.kg,
+    required this.lotes,
+    required this.entregas,
+    required this.fincas,
+    required this.areaOficialHa,
+    required this.fincasSinVerde,
+  });
+
+  factory Exportacion.desdeJson(Map<String, dynamic> j) {
+    final r = j['resumen'] as Map<String, dynamic>;
+    return Exportacion(
+      id: j['id'] as String,
+      codigo: j['codigo'] as String,
+      cultivo: j['cultivo'] as String,
+      comprador: j['comprador'] as String,
+      destino: j['destino'] as String,
+      contenedor: j['contenedor'] as String?,
+      fechaEmbarque: j['fechaEmbarque'] == null
+          ? null
+          : DateTime.parse(j['fechaEmbarque'] as String),
+      ddsRef: j['ddsRef'] as String?,
+      abierta: j['estado'] == 'abierta',
+      kg: (j['kg'] as num).toDouble(),
+      lotes: [
+        for (final l in (j['lotes'] as List).cast<Map>())
+          (
+            codigo: l['codigo'] as String,
+            kg: (l['kg'] as num).toDouble(),
+            estado: l['estado'] as String,
+            temporada: l['temporadaNombre'] as String,
+          ),
+      ],
+      entregas: r['entregas'] as int,
+      fincas: r['fincas'] as int,
+      areaOficialHa: (r['areaOficialHa'] as num).toDouble(),
+      fincasSinVerde: r['fincasSinVerde'] as int,
+    );
+  }
+
+  final String id;
+  final String codigo;
+  final String cultivo;
+  final String comprador;
+  final String destino;
+
+  /// Número ISO 6346; suele llegar después de armarlo.
+  final String? contenedor;
+  final DateTime? fechaEmbarque;
+
+  /// Referencia de la declaración de diligencia debida en TRACES.
+  final String? ddsRef;
+
+  /// Abierta: se puede editar o deshacer.
+  final bool abierta;
+  final double kg;
+  final List<({String codigo, double kg, String estado, String temporada})>
+  lotes;
+  final int entregas;
+  final int fincas;
+  final double areaOficialHa;
+
+  /// Fincas de origen sin chequeo satelital verde (el paquete EUDR las pide).
+  final int fincasSinVerde;
 }
 
 class ApiClient {
@@ -279,6 +361,51 @@ class ApiClient {
   /// Deshace un lote que aún no está en la blockchain.
   Future<void> eliminarLote(String id) =>
       _pedir('DELETE', '/v1/lotes/${Uri.encodeComponent(id)}');
+
+  /// Contenedores de la organización (solo administradores).
+  Future<List<Exportacion>> exportaciones() async {
+    final r = await _pedir('GET', '/v1/exportaciones');
+    return [
+      for (final x in r['exportaciones'] as List)
+        Exportacion.desdeJson(x as Map<String, dynamic>),
+    ];
+  }
+
+  /// Arma un contenedor con lotes de un mismo cultivo.
+  Future<Exportacion> crearExportacion({
+    required String codigo,
+    required String comprador,
+    required String destino,
+    required List<String> lotes,
+    String? contenedor,
+    String? fechaEmbarque,
+  }) async => Exportacion.desdeJson(
+    await _pedir('POST', '/v1/exportaciones', {
+      'codigo': codigo,
+      'comprador': comprador,
+      'destino': destino,
+      'lotes': lotes,
+      'contenedor': ?contenedor,
+      'fechaEmbarque': ?fechaEmbarque,
+    }),
+  );
+
+  /// Corrige o completa datos de un contenedor abierto. Un valor `null` en
+  /// [cambios] borra ese dato.
+  Future<Exportacion> cambiarExportacion(
+    String id,
+    Map<String, Object?> cambios,
+  ) async => Exportacion.desdeJson(
+    await _pedir(
+      'PATCH',
+      '/v1/exportaciones/${Uri.encodeComponent(id)}',
+      cambios,
+    ),
+  );
+
+  /// Deshace un contenedor abierto; sus lotes quedan libres.
+  Future<void> eliminarExportacion(String id) =>
+      _pedir('DELETE', '/v1/exportaciones/${Uri.encodeComponent(id)}');
 
   Future<List<Invitacion>> invitaciones() async {
     final r = await _pedir('GET', '/v1/invitaciones');

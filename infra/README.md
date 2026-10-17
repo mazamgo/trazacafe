@@ -173,6 +173,18 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - **Deshacer:** un lote que no está en la blockchain ni en un contenedor se puede deshacer, y sus entregas quedan libres. Una finca con entregas en un lote no se puede borrar.
 - Cada lote encola su attestation (`Lote`). El esquema EAS ahora incluye cultivo, temporada y estado.
 
+## 4g. Contenedores (Fase 2)
+
+- **Quién:** solo administradores, desde el menú ⋮ → **Contenedores**. Necesita señal.
+- **Reglas** (`backend/src/exportaciones.ts`):
+  - un contenedor lleva lotes de **un solo cultivo**, y un lote va a un solo contenedor;
+  - un lote embarcado ya no se puede deshacer.
+- **Datos:** código interno, comprador y destino. El número de contenedor (ISO 6346, con el **dígito de control validado**), la fecha de embarque y la referencia de la DDS de TRACES se pueden completar después.
+- **Estados:**
+  - **abierto:** se edita o se deshace, y sus lotes quedan libres;
+  - **cerrado:** ya no cambia. Se cierra en el paso del paquete EUDR, que exigirá todas las fincas en verde y encolará la attestation `Exportacion`.
+- **Resumen de origen** para el paquete: fincas, hectáreas oficiales, entregas y cuántas fincas no tienen chequeo satelital verde.
+
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints:
@@ -180,6 +192,7 @@ Endpoints:
 - Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`, `PUT /v1/fincas/:id/cultivo`.
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
 - Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `DELETE /v1/lotes/:id`.
+- Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`.
 
