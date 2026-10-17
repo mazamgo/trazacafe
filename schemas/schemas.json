@@ -15,8 +15,8 @@
     "revocable": true
   },
   "Lote": {
-    "descripcion": "Lote de pergamino u oro formado por varias entregas.",
-    "schema": "bytes32 loteId,bytes32[] entregasUIDs,uint32 kg,string beneficio,string proceso",
+    "descripcion": "Lote del beneficio o centro de acopio (p. ej. café pergamino o cacao seco) formado por entregas de un cultivo y una temporada.",
+    "schema": "bytes32 loteId,string cultivo,string temporada,bytes32[] entregasUIDs,uint32 kg,string estado,string beneficio,string proceso",
     "revocable": true
   },
   "Exportacion": {

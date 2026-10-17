@@ -20,8 +20,9 @@ const cuerpo = cultivos
     codigoHS: ${dart(c.codigoHS)},
     color: 0xFF${c.color.slice(1).toUpperCase()},
     maxKgEntrega: ${c.maxKgEntrega},
+    maxKgExportableHa: ${c.maxKgExportableHa},
     estados: [
-${c.estados.map((e) => `      EstadoEntrega(id: ${dart(e.id)}, nombre: ${dart(e.nombre)}, corto: ${dart(e.corto)}),`).join("\n")}
+${c.estados.map((e) => `      EstadoEntrega(id: ${dart(e.id)}, nombre: ${dart(e.nombre)}, corto: ${dart(e.corto)}, factorExportable: ${e.factorExportable.toFixed(2)}),`).join("\n")}
     ],
   ),`,
   )

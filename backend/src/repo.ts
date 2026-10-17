@@ -1,6 +1,7 @@
-import { cultivo, estadoValido } from "@trazacafe/eudr-eas-schemas";
+import { convertirKg, cultivo, estadoValido } from "@trazacafe/eudr-eas-schemas";
 import type pg from "pg";
 import type { Rol, UsuarioActivo } from "./auth.ts";
+import type { Aviso, EntregaCandidata, LoteNuevo } from "./lotes.ts";
 import type { LoteSync, TemporadaNueva } from "./sync.ts";
 
 export class AccesoDenegado extends Error {}
@@ -22,11 +23,43 @@ export interface Invitacion {
 }
 
 export interface ResultadoEliminarFinca {
-  estado: "eliminada" | "no_encontrada" | "atestada";
+  /** `en_lote`: alguna de sus entregas ya está en un lote. */
+  estado: "eliminada" | "no_encontrada" | "atestada" | "en_lote";
   archivos: string[];
 }
 
 export type ResultadoCambiarCultivo = "cambiado" | "no_encontrada" | "con_entregas" | "atestada";
+
+/** Lote ya guardado, con sus entregas, para la pantalla Lotes. */
+export interface Lote {
+  id: string;
+  codigo: string;
+  cultivo: string;
+  temporadaId: string;
+  temporadaNombre: string;
+  estado: string;
+  kg: number;
+  kgEsperados: number;
+  beneficio: string;
+  proceso: string | null;
+  avisos: Aviso[];
+  attestationUid: string | null;
+  creadoEn: string;
+  entregas: {
+    id: string;
+    fincaId: string;
+    fincaNombre: string;
+    productorNombre: string;
+    kg: number;
+    estado: string;
+    fecha: string;
+  }[];
+}
+
+export type DatosLote = LoteNuevo & { id: string; beneficio: string; kgEsperados: number; avisos: Aviso[] };
+
+export type ResultadoGuardarLote = "creado" | "codigo_repetido" | "entrega_ocupada";
+export type ResultadoEliminarLote = "eliminado" | "no_encontrado" | "atestado";
 
 export interface Temporada {
   id: string;
@@ -139,6 +172,21 @@ export interface Repo {
    * reasignan a la temporada que les toca con el cultivo nuevo.
    */
   cambiarCultivoFinca(organizacionId: string, fincaId: string, cultivo: string): Promise<ResultadoCambiarCultivo>;
+
+  /**
+   * Entregas de la organización con lo necesario para armar lotes: las de
+   * [ids], o todas las de un cultivo y temporada.
+   */
+  entregasCandidatas(
+    organizacionId: string,
+    filtro: { ids: string[] } | { cultivo: string; temporadaId: string },
+  ): Promise<EntregaCandidata[]>;
+  /** Guarda el lote ya evaluado y encola su attestation. */
+  guardarLote(organizacionId: string, uid: string, lote: DatosLote): Promise<ResultadoGuardarLote>;
+  /** Del más reciente al más antiguo. */
+  listarLotes(organizacionId: string): Promise<Lote[]>;
+  /** Deshace un lote que todavía no está en la blockchain; sus entregas quedan libres. */
+  eliminarLote(organizacionId: string, loteId: string): Promise<ResultadoEliminarLote>;
 
   /** Todo lo de la organización, para que cada celular vea lo del equipo. */
   datosOrganizacion(organizacionId: string): Promise<DatosOrganizacion>;
@@ -411,19 +459,22 @@ export class PgRepo implements Repo {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const { rows } = await client.query<{ atestada: boolean }>(
+      const { rows } = await client.query<{ atestada: boolean; en_lote: boolean }>(
         `SELECT EXISTS (SELECT 1 FROM fincas_versiones fv WHERE fv.finca_id = f.id AND fv.attestation_uid IS NOT NULL)
                 OR f.attestation_uid IS NOT NULL
                 OR EXISTS (SELECT 1 FROM entregas e WHERE e.finca_id = f.id AND e.attestation_uid IS NOT NULL)
                 OR EXISTS (SELECT 1 FROM verificaciones v WHERE v.finca_id = f.id AND v.attestation_uid IS NOT NULL)
-                AS atestada
+                AS atestada,
+                EXISTS (SELECT 1 FROM entregas e JOIN lote_entregas le ON le.entrega_id = e.id WHERE e.finca_id = f.id)
+                AS en_lote
          FROM fincas f JOIN productores p ON p.id = f.productor_id
          WHERE f.id = $1 AND p.organizacion_id = $2 FOR UPDATE OF f`,
         [fincaId, organizacionId],
       );
-      if (rows.length === 0 || rows[0].atestada) {
+      if (rows.length === 0 || rows[0].atestada || rows[0].en_lote) {
         await client.query("ROLLBACK");
-        return { estado: rows.length === 0 ? "no_encontrada" : "atestada", archivos: [] };
+        const estado = rows.length === 0 ? "no_encontrada" : rows[0].atestada ? "atestada" : "en_lote";
+        return { estado, archivos: [] };
       }
       await client.query(
         `DELETE FROM attestations_pendientes
@@ -478,6 +529,132 @@ export class PgRepo implements Repo {
       );
       await client.query("COMMIT");
       return "cambiado";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async entregasCandidatas(
+    organizacionId: string,
+    filtro: { ids: string[] } | { cultivo: string; temporadaId: string },
+  ): Promise<EntregaCandidata[]> {
+    const [condicion, params] =
+      "ids" in filtro
+        ? ["e.id = ANY($2::uuid[])", [filtro.ids]]
+        : ["f.cultivo = $2 AND e.temporada_id = $3", [filtro.cultivo, filtro.temporadaId]];
+    const { rows } = await this.pool.query(
+      `SELECT e.id, f.id AS "fincaId", f.nombre AS "fincaNombre", p.nombre AS "productorNombre", f.cultivo,
+              e.temporada_id AS "temporadaId", e.kg::float8 AS kg, e.estado, e.fecha, f.deforestacion,
+              EXISTS (SELECT 1 FROM verificaciones v WHERE v.finca_id = f.id AND v.temporada_id = e.temporada_id)
+                AS verificada,
+              f.area_oficial_ha::float8 AS "areaOficialHa", l.codigo AS "loteCodigo"
+       FROM entregas e JOIN fincas f ON f.id = e.finca_id JOIN productores p ON p.id = f.productor_id
+       LEFT JOIN lote_entregas le ON le.entrega_id = e.id LEFT JOIN lotes l ON l.id = le.lote_id
+       WHERE p.organizacion_id = $1 AND ${condicion}
+       ORDER BY e.fecha`,
+      [organizacionId, ...params],
+    );
+    // Rendimiento de cada finca en la temporada: todas sus entregas, no solo
+    // las del lote, convertidas al estado exportable (café oro, cacao seco).
+    const totales = await this.pool.query<{ finca_id: string; temporada_id: string; cultivo: string; estado: string; kg: number }>(
+      `SELECT e.finca_id, e.temporada_id, f.cultivo, e.estado, sum(e.kg)::float8 AS kg
+       FROM entregas e JOIN fincas f ON f.id = e.finca_id
+       WHERE e.finca_id = ANY($1::uuid[]) AND e.temporada_id IS NOT NULL
+       GROUP BY 1, 2, 3, 4`,
+      [[...new Set(rows.map((r) => r.fincaId))]],
+    );
+    const exportables = new Map<string, number>();
+    for (const t of totales.rows) {
+      const c = cultivo(t.cultivo);
+      const exportable = c?.estados.find((x) => x.factorExportable === 1);
+      if (!c || !exportable || !estadoValido(t.cultivo, t.estado)) continue;
+      const clave = `${t.finca_id}/${t.temporada_id}`;
+      exportables.set(clave, (exportables.get(clave) ?? 0) + convertirKg(c.id, t.kg, t.estado, exportable.id));
+    }
+    return rows.map((r) => ({
+      ...r,
+      fecha: new Date(r.fecha).toISOString(),
+      kgExportablesFincaTemporada: exportables.get(`${r.fincaId}/${r.temporadaId}`) ?? 0,
+    }));
+  }
+
+  async guardarLote(organizacionId: string, uid: string, l: DatosLote): Promise<ResultadoGuardarLote> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO lotes (id, organizacion_id, codigo, cultivo, temporada_id, estado, kg, kg_esperados,
+                            beneficio, proceso, avisos, creado_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [l.id, organizacionId, l.codigo, l.cultivo, l.temporadaId, l.estado, l.kg, l.kgEsperados,
+         l.beneficio, l.proceso ?? null, JSON.stringify(l.avisos), uid],
+      );
+      await client.query(
+        "INSERT INTO lote_entregas (lote_id, entrega_id) SELECT $1, unnest($2::uuid[])",
+        [l.id, l.entregas],
+      );
+      await client.query("INSERT INTO attestations_pendientes (esquema, entidad_id) VALUES ('Lote', $1)", [l.id]);
+      await client.query("COMMIT");
+      return "creado";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      const restriccion = (e as { constraint?: string }).constraint;
+      if (restriccion === "lotes_codigo_unico") return "codigo_repetido";
+      if (restriccion === "lote_entregas_entrega_unica") return "entrega_ocupada";
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listarLotes(organizacionId: string): Promise<Lote[]> {
+    const { rows } = await this.pool.query(
+      `SELECT l.id, l.codigo, l.cultivo, l.temporada_id AS "temporadaId", t.nombre AS "temporadaNombre", l.estado,
+              l.kg::float8 AS kg, l.kg_esperados::float8 AS "kgEsperados", l.beneficio, l.proceso, l.avisos,
+              l.attestation_uid AS "attestationUid", l.creado_en AS "creadoEn",
+              coalesce(json_agg(json_build_object(
+                'id', e.id, 'fincaId', f.id, 'fincaNombre', f.nombre, 'productorNombre', p.nombre,
+                'kg', e.kg::float8, 'estado', e.estado, 'fecha', e.fecha
+              ) ORDER BY e.fecha) FILTER (WHERE e.id IS NOT NULL), '[]') AS entregas
+       FROM lotes l JOIN temporadas t ON t.id = l.temporada_id
+       LEFT JOIN lote_entregas le ON le.lote_id = l.id
+       LEFT JOIN entregas e ON e.id = le.entrega_id
+       LEFT JOIN fincas f ON f.id = e.finca_id
+       LEFT JOIN productores p ON p.id = f.productor_id
+       WHERE l.organizacion_id = $1
+       GROUP BY l.id, t.nombre
+       ORDER BY l.creado_en DESC`,
+      [organizacionId],
+    );
+    return rows.map((r) => ({
+      ...r,
+      creadoEn: new Date(r.creadoEn).toISOString(),
+      entregas: r.entregas.map((e: { fecha: string }) => ({ ...e, fecha: new Date(e.fecha).toISOString() })),
+    }));
+  }
+
+  async eliminarLote(organizacionId: string, loteId: string): Promise<ResultadoEliminarLote> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query<{ atestado: boolean }>(
+        `SELECT attestation_uid IS NOT NULL
+                OR EXISTS (SELECT 1 FROM exportacion_lotes x WHERE x.lote_id = l.id) AS atestado
+         FROM lotes l WHERE l.id = $1 AND l.organizacion_id = $2 FOR UPDATE`,
+        [loteId, organizacionId],
+      );
+      if (rows.length === 0 || rows[0].atestado) {
+        await client.query("ROLLBACK");
+        return rows.length === 0 ? "no_encontrado" : "atestado";
+      }
+      await client.query("DELETE FROM attestations_pendientes WHERE esquema = 'Lote' AND entidad_id = $1", [loteId]);
+      await client.query("DELETE FROM lote_entregas WHERE lote_id = $1", [loteId]);
+      await client.query("DELETE FROM lotes WHERE id = $1", [loteId]);
+      await client.query("COMMIT");
+      return "eliminado";
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;

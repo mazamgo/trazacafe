@@ -21,11 +21,15 @@ void main() {
       expect(cultivo.nombre, c['nombre']);
       expect(cultivo.codigoHS, c['codigoHS']);
       expect(cultivo.maxKgEntrega, c['maxKgEntrega']);
+      expect(cultivo.maxKgExportableHa, c['maxKgExportableHa']);
       final hex = (c['color'] as String).substring(1);
       expect(cultivo.color, 0xFF000000 | int.parse(hex, radix: 16));
       expect(
-        [for (final e in cultivo.estados) [e.id, e.nombre, e.corto]],
-        [for (final e in c['estados'] as List) [e['id'], e['nombre'], e['corto']]],
+        [for (final e in cultivo.estados) [e.id, e.nombre, e.corto, e.factorExportable]],
+        [
+          for (final e in c['estados'] as List)
+            [e['id'], e['nombre'], e['corto'], (e['factorExportable'] as num).toDouble()],
+        ],
       );
     });
   }
@@ -34,5 +38,6 @@ void main() {
     expect(cultivoDe('soya').id, cultivoPorDefecto);
     expect(cultivoDe('cacao').nombreEstado('fermentado'), 'Fermentado');
     expect(cultivoDe('cafe').nombreEstado('raro'), 'raro');
+    expect(cultivoDe('cafe').convertirKg(500, 'uva', 'pergamino'), closeTo(100, 0.001));
   });
 }

@@ -4,21 +4,23 @@
     "codigoHS": "0901",
     "color": "#6F4E37",
     "estados": [
-      { "id": "uva", "nombre": "Uva (café maduro)", "corto": "Uva" },
-      { "id": "pergamino", "nombre": "Pergamino", "corto": "Pergamino" },
-      { "id": "oro", "nombre": "Oro (café verde)", "corto": "Oro" }
+      { "id": "uva", "nombre": "Uva (café maduro)", "corto": "Uva", "factorExportable": 0.16 },
+      { "id": "pergamino", "nombre": "Pergamino", "corto": "Pergamino", "factorExportable": 0.8 },
+      { "id": "oro", "nombre": "Oro (café verde)", "corto": "Oro", "factorExportable": 1 }
     ],
-    "maxKgEntrega": 20000
+    "maxKgEntrega": 20000,
+    "maxKgExportableHa": 2500
   },
   "cacao": {
     "nombre": "Cacao",
     "codigoHS": "1801",
     "color": "#8D5524",
     "estados": [
-      { "id": "baba", "nombre": "En baba (fresco)", "corto": "Baba" },
-      { "id": "fermentado", "nombre": "Fermentado", "corto": "Fermentado" },
-      { "id": "seco", "nombre": "Seco", "corto": "Seco" }
+      { "id": "baba", "nombre": "En baba (fresco)", "corto": "Baba", "factorExportable": 0.38 },
+      { "id": "fermentado", "nombre": "Fermentado", "corto": "Fermentado", "factorExportable": 0.45 },
+      { "id": "seco", "nombre": "Seco", "corto": "Seco", "factorExportable": 1 }
     ],
-    "maxKgEntrega": 20000
+    "maxKgEntrega": 20000,
+    "maxKgExportableHa": 2000
   }
 }

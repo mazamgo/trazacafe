@@ -3,6 +3,7 @@ import { z } from "zod";
 import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
+import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
 
@@ -255,6 +256,12 @@ export function buildApp({
         mensaje: "Esta finca o una de sus entregas ya está en la blockchain; hay que revocar su attestation.",
       });
     }
+    if (r.estado === "en_lote") {
+      return reply.code(409).send({
+        error: "en_lote",
+        mensaje: "Una entrega de esta finca ya está en un lote; primero deshaz el lote.",
+      });
+    }
     // Si falla borrar un archivo, la finca ya no existe: queda un archivo
     // huérfano en Storage, que no expone nada (solo lo lee la organización).
     await Promise.allSettled(r.archivos.map((a) => almacen.borrar(a)));
@@ -289,6 +296,85 @@ export function buildApp({
       return reply.code(409).send({ error: "atestada", mensaje: "La finca ya está en la blockchain; no se puede cambiar su cultivo." });
     }
     return { cultivo: datos.data.cultivo };
+  });
+
+  /** Lotes del beneficio o centro de acopio (solo administradores). */
+  app.get("/v1/lotes", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    return { lotes: await repo.listarLotes(admin.organizacionId) };
+  });
+
+  /** Entregas de un cultivo y temporada, con el motivo si no pueden ir a un lote. */
+  app.get<{ Querystring: { cultivo?: string; temporadaId?: string } }>("/v1/lotes/disponibles", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    const q = z.object({ cultivo: z.string().regex(/^[a-z_]+$/), temporadaId: z.uuid() }).safeParse(req.query);
+    if (!q.success) return reply.code(422).send({ error: "Datos inválidos", detalles: q.error.issues });
+    const entregas = await repo.entregasCandidatas(admin.organizacionId, q.data);
+    return {
+      entregas: entregas.map((e) => ({ ...e, motivo: motivoExclusion(e, q.data.cultivo, q.data.temporadaId) })),
+    };
+  });
+
+  app.post("/v1/lotes", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    const datos = loteSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const l = datos.data;
+    const org = await repo.organizacion(admin.organizacionId);
+    if (!org?.cultivos.includes(l.cultivo)) {
+      return reply.code(422).send({ error: "datos_invalidos", mensaje: `La organización no trabaja ${l.cultivo}.` });
+    }
+    const temporada = (await repo.listarTemporadas(admin.organizacionId)).find((t) => t.id === l.temporadaId);
+    if (!temporada || (temporada.cultivo !== null && temporada.cultivo !== l.cultivo)) {
+      return reply.code(422).send({ error: "datos_invalidos", mensaje: "Esa temporada no es de este cultivo." });
+    }
+
+    const candidatas = await repo.entregasCandidatas(admin.organizacionId, { ids: l.entregas });
+    const { rechazos, avisos, kgEsperados } = evaluarLote(l, candidatas);
+    if (rechazos.length > 0) {
+      return reply.code(422).send({
+        error: "entregas_excluidas",
+        mensaje: `${rechazos.length} ${rechazos.length === 1 ? "entrega no puede" : "entregas no pueden"} ir en el lote: ${rechazos[0].motivo}.`,
+        rechazos,
+      });
+    }
+    const id = crypto.randomUUID();
+    const r = await repo.guardarLote(admin.organizacionId, admin.uid, {
+      ...l,
+      id,
+      beneficio: l.beneficio ?? org.nombre,
+      kgEsperados,
+      avisos,
+    });
+    if (r === "codigo_repetido") {
+      return reply.code(409).send({ error: "codigo_repetido", mensaje: `Ya existe un lote con el código ${l.codigo}.` });
+    }
+    if (r === "entrega_ocupada") {
+      return reply.code(409).send({ error: "entrega_ocupada", mensaje: "Otra persona acaba de poner una de esas entregas en otro lote." });
+    }
+    const lote = (await repo.listarLotes(admin.organizacionId)).find((x) => x.id === id);
+    return reply.code(201).send(lote);
+  });
+
+  /** Deshace un lote que aún no está en la blockchain ni en un contenedor. */
+  app.delete<{ Params: { id: string } }>("/v1/lotes/:id", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin) return;
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrado" });
+    const r = await repo.eliminarLote(admin.organizacionId, req.params.id);
+    if (r === "no_encontrado") return reply.code(404).send({ error: "no_encontrado" });
+    if (r === "atestado") {
+      return reply.code(409).send({
+        error: "atestado",
+        mensaje: "El lote ya está en la blockchain o en un contenedor; no se puede deshacer.",
+      });
+    }
+    return reply.code(204).send();
   });
 
   app.get("/v1/invitaciones", async (req, reply) => {

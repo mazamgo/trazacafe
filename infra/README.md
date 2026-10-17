@@ -155,12 +155,31 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - **Cambiar cultivo:** en el detalle de la finca, solo mientras no tenga entregas ni esté atestada (`PUT /v1/fincas/:id/cultivo`; necesita señal si la finca ya se envió). Las visitas pasan a la temporada del cultivo nuevo.
 - **Attestations:** los esquemas `Finca` y `Entrega` incluyen `cultivo`. Todavía no están registrados en la blockchain.
 
+## 4f. Lotes (Fase 2)
+
+- **Quién:** solo administradores, desde la app (menú ⋮ → **Lotes**). Necesita señal: el lote se arma con las entregas de todo el equipo, que están en el servidor.
+- **Reglas EUDR** (`backend/src/lotes.ts`). Un lote es de **un cultivo y una temporada**, y una entrega va a un solo lote. La API rechaza el lote (422, diciendo qué entrega y por qué) si una entrega:
+  - es de una finca en **rojo**;
+  - es de una finca **sin visita de verificación** en esa temporada;
+  - es de otro cultivo o de otra temporada;
+  - ya está en otro lote.
+- **Avisos** (se guardan con el lote, no lo impiden):
+  - **Volumen:** el peso del lote supera en más de un 10 % lo que rinden sus entregas. Por ejemplo, 500 kg de uva rinden unos 100 kg de pergamino.
+  - **Rendimiento:** una finca entrega en la temporada más kg por hectárea de lo razonable (café 2,500 kg oro/ha; cacao 2,000 kg seco/ha).
+  - **Satélite:** hay fincas sin chequeo satelital verde.
+- **Factores de rendimiento** en `schemas/cultivos.json` (`factorExportable` por estado: kg de café oro o cacao seco por kg). Son aproximaciones que hay que ajustar con datos del piloto:
+  - café: uva 0.16, pergamino 0.8;
+  - cacao: baba 0.38, fermentado 0.45.
+- **Deshacer:** un lote que no está en la blockchain ni en un contenedor se puede deshacer, y sus entregas quedan libres. Una finca con entregas en un lote no se puede borrar.
+- Cada lote encola su attestation (`Lote`). El esquema EAS ahora incluye cultivo, temporada y estado.
+
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints:
 - Acceso y sincronización: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, versiones de lindero, visitas, entregas, fotos), `GET /v1/datos` (todo lo de la organización, con sus cultivos), `POST /v1/fotos/:id/subida`.
 - Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`, `PUT /v1/fincas/:id/cultivo`.
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
+- Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `DELETE /v1/lotes/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`.
 

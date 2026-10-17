@@ -27,6 +27,130 @@ class Invitacion {
   final bool activa;
 }
 
+/// Entrega de la organización para armar un lote (`GET /v1/lotes/disponibles`).
+class EntregaDisponible {
+  EntregaDisponible({
+    required this.id,
+    required this.fincaNombre,
+    required this.productorNombre,
+    required this.kg,
+    required this.estado,
+    required this.fecha,
+    required this.deforestacion,
+    required this.motivo,
+  });
+
+  factory EntregaDisponible.desdeJson(Map<String, dynamic> j) =>
+      EntregaDisponible(
+        id: j['id'] as String,
+        fincaNombre: j['fincaNombre'] as String,
+        productorNombre: j['productorNombre'] as String,
+        kg: (j['kg'] as num).toDouble(),
+        estado: j['estado'] as String,
+        fecha: DateTime.parse(j['fecha'] as String).toLocal(),
+        deforestacion: j['deforestacion'] as String,
+        motivo: j['motivo'] as String?,
+      );
+
+  final String id;
+  final String fincaNombre;
+  final String productorNombre;
+  final double kg;
+  final String estado;
+  final DateTime fecha;
+  final String deforestacion;
+
+  /// Por qué no puede ir en el lote, o `null` si puede.
+  final String? motivo;
+}
+
+/// Aviso guardado con un lote (volumen, rendimiento por ha, satélite).
+class AvisoLote {
+  AvisoLote(this.codigo, this.mensaje);
+  final String codigo;
+  final String mensaje;
+}
+
+/// Entrega dentro de un lote ya armado.
+class EntregaDeLote {
+  EntregaDeLote({
+    required this.fincaNombre,
+    required this.productorNombre,
+    required this.kg,
+    required this.estado,
+    required this.fecha,
+  });
+  final String fincaNombre;
+  final String productorNombre;
+  final double kg;
+  final String estado;
+  final DateTime fecha;
+}
+
+class Lote {
+  Lote({
+    required this.id,
+    required this.codigo,
+    required this.cultivo,
+    required this.temporadaNombre,
+    required this.estado,
+    required this.kg,
+    required this.kgEsperados,
+    required this.beneficio,
+    required this.proceso,
+    required this.avisos,
+    required this.atestado,
+    required this.creadoEn,
+    required this.entregas,
+  });
+
+  factory Lote.desdeJson(Map<String, dynamic> j) => Lote(
+    id: j['id'] as String,
+    codigo: j['codigo'] as String,
+    cultivo: j['cultivo'] as String,
+    temporadaNombre: j['temporadaNombre'] as String,
+    estado: j['estado'] as String,
+    kg: (j['kg'] as num).toDouble(),
+    kgEsperados: (j['kgEsperados'] as num).toDouble(),
+    beneficio: j['beneficio'] as String,
+    proceso: j['proceso'] as String?,
+    avisos: [
+      for (final a in (j['avisos'] as List? ?? const []).cast<Map>())
+        AvisoLote(a['codigo'] as String, a['mensaje'] as String),
+    ],
+    atestado: j['attestationUid'] != null,
+    creadoEn: DateTime.parse(j['creadoEn'] as String).toLocal(),
+    entregas: [
+      for (final e in (j['entregas'] as List? ?? const []).cast<Map>())
+        EntregaDeLote(
+          fincaNombre: e['fincaNombre'] as String,
+          productorNombre: e['productorNombre'] as String,
+          kg: (e['kg'] as num).toDouble(),
+          estado: e['estado'] as String,
+          fecha: DateTime.parse(e['fecha'] as String).toLocal(),
+        ),
+    ],
+  );
+
+  final String id;
+  final String codigo;
+  final String cultivo;
+  final String temporadaNombre;
+  final String estado;
+  final double kg;
+
+  /// Lo que deberían rendir sus entregas en [estado].
+  final double kgEsperados;
+  final String beneficio;
+  final String? proceso;
+  final List<AvisoLote> avisos;
+
+  /// Ya está en la blockchain: no se puede deshacer.
+  final bool atestado;
+  final DateTime creadoEn;
+  final List<EntregaDeLote> entregas;
+}
+
 class ApiClient {
   ApiClient({
     required this.token,
@@ -101,6 +225,60 @@ class ApiClient {
       if (e.status != 404) rethrow;
     }
   }
+
+  /// Lotes de la organización (solo administradores).
+  Future<List<Lote>> lotes() async {
+    final r = await _pedir('GET', '/v1/lotes');
+    return [
+      for (final l in r['lotes'] as List)
+        Lote.desdeJson(l as Map<String, dynamic>),
+    ];
+  }
+
+  /// Entregas de un cultivo y temporada, con el motivo de las que no pueden
+  /// ir en un lote.
+  Future<List<EntregaDisponible>> entregasDisponibles(
+    String cultivo,
+    String temporadaId,
+  ) async {
+    final r = await _pedir(
+      'GET',
+      '/v1/lotes/disponibles?cultivo=${Uri.encodeQueryComponent(cultivo)}'
+          '&temporadaId=${Uri.encodeQueryComponent(temporadaId)}',
+    );
+    return [
+      for (final e in r['entregas'] as List)
+        EntregaDisponible.desdeJson(e as Map<String, dynamic>),
+    ];
+  }
+
+  /// Arma un lote. La API lo rechaza (422) si alguna entrega no cumple las
+  /// reglas EUDR; los avisos vienen en el lote creado.
+  Future<Lote> crearLote({
+    required String codigo,
+    required String cultivo,
+    required String temporadaId,
+    required String estado,
+    required double kg,
+    required List<String> entregas,
+    String? beneficio,
+    String? proceso,
+  }) async => Lote.desdeJson(
+    await _pedir('POST', '/v1/lotes', {
+      'codigo': codigo,
+      'cultivo': cultivo,
+      'temporadaId': temporadaId,
+      'estado': estado,
+      'kg': kg,
+      'entregas': entregas,
+      'beneficio': ?beneficio,
+      'proceso': ?proceso,
+    }),
+  );
+
+  /// Deshace un lote que aún no está en la blockchain.
+  Future<void> eliminarLote(String id) =>
+      _pedir('DELETE', '/v1/lotes/${Uri.encodeComponent(id)}');
 
   Future<List<Invitacion>> invitaciones() async {
     final r = await _pedir('GET', '/v1/invitaciones');

@@ -160,6 +160,11 @@ final pendientesProvider = StreamProvider<int>(
   (ref) => ref.watch(databaseProvider).observarTotalPendientes(),
 );
 
+/// Lotes del beneficio (solo administradores; requiere señal).
+final lotesProvider = FutureProvider.autoDispose<List<Lote>>(
+  (ref) => ref.watch(apiProvider).lotes(),
+);
+
 /// Equipo de la organización (solo administradores; requiere señal).
 final invitacionesProvider = FutureProvider.autoDispose<List<Invitacion>>(
   (ref) => ref.watch(apiProvider).invitaciones(),

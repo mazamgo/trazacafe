@@ -4,6 +4,7 @@ import { rutaFoto, sha256Hex, type Almacen } from "../src/almacen.ts";
 import { buildApp } from "../src/app.ts";
 import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
 import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/deforestacion.ts";
+import type { EntregaCandidata } from "../src/lotes.ts";
 import {
   AccesoDenegado,
   aGeometria,
@@ -11,9 +12,11 @@ import {
   desdeGeometria,
   VersionDesfasada,
   type Chequeo,
+  type DatosLote,
   type DatosOrganizacion,
   type FincaPorRevisar,
   type Invitacion,
+  type Lote,
   type Organizacion,
   type Repo,
   type ResultadoEliminarFinca,
@@ -68,13 +71,57 @@ class RepoMemoria implements Repo {
     this.invitaciones.set(inv.email, { ...inv, usuarioUid: null, creadoEn: "ahora", aceptadaEn: null });
     return true;
   }
-  fincas = new Map<string, { organizacionId: string; atestada: boolean; archivos?: string[] }>();
+  fincas = new Map<string, { organizacionId: string; atestada: boolean; enLote?: boolean; archivos?: string[] }>();
   async eliminarFinca(organizacionId: string, fincaId: string): Promise<ResultadoEliminarFinca> {
     const f = this.fincas.get(fincaId);
     if (!f || f.organizacionId !== organizacionId) return { estado: "no_encontrada", archivos: [] };
     if (f.atestada) return { estado: "atestada", archivos: [] };
+    if (f.enLote) return { estado: "en_lote", archivos: [] };
     this.fincas.delete(fincaId);
     return { estado: "eliminada", archivos: f.archivos ?? [] };
+  }
+  /** Entregas de la organización ORG que la API puede poner en lotes. */
+  candidatas: EntregaCandidata[] = [];
+  lotes: (DatosLote & { organizacionId: string; atestado?: boolean })[] = [];
+  async entregasCandidatas(organizacionId: string, filtro: { ids: string[] } | { cultivo: string; temporadaId: string }) {
+    if (organizacionId !== ORG) return [];
+    const enLote = (id: string) => this.lotes.find((l) => l.entregas.includes(id))?.codigo ?? null;
+    return this.candidatas
+      .filter((e) => ("ids" in filtro ? filtro.ids.includes(e.id) : e.cultivo === filtro.cultivo && e.temporadaId === filtro.temporadaId))
+      .map((e) => ({ ...e, loteCodigo: e.loteCodigo ?? enLote(e.id) }));
+  }
+  async guardarLote(organizacionId: string, _uid: string, l: DatosLote) {
+    if (this.lotes.some((x) => x.organizacionId === organizacionId && x.codigo === l.codigo)) return "codigo_repetido" as const;
+    if (this.lotes.some((x) => x.entregas.some((e) => l.entregas.includes(e)))) return "entrega_ocupada" as const;
+    this.lotes.push({ ...l, organizacionId });
+    return "creado" as const;
+  }
+  async listarLotes(organizacionId: string): Promise<Lote[]> {
+    return this.lotes
+      .filter((l) => l.organizacionId === organizacionId)
+      .map((l) => ({
+        id: l.id,
+        codigo: l.codigo,
+        cultivo: l.cultivo,
+        temporadaId: l.temporadaId,
+        temporadaNombre: "2026/27",
+        estado: l.estado,
+        kg: l.kg,
+        kgEsperados: l.kgEsperados,
+        beneficio: l.beneficio,
+        proceso: l.proceso ?? null,
+        avisos: l.avisos,
+        attestationUid: null,
+        creadoEn: "2026-10-16T20:00:00.000Z",
+        entregas: [],
+      }));
+  }
+  async eliminarLote(organizacionId: string, loteId: string) {
+    const i = this.lotes.findIndex((l) => l.id === loteId && l.organizacionId === organizacionId);
+    if (i < 0) return "no_encontrado" as const;
+    if (this.lotes[i].atestado) return "atestado" as const;
+    this.lotes.splice(i, 1);
+    return "eliminado" as const;
   }
   /** Fincas para cambiar de cultivo: cultivo actual y si tienen entregas. */
   cultivoFincas = new Map<string, { cultivo: string; conEntregas?: boolean; atestada?: boolean }>();
@@ -627,6 +674,123 @@ describe("cultivos", () => {
     expect(cacao.statusCode).toBe(201);
     expect(cacao.json().cultivo).toBe("cacao");
     expect((await pedir(app, "POST", "/v1/temporadas", "admin", { ...t, nombre: "x", cultivo: "cacao" })).statusCode).toBe(409);
+  });
+});
+
+describe("/v1/lotes", () => {
+  const T = "33333333-3333-4333-8333-333333333333";
+  let n = 0;
+  const candidata = (p: Partial<EntregaCandidata> = {}): EntregaCandidata => ({
+    id: `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`,
+    fincaId: finca.id,
+    fincaNombre: "La Esperanza",
+    productorNombre: "Productora de prueba",
+    cultivo: "cafe",
+    temporadaId: T,
+    kg: 500,
+    estado: "uva",
+    fecha: "2026-10-16T17:00:00.000Z",
+    deforestacion: "verde",
+    verificada: true,
+    areaOficialHa: 4,
+    kgExportablesFincaTemporada: 80,
+    loteCodigo: null,
+    ...p,
+  });
+  function preparar() {
+    const c = crearApp();
+    c.repo.temporadas.push({ id: T, nombre: "2026/27", inicio: "2026-10-01", fin: "2027-09-30", cultivo: null, organizacionId: ORG });
+    return c;
+  }
+  const nuevo = (entregas: string[], p: object = {}) => ({
+    codigo: "CAFE-001", cultivo: "cafe", temporadaId: T, estado: "pergamino", kg: 100, entregas, ...p,
+  });
+
+  it("el administrador arma un lote; se guarda con sus avisos y el beneficio por defecto", async () => {
+    const { app, repo } = preparar();
+    const e = candidata({ deforestacion: "pendiente" });
+    repo.candidatas.push(e);
+    const res = await pedir(app, "POST", "/v1/lotes", "admin", nuevo([e.id]));
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ codigo: "CAFE-001", kg: 100, beneficio: "Prueba" });
+    expect(res.json().kgEsperados).toBeCloseTo(100);
+    expect(res.json().avisos.map((a: { codigo: string }) => a.codigo)).toEqual(["satelite"]);
+    expect((await pedir(app, "GET", "/v1/lotes", "admin")).json().lotes).toHaveLength(1);
+  });
+
+  it("rechaza el lote si una entrega es de una finca en rojo o sin visita, y dice cuál", async () => {
+    const { app, repo } = preparar();
+    const buena = candidata();
+    const roja = candidata({ deforestacion: "rojo" });
+    const sinVisita = candidata({ verificada: false });
+    repo.candidatas.push(buena, roja, sinVisita);
+    const res = await pedir(app, "POST", "/v1/lotes", "admin", nuevo([buena.id, roja.id, sinVisita.id]));
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error).toBe("entregas_excluidas");
+    expect(res.json().rechazos.map((r: { entregaId: string }) => r.entregaId)).toEqual([roja.id, sinVisita.id]);
+    expect(repo.lotes).toHaveLength(0);
+  });
+
+  it("una entrega no va a dos lotes y el código no se repite", async () => {
+    const { app, repo } = preparar();
+    const a = candidata();
+    const b = candidata();
+    repo.candidatas.push(a, b);
+    expect((await pedir(app, "POST", "/v1/lotes", "admin", nuevo([a.id]))).statusCode).toBe(201);
+    const otraVez = await pedir(app, "POST", "/v1/lotes", "admin", nuevo([a.id], { codigo: "CAFE-002" }));
+    expect(otraVez.statusCode).toBe(422);
+    expect(otraVez.json().rechazos[0].motivo).toContain("CAFE-001");
+    expect((await pedir(app, "POST", "/v1/lotes", "admin", nuevo([b.id]))).statusCode).toBe(409);
+  });
+
+  it("valida el estado del lote, el cultivo de la organización y la temporada", async () => {
+    const { app, repo } = preparar();
+    const e = candidata();
+    repo.candidatas.push(e);
+    expect((await pedir(app, "POST", "/v1/lotes", "admin", nuevo([e.id], { estado: "seco" }))).statusCode).toBe(422);
+    expect((await pedir(app, "POST", "/v1/lotes", "admin", nuevo([e.id], { cultivo: "cacao", estado: "seco" }))).statusCode).toBe(422);
+    const otraT = "44444444-4444-4444-8444-444444444444";
+    expect((await pedir(app, "POST", "/v1/lotes", "admin", nuevo([e.id], { temporadaId: otraT }))).statusCode).toBe(422);
+    expect((await pedir(app, "POST", "/v1/lotes", "admin", nuevo([]))).statusCode).toBe(422);
+  });
+
+  it("lista las entregas disponibles con el motivo de las que no pueden ir", async () => {
+    const { app, repo } = preparar();
+    const buena = candidata();
+    const roja = candidata({ deforestacion: "rojo" });
+    repo.candidatas.push(buena, roja, candidata({ cultivo: "cacao", estado: "seco" }));
+    const res = await pedir(app, "GET", `/v1/lotes/disponibles?cultivo=cafe&temporadaId=${T}`, "admin");
+    expect(res.statusCode).toBe(200);
+    const entregas = res.json().entregas as { id: string; motivo: string | null }[];
+    expect(entregas.map((e) => [e.id, e.motivo === null])).toEqual([[buena.id, true], [roja.id, false]]);
+    expect((await pedir(app, "GET", "/v1/lotes/disponibles?cultivo=cafe", "admin")).statusCode).toBe(422);
+  });
+
+  it("solo los administradores ven y arman lotes", async () => {
+    const { app } = preparar();
+    expect((await pedir(app, "GET", "/v1/lotes", "tecnico")).statusCode).toBe(403);
+    expect((await pedir(app, "POST", "/v1/lotes", "tecnico", nuevo([]))).statusCode).toBe(403);
+  });
+
+  it("deshace un lote que no está atestado; uno atestado no", async () => {
+    const { app, repo } = preparar();
+    const e = candidata();
+    repo.candidatas.push(e);
+    const id = (await pedir(app, "POST", "/v1/lotes", "admin", nuevo([e.id]))).json().id;
+    repo.lotes[0].atestado = true;
+    expect((await pedir(app, "DELETE", `/v1/lotes/${id}`, "admin")).statusCode).toBe(409);
+    repo.lotes[0].atestado = false;
+    expect((await pedir(app, "DELETE", `/v1/lotes/${id}`, "admin")).statusCode).toBe(204);
+    expect(repo.lotes).toHaveLength(0);
+    expect((await pedir(app, "DELETE", `/v1/lotes/${id}`, "admin")).statusCode).toBe(404);
+  });
+
+  it("no se borra una finca con entregas en un lote", async () => {
+    const { app, repo } = preparar();
+    repo.fincas.set(finca.id, { organizacionId: ORG, atestada: false, enLote: true });
+    const res = await pedir(app, "DELETE", `/v1/fincas/${finca.id}`, "tecnico");
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("en_lote");
   });
 });
 

@@ -97,6 +97,11 @@
 ## Fase 2 — Del campo al contenedor: el paquete EUDR (~4 semanas, prioridad comercial)
 Es la parte que **paga el cliente**.
 
+**Avance:**
+- **Lotes: hechos** (migración 009, pantalla Lotes para administradores). Detalle de reglas y avisos en `infra/README.md` §4f.
+- Los factores de rendimiento por estado (`cultivos.json`) son aproximados y se validan con el piloto.
+- Siguen contenedores, paquete EUDR, attestations y verificador.
+
 - **Lotes** (beneficio o centro de acopio):
   - Agrupar entregas de un mismo cultivo y temporada.
   - **Control de volumen:** kg del lote frente a la suma de las entregas, y kg por finca frente a un rendimiento razonable por hectárea; si se excede, aviso.
