@@ -5,6 +5,7 @@ import { OAuth2Client } from "google-auth-library";
 import type { Almacen } from "./almacen.ts";
 import { buildApp, type VerificarTarea } from "./app.ts";
 import { GlobalForestWatch } from "./deforestacion.ts";
+import { MapasPublicos } from "./mapas.ts";
 import type { Identidad, Rol, VerificarToken } from "./auth.ts";
 import { optimism, optimismSepolia } from "viem/chains";
 import { ColaPg, EasViem } from "./atestador.ts";
@@ -78,7 +79,12 @@ const verificarTarea: VerificarTarea = async (token) => {
   }
 };
 
-const satelite = process.env.GFW_API_KEY ? new GlobalForestWatch(process.env.GFW_API_KEY) : null;
+// Chequeo satelital: por defecto, mapas públicos (JRC 2020 + Hansen), sin
+// cuentas ni keys. Con SATELITE=gfw y GFW_API_KEY, la Data API de GFW.
+const satelite =
+  process.env.SATELITE === "gfw" && process.env.GFW_API_KEY
+    ? new GlobalForestWatch(process.env.GFW_API_KEY)
+    : new MapasPublicos();
 
 const { pool } = await crearPool();
 

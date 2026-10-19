@@ -1,4 +1,4 @@
-# Crea una API key de Global Forest Watch / Global Nature Watch y la guarda en
+﻿# Crea una API key de Global Forest Watch / Global Nature Watch y la guarda en
 # Secret Manager (secreto "gfw-api-key"). La contraseña y la key no se
 # muestran en pantalla.
 #
@@ -9,14 +9,19 @@
 #   powershell -ExecutionPolicy Bypass -File infra\gfw-api-key.ps1
 #
 # Primera vez: elige "registrar"; llega un correo de Okta para crear la
-# contraseña. Después vuelve a correr el script y elige "crear key".
+# contraseña (revisa también el correo no deseado). Después vuelve a correr
+# el script y elige "crear key".
+#
+# Opción 3 (a prueba): /auth/apikey solo pide un token de sesión válido. Si
+# entras a globalforestwatch.org con Google, puedes copiar el token de esa
+# sesión desde el navegador (F12) y pegarlo aquí; no se muestra en pantalla.
 
 $ErrorActionPreference = "Stop"
 $proyecto = "trazacafe-dev"
 $cuentaApi = "trazacafe-api@$proyecto.iam.gserviceaccount.com"
 $api = "https://data-api.globalforestwatch.org"
 
-$opcion = Read-Host "¿Qué quieres hacer? [1] Registrar una cuenta nueva con correo  [2] Crear la key (ya tengo contraseña)"
+$opcion = Read-Host "¿Qué quieres hacer? [1] Registrar una cuenta nueva con correo  [2] Crear la key (ya tengo contraseña)  [3] Crear la key con el token de mi sesión del navegador"
 
 if ($opcion -eq "1") {
   $nombre = Read-Host "Tu nombre"
@@ -28,19 +33,34 @@ if ($opcion -eq "1") {
   exit 0
 }
 
-$correo = Read-Host "Correo de tu cuenta de GFW (la de correo y contraseña)"
-$claveSegura = Read-Host "Contraseña" -AsSecureString
-$clave = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-  [Runtime.InteropServices.Marshal]::SecureStringToBSTR($claveSegura))
+function Texto([Security.SecureString] $seguro) {
+  [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($seguro))
+}
 
-$token = (Invoke-RestMethod -Method Post "$api/auth/token" `
-  -ContentType "application/x-www-form-urlencoded" `
-  -Body @{ username = $correo; password = $clave }).data.access_token
-$clave = $null
+if ($opcion -eq "3") {
+  $correo = Read-Host "Correo de tu cuenta (el de Google con que entraste)"
+  $token = (Texto (Read-Host "Token de sesión (sin la palabra Bearer)" -AsSecureString)).Trim()
+  if ($token -like "Bearer *") { $token = $token.Substring(7).Trim() }
+} else {
+  $correo = Read-Host "Correo de tu cuenta de GFW (la de correo y contraseña)"
+  $clave = Texto (Read-Host "Contraseña" -AsSecureString)
+  $token = (Invoke-RestMethod -Method Post "$api/auth/token" `
+    -ContentType "application/x-www-form-urlencoded" `
+    -Body @{ username = $correo; password = $clave }).data.access_token
+  $clave = $null
+}
 
 $cuerpo = @{ alias = "trazacafe-api"; email = $correo; organization = "GoProduction"; domains = @() } | ConvertTo-Json
-$respuesta = Invoke-RestMethod -Method Post "$api/auth/apikey" `
-  -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $cuerpo
+try {
+  $respuesta = Invoke-RestMethod -Method Post "$api/auth/apikey" `
+    -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $cuerpo
+} catch {
+  Write-Host "GFW rechazó la solicitud: $($_.ErrorDetails.Message)" -ForegroundColor Red
+  if ($opcion -eq "3") { Write-Host "El token de una sesión de Google no sirve o ya venció (dura poco): vuelve a copiarlo recién entrado." -ForegroundColor Yellow }
+  exit 1
+} finally {
+  $token = $null
+}
 $dato = @($respuesta.data)[0]
 $key = $dato.api_key
 

@@ -155,18 +155,19 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - **Temporadas:** cada organización crea las suyas (menú ⋮ → Temporadas, solo administradores). Una temporada puede ser para **todos los cultivos** o **solo para uno** (por ejemplo, la cosecha de cacao). No pueden traslaparse dentro del mismo cultivo, pero una de cacao sí puede cruzarse con la general. Si existen las dos, las entregas y visitas de cacao van a la de cacao. Las entregas y visitas que llegan sin temporada se asignan solas al crearla.
 - **Visita de verificación:** al menos una foto y, si cambió el lindero, uno nuevo. El lindero anterior queda en `fincas_versiones` y cada versión se atesta con su propio número.
 - **Aviso:** si la finca no tiene visita en la temporada actual, o está en rojo, la app avisa al registrar una entrega. En la semana 4, el lote de exportación rechazará esas entregas.
-- **Chequeo satelital** (`backend/src/deforestacion.ts`): consulta la Data API de Global Forest Watch.
-  - **Datos:** pérdida de cobertura (`umd_tree_cover_loss`, años > 2020, densidad ≥ 30 %) y alertas integradas (`gfw_integrated_alerts` posteriores al 31/12/2020, confianza nominal o alta).
+- **Chequeo satelital** (`backend/src/mapas.ts`): con **mapas públicos**, sin cuentas ni keys. Se leen por partes, solo la ventana de cada finca, directamente de sus servidores (de 0.5 a 2.5 s por finca):
+  - **Bosque al 31/12/2020:** JRC GFC2020 V4, ~10 m, el mapa de referencia de la Comisión Europea para el EUDR (COG mundial en `jeodpp.jrc.ec.europa.eu`).
+  - **Pérdida de cobertura arbórea 2001-2024:** Hansen/UMD Global Forest Change v1.12, 30 m (tesela `20N_090W`, que cubre Nicaragua, en `storage.googleapis.com/earthenginepartners-hansen`).
+  - **Regla:** cuenta como deforestación la pérdida de **2021 en adelante** en lo que **era bosque en 2020**. La pérdida fuera de ese bosque se informa en el detalle, pero no marca la finca.
   - **Resultado:** verde = nada; amarillo = menos de 0.1 ha; rojo = 0.1 ha o más. Las fincas de un solo punto se revisan como un círculo de su área.
+  - **Prueba (19/10/2026):** La Leonesa y XXX salen verdes, sin bosque en 2020. En zonas de frontera agrícola sale rojo: Wiwilí con 6.3 ha perdidas en 2021-2024 y Siuna con 0.6 ha en 2021.
+  - **Límite:** Hansen se publica una vez al año, así que no hay alertas casi en tiempo real (GLAD/RADD). Cuando salga la v1.13, se actualiza la URL en `FUENTES_MAPAS`.
+  - `npm run explorar-mapas -- <lon> <lat>` muestra la estructura de los mapas y los valores en una coordenada.
   - **Programación:** Cloud Scheduler `chequeo-deforestacion` (us-east4) llama todos los días a las 6:00 (hora de Managua) a `POST /v1/tareas/chequeo-deforestacion`, con un token OIDC de la cuenta `trazacafe-tareas@…`. Cada día revisa hasta 50 fincas que aún no tienen chequeo de su lindero vigente en la temporada actual; en la práctica, cada finca una vez por temporada.
   - **Revisión a mano:** el administrador puede revisar una finca en el momento desde la app (`POST /v1/fincas/:id/chequeo`).
-- **API key de GFW:** con tu cuenta de globalforestwatch.org creada (con correo, no con Google), ejecuta `powershell -ExecutionPolicy Bypass -File infra\gfw-api-key.ps1`. El script la guarda en Secret Manager (`gfw-api-key`). Después:
-
-  ```powershell
-  gcloud run deploy trazacafe-api --image=<imagen actual> --region=$REGION --project=$PROYECTO --set-secrets=GFW_API_KEY=gfw-api-key:latest
-  ```
-
-  Sin la key, la tarea responde 503 y no marca ninguna finca. La key vence al año: vuelve a correr el script.
+- **Global Forest Watch (opcional):** agrega las alertas integradas casi en tiempo real. Necesita una cuenta de GFW **con contraseña**; las creadas con Google no sirven. En octubre de 2026 no se pudo crear: la cuenta de Hotmail quedó sin activar y se pidió ayuda a gfw@wri.org.
+  - El script `infra\gfw-api-key.ps1` crea la key y la guarda en Secret Manager (`gfw-api-key`). Tiene una opción 3 para probar con el token de una sesión de Google.
+  - Para usarla, despliega con `--set-secrets=GFW_API_KEY=gfw-api-key:latest --update-env-vars=SATELITE=gfw`. La key vence al año.
 
 ## 4e. Cultivos (café y cacao)
 

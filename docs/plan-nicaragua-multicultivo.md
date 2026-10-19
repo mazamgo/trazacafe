@@ -107,6 +107,7 @@ Es la parte que **paga el cliente**.
 - **Attestations: código hecho**: firma con Cloud KMS, worker en cuatro olas, migración 011 y esquema `Chequeo` separado de `Finca`. Detalle en `infra/README.md` §3.
   - La clave HSM ya está creada (dirección `0xBFC2333a01536EdFDB3e6aB987c544CDeAC8CB99`).
   - Faltan: ETH de prueba, registrar los esquemas en OP Sepolia, aplicar la 011, desplegar y programar el worker.
+- **Chequeo satelital propio: hecho.** Mapas públicos JRC GFC2020 V4 (bosque 2020, la referencia de la UE) y Hansen/UMD v1.12 (pérdida 2021-2024), leídos por partes. Ya no se depende de la key de GFW, que queda como complemento opcional para alertas recientes. Detalle en `infra/README.md` §4d.
 - Sigue el verificador público.
 
 - **Lotes** (beneficio o centro de acopio):

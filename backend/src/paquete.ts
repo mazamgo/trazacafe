@@ -138,7 +138,8 @@ export function pdfPaquete(p: Paquete, generado = new Date()): Promise<Buffer> {
   fila("Fincas de origen", `${p.fincas.length} (${ha.toFixed(2)} ha oficiales, calculadas sobre el elipsoide WGS84)`);
   fila(
     "Deforestación",
-    `Corte: 31/12/2020. Chequeo satelital (Global Forest Watch): ${porEstado("verde")} verde, ` +
+    "Corte: 31/12/2020. Chequeo satelital contra el mapa de bosque 2020 de la Comisión Europea (JRC GFC2020) " +
+      `y la pérdida anual de cobertura arbórea (Hansen/UMD): ${porEstado("verde")} verde, ` +
       `${porEstado("amarillo")} amarillo, ${porEstado("rojo")} rojo, ${porEstado("pendiente")} sin chequeo.`,
   );
   fila("Visitas de campo", `${p.fincas.filter((f) => f.ultimaVisita).length} de ${p.fincas.length} fincas con visita de verificación registrada.`);
