@@ -252,7 +252,7 @@ class ApiClient {
 
   /// Envía un lote de registros a `POST /v1/sync`.
   Future<Map<String, dynamic>> sync(Map<String, dynamic> payload) =>
-      _pedir('POST', '/v1/sync', payload);
+      _pedirJson('POST', '/v1/sync', payload, reintentable: true);
 
   /// Crea una temporada de cosecha (solo administradores). Fechas `AAAA-MM-DD`.
   /// Sin [cultivo], aplica a todos los cultivos de la organización.
@@ -274,10 +274,11 @@ class ApiClient {
       _pedir('PUT', '/v1/organizacion/cultivos', {'cultivos': cultivos});
 
   /// Revisa la finca por satélite ahora mismo (solo administradores).
-  Future<Map<String, dynamic>> chequearFinca(String fincaId) => _pedir(
+  Future<Map<String, dynamic>> chequearFinca(String fincaId) => _pedirJson(
     'POST',
     '/v1/fincas/${Uri.encodeComponent(fincaId)}/chequeo',
     const <String, dynamic>{},
+    reintentable: true,
   );
 
   /// Cambia el cultivo de una finca ya enviada. La API lo rechaza (409) si
@@ -292,16 +293,21 @@ class ApiClient {
   Future<Map<String, dynamic>> datos() => _pedir('GET', '/v1/datos');
 
   /// Pide a la API que compruebe el archivo de la foto ya subido a Storage.
-  Future<void> confirmarFoto(String fotoId) => _pedir(
+  Future<void> confirmarFoto(String fotoId) => _pedirJson(
     'POST',
     '/v1/fotos/${Uri.encodeComponent(fotoId)}/subida',
     const <String, dynamic>{},
+    reintentable: true,
   );
 
   /// Activa la invitación del correo con el que se inició sesión. Lleva `{}`
   /// porque el frontal de Cloud Run rechaza POST sin cuerpo (411).
-  Future<void> activar() =>
-      _pedir('POST', '/v1/activar', const <String, dynamic>{});
+  Future<void> activar() => _pedirJson(
+    'POST',
+    '/v1/activar',
+    const <String, dynamic>{},
+    reintentable: true,
+  );
 
   /// Borra en la API una finca que aún no se atestó. Si ya no existe allá, no
   /// es error: el objetivo es que desaparezca.
@@ -451,13 +457,41 @@ class ApiClient {
   Future<void> quitarAcceso(String email) =>
       _pedir('DELETE', '/v1/invitaciones/${Uri.encodeComponent(email)}');
 
+  /// Envía la petición. Si la conexión se cae antes de llegar la respuesta
+  /// (p. ej. "Connection closed before full header was received": el celular
+  /// reusó una conexión que ya se cerraba, o la señal parpadeó), la repite una
+  /// vez, pero solo si repetirla no tiene efectos dobles ([reintentable]).
+  Future<http.Response> _enviar(
+    http.Request Function() crear, {
+    required bool reintentable,
+  }) async {
+    for (var intento = 1; ; intento++) {
+      try {
+        return await http.Response.fromStream(await _cliente.send(crear()));
+      } on http.ClientException {
+        if (reintentable && intento == 1) {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          continue;
+        }
+        throw ApiError(
+          0,
+          'Se cortó la conexión con el servidor antes de recibir la respuesta; '
+          'la acción pudo haberse hecho. Revisa la señal y vuelve a intentar.',
+        );
+      }
+    }
+  }
+
   /// GET de un archivo (PDF, GeoJSON): devuelve los bytes tal cual.
   Future<List<int>> _descargar(String ruta) async {
     final t = await token();
     if (t == null) throw ApiError(401, 'Inicia sesión para continuar.');
-    final req = http.Request('GET', _base.resolve(ruta))
-      ..headers['Authorization'] = 'Bearer $t';
-    final res = await http.Response.fromStream(await _cliente.send(req));
+    final res = await _enviar(
+      () =>
+          http.Request('GET', _base.resolve(ruta))
+            ..headers['Authorization'] = 'Bearer $t',
+      reintentable: true,
+    );
     if (res.statusCode >= 300) {
       final json = res.body.isEmpty
           ? <String, dynamic>{}
@@ -467,21 +501,40 @@ class ApiClient {
     return res.bodyBytes;
   }
 
+  /// [reintentable]: se puede repetir sin efectos dobles. Por defecto, las
+  /// lecturas y ediciones (GET, PUT, PATCH); un POST o DELETE solo si se indica
+  /// (crear un lote dos veces daría "ya existe", y borrar dos veces, 404).
   Future<Map<String, dynamic>> _pedir(
     String metodo,
     String ruta, [
     Object? cuerpo,
-  ]) async {
+  ]) => _pedirJson(
+    metodo,
+    ruta,
+    cuerpo,
+    reintentable: const {'GET', 'PUT', 'PATCH'}.contains(metodo),
+  );
+
+  Future<Map<String, dynamic>> _pedirJson(
+    String metodo,
+    String ruta,
+    Object? cuerpo, {
+    required bool reintentable,
+  }) async {
     final t = await token();
     if (t == null) throw ApiError(401, 'Inicia sesión para continuar.');
 
-    final req = http.Request(metodo, _base.resolve(ruta))
-      ..headers['Authorization'] = 'Bearer $t';
-    if (cuerpo != null) {
-      req.headers['Content-Type'] = 'application/json';
-      req.body = jsonEncode(cuerpo);
+    http.Request crear() {
+      final req = http.Request(metodo, _base.resolve(ruta))
+        ..headers['Authorization'] = 'Bearer $t';
+      if (cuerpo != null) {
+        req.headers['Content-Type'] = 'application/json';
+        req.body = jsonEncode(cuerpo);
+      }
+      return req;
     }
-    final res = await http.Response.fromStream(await _cliente.send(req));
+
+    final res = await _enviar(crear, reintentable: reintentable);
     final json = res.body.isEmpty
         ? <String, dynamic>{}
         : jsonDecode(res.body) as Map<String, dynamic>;
