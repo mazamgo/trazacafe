@@ -121,7 +121,27 @@ const easAbi = parseAbi([
   "struct MultiAttestationRequest { bytes32 schema; AttestationRequestData[] data; }",
   "function multiAttest(MultiAttestationRequest[] multiRequests) payable returns (bytes32[])",
   "event Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schemaUID)",
+  "error NotFound()",
+  "error InvalidSchema()",
 ]);
+
+/**
+ * El RPC público reparte las peticiones entre nodos: justo después de
+ * confirmarse una ola, un nodo atrasado todavía no ve sus attestations y la
+ * siguiente ola, que apunta a ellas (refUID), falla con NotFound. Se espera
+ * y se reintenta; cualquier otro error sale de inmediato.
+ */
+export async function reintentarSiNoExiste<T>(enviar: () => Promise<T>, intentos = 5, esperaMs = 3000): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await enviar();
+    } catch (e) {
+      const noExiste = /NotFound|0xc5723b51/.test((e as Error).message);
+      if (!noExiste || i >= intentos) throw e;
+      await new Promise((r) => setTimeout(r, esperaMs));
+    }
+  }
+}
 
 /** EAS del OP Stack (predeploy) con una cuenta que firma (Cloud KMS). */
 export class EasViem implements RedEAS {
@@ -141,14 +161,16 @@ export class EasViem implements RedEAS {
 
   async atestar(solicitudes: Solicitud[]) {
     const { pedido, orden } = agruparPorEsquema(solicitudes);
-    const txHash = await this.billetera.writeContract({
-      address: EAS_ADDRESS,
-      abi: easAbi,
-      functionName: "multiAttest",
-      args: [pedido],
-      chain: this.chain,
-      account: this.cuenta,
-    });
+    const txHash = await reintentarSiNoExiste(() =>
+      this.billetera.writeContract({
+        address: EAS_ADDRESS,
+        abi: easAbi,
+        functionName: "multiAttest",
+        args: [pedido],
+        chain: this.chain,
+        account: this.cuenta,
+      }),
+    );
     const recibo = await this.publico.waitForTransactionReceipt({ hash: txHash });
     if (recibo.status !== "success") throw new Error(`La transacción ${txHash} falló`);
     const eventos = parseEventLogs({ abi: easAbi, logs: recibo.logs, eventName: "Attested" }).filter(

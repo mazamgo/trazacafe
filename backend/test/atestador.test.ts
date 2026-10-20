@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   agruparPorEsquema,
   procesarCola,
+  reintentarSiNoExiste,
   type ColaAttestations,
   type Ola,
   type Pendiente,
@@ -48,6 +49,37 @@ class RedFalsa implements RedEAS {
     return { uids: s.map((x) => `0xa${x.data.slice(3)}` as Hex), txHash: uid(this.llamadas.length) };
   }
 }
+
+describe("reintentarSiNoExiste", () => {
+  /** Falla con [error] las primeras [n] veces y luego responde "tx". */
+  const enviarQueFalla = (n: number, error: string) => {
+    let llamadas = 0;
+    const enviar = async () => {
+      llamadas++;
+      if (llamadas <= n) throw new Error(error);
+      return "tx";
+    };
+    return { enviar, llamadas: () => llamadas };
+  };
+
+  it("reintenta cuando un nodo atrasado todavía no ve la attestation de la ola anterior", async () => {
+    const f = enviarQueFalla(2, 'The contract function "multiAttest" reverted with the following signature:\n0xc5723b51');
+    expect(await reintentarSiNoExiste(f.enviar, 5, 0)).toBe("tx");
+    expect(f.llamadas()).toBe(3);
+  });
+
+  it("no reintenta otros errores", async () => {
+    const f = enviarQueFalla(1, "insufficient funds for gas");
+    await expect(reintentarSiNoExiste(f.enviar, 5, 0)).rejects.toThrow("insufficient funds");
+    expect(f.llamadas()).toBe(1);
+  });
+
+  it("se rinde después de los intentos", async () => {
+    const f = enviarQueFalla(9, 'reverted with the following reason: NotFound()');
+    await expect(reintentarSiNoExiste(f.enviar, 3, 0)).rejects.toThrow("NotFound");
+    expect(f.llamadas()).toBe(3);
+  });
+});
 
 describe("procesarCola", () => {
   it("firma ola por ola, una transacción por ola, y salta las vacías", async () => {

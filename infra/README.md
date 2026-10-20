@@ -76,7 +76,14 @@ El worker firma en cuatro olas, una transacción por ola, para que cada attestat
 | 3 | `Lote` | Lleva los UIDs de sus entregas |
 | 4 | `Exportacion` | Lleva los UIDs de sus lotes; solo cerrada y con la referencia de la DDS |
 
-- **Fallos:** si una ola falla, se reintenta a los 15 minutos.
+- **Fallos:** si una ola falla, se reintenta a los 15 minutos. Si falla con `NotFound` porque el nodo del RPC público todavía no ve la ola anterior, se reintenta en el momento (hasta 5 veces, cada 3 s).
+- **Activado en OP Sepolia (20/10/2026):**
+  - los 6 esquemas están registrados con la clave KMS (`0xBFC2…CB99`);
+  - la API tiene `KMS_KEY_VERSION` y `EAS_RED=optimism-sepolia`;
+  - el job de Cloud Scheduler `attestations` (us-east4) corre cada hora, al minuto 15, hora de Managua.
+  - **Costo real:** una ola de 2 fincas usó unos 660,000 de gas, menos de 0.000001 ETH de prueba.
+  - **Primera firma:** Finca Cacaito y La Leonesa (v1).
+  - **Consultar en el explorador:** https://optimism-sepolia.easscan.org/address/0xBFC2333a01536EdFDB3e6aB987c544CDeAC8CB99
 - **Registro:** lo firmado queda en la tabla `attestaciones` (red y transacción).
 - **Privacidad:** en la blockchain solo van ids, hashes, cantidades y textos de catálogo, nunca nombres de personas.
 
@@ -175,7 +182,7 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - **Validación:** la API rechaza (422) las fincas de un cultivo que la organización no tiene activado y las entregas cuyo estado no corresponde al cultivo de su finca (por ejemplo, cacao en `uva`).
 - **App:** **Nueva finca** siempre muestra el cultivo. Con un solo cultivo activado aparece fijo, y al administrador se le indica dónde activar más. Con varios, se elige con el selector Café | Cacao.
 - **Cambiar cultivo:** en el detalle de la finca, solo mientras no tenga entregas ni esté atestada (`PUT /v1/fincas/:id/cultivo`; necesita señal si la finca ya se envió). Las visitas pasan a la temporada del cultivo nuevo.
-- **Attestations:** los esquemas `Finca` y `Entrega` incluyen `cultivo`. Todavía no están registrados en la blockchain.
+- **Attestations:** los esquemas `Finca` y `Entrega` incluyen `cultivo`. Registrados en OP Sepolia el 20/10/2026 (sección 3).
 
 ## 4f. Lotes (Fase 2)
 
@@ -264,7 +271,7 @@ Endpoints:
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
-- Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`.
+- Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`, `POST /v1/tareas/attestations`.
 
 **URL de la API:** https://trazacafe-api-85528878949.us-east4.run.app
 
