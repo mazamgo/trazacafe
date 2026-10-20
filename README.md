@@ -1,10 +1,19 @@
 # TrazaCafé
 
-Trazabilidad de café y cacao nicaragüenses para el reglamento europeo contra la deforestación (EUDR). Cada paso de la cadena de custodia (finca → entrega → lote → exportación) se registra como *attestation* de [EAS](https://attest.org) en OP Mainnet. El comprador lo verifica escaneando un QR.
+Trazabilidad de café y cacao nicaragüenses para el reglamento europeo contra la deforestación (EUDR). Cada paso de la cadena de custodia (finca → entrega → lote → exportación) se registra como *attestation* de [EAS](https://attest.org) en el OP Stack (hoy en OP Sepolia, la red de pruebas; en producción, OP Mainnet). El comprador lo verifica escaneando un QR.
 
-Planes:
-- [docs/plan-nicaragua-multicultivo.md](docs/plan-nicaragua-multicultivo.md): plan vigente (rentable en Nicaragua con café y cacao, después la región).
-- [docs/plan-mvp-trazabilidad-cafe.md](docs/plan-mvp-trazabilidad-cafe.md): MVP original.
+## Documentación
+
+| Documento | Para quién | Qué tiene |
+|---|---|---|
+| [docs/guia-de-uso.md](docs/guia-de-uso.md) | Técnicos y administradores | Manual de la app, paso a paso |
+| [infra/README.md](infra/README.md) | Quien instala o mantiene el sistema | Google Cloud, Firebase, base de datos, API, satélite, attestations, verificador y cómo desplegar |
+| [app/README.md](app/README.md) | Desarrolladores de la app | Estructura, variables de compilación, APK, web y pruebas |
+| [backend/.env.example](backend/.env.example) | Desarrolladores de la API | Todas las variables de entorno, explicadas |
+| [docs/plan-nicaragua-multicultivo.md](docs/plan-nicaragua-multicultivo.md) | Todos | Plan vigente y avance por fase |
+| [docs/plan-mvp-trazabilidad-cafe.md](docs/plan-mvp-trazabilidad-cafe.md) | Referencia | MVP original |
+
+Cada cambio en la app o la API actualiza en el mismo commit la documentación que afecta (ver `CLAUDE.md`).
 
 ## Estructura
 

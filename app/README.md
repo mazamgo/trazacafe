@@ -1,17 +1,71 @@
-# trazacafe
+# TrazaCafé: app Flutter
 
-Trazabilidad de cafe para EUDR con EAS en OP Mainnet
+Un solo proyecto Flutter da dos productos:
 
-## Getting Started
+| Producto | Plataforma | Quién lo usa |
+|---|---|---|
+| **App de campo** | Android (APK) | Técnicos y administradores de la cooperativa o exportadora. Funciona sin internet y sincroniza cuando hay señal. |
+| **Verificador público** | Web (Firebase Hosting, `/v/{uid}`) | El comprador que escanea el QR del contenedor. Sin cuenta. |
 
-This project is a starting point for a Flutter application.
+En la web solo se abre el verificador (`lib/main.dart`). El manual para las personas que usan la app está en [`docs/guia-de-uso.md`](../docs/guia-de-uso.md); la infraestructura, en [`infra/README.md`](../infra/README.md).
 
-A few resources to get you started if this is your first Flutter project:
+## Estructura
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+| Carpeta | Contenido |
+|---|---|
+| `lib/screens/` | Pantallas: login, productores, fincas, visitas, entregas, temporadas, equipo, cultivos, lotes, contenedores y verificador |
+| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión), sincronización, fincas, fotos, mapas, correcciones, compartir archivos y verificador |
+| `lib/data/` | Base local SQLite con drift (`database.dart`; `database.g.dart` es generado) |
+| `lib/domain/` | Reglas puras: geometría y polígonos, cédula nicaragüense, cultivos (`cultivos_generados.dart` sale de `schemas/cultivos.json`) |
+| `lib/widgets/` | Formulario de entrega, mapa de Google, motivo de corrección, fotos |
+| `test/` | Pruebas de pantallas, servicios y base local |
+| `web/` | Página base del verificador (`index.html`, íconos) |
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Variables de compilación (`--dart-define`)
+
+| Variable | Para qué | Valor por defecto |
+|---|---|---|
+| `API_URL` | URL de la API | `http://10.0.2.2:8080` (emulador). **Siempre** pasar la de Cloud Run al compilar el APK o la web. |
+| `EAS_RED` | Red donde el verificador comprueba las attestations: `optimism-sepolia` u `optimism` | `optimism-sepolia` |
+| `VERIFICADOR_URL` | Página que va en el QR | `https://trazacafe-dev.web.app` |
+| `GOOGLE_MAPS_KEY` | Key de Google Map Tiles (solo Android) | la key restringida del proyecto |
+| `ANDROID_CERT_SHA1` | SHA-1 del certificado que firma el APK (Google Map Tiles lo exige) | el certificado de depuración actual |
+
+## Comandos
+
+```powershell
+flutter pub get
+
+# APK para los celulares del equipo
+flutter build apk --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
+# → build\app\outputs\flutter-apk\app-release.apk
+
+# Verificador web (después: firebase deploy --only hosting, desde la raíz)
+flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
+
+# Pruebas: en Windows, mejor archivo por archivo (ver dart_test.yaml)
+powershell -ExecutionPolicy Bypass -File tool\probar.ps1
+flutter analyze
+
+# Después de cambiar las tablas de lib/data/database.dart
+dart run build_runner build
+
+# Después de cambiar schemas/cultivos.json (desde la raíz)
+npm run cultivos-dart --workspace schemas
+
+# Ícono de la app (assets/icon/icono.png)
+dart run flutter_launcher_icons
+```
+
+## Firma del APK
+
+El APK release se firma con el **certificado de depuración** de esta computadora (`%USERPROFILE%\.android\debug.keystore`). Su SHA-1 está registrado en Firebase (login con Google) y en la key de mapas.
+
+- **Respalda ese archivo.** Si se pierde, los APK nuevos no podrán iniciar sesión ni cargar mapas hasta registrar el SHA-1 del certificado nuevo (`infra/README.md` §4).
+- Para Play Store hace falta un certificado de subida propio y registrar el SHA-1 de Play App Signing.
+
+## Base local
+
+- **Versión actual del esquema:** 6. Cada cambio sube `schemaVersion` y agrega su paso en `migration`, con su prueba en `test/temporadas_visitas_test.dart`.
+- **Sin señal:** la app guarda todo en el celular y lo envía con **Sincronizar**.
+- **Al sincronizar:** el servidor devuelve los datos de toda la organización y la app actualiza su copia, sin perder lo que todavía no se ha enviado.
