@@ -2977,6 +2977,32 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _loteCodigoMeta = const VerificationMeta(
+    'loteCodigo',
+  );
+  @override
+  late final GeneratedColumn<String> loteCodigo = GeneratedColumn<String>(
+    'lote_codigo',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _corregidaMeta = const VerificationMeta(
+    'corregida',
+  );
+  @override
+  late final GeneratedColumn<bool> corregida = GeneratedColumn<bool>(
+    'corregida',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("corregida" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2988,6 +3014,8 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
     attestationUid,
     creadoEn,
     sincronizado,
+    loteCodigo,
+    corregida,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3068,6 +3096,18 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
         ),
       );
     }
+    if (data.containsKey('lote_codigo')) {
+      context.handle(
+        _loteCodigoMeta,
+        loteCodigo.isAcceptableOrUnknown(data['lote_codigo']!, _loteCodigoMeta),
+      );
+    }
+    if (data.containsKey('corregida')) {
+      context.handle(
+        _corregidaMeta,
+        corregida.isAcceptableOrUnknown(data['corregida']!, _corregidaMeta),
+      );
+    }
     return context;
   }
 
@@ -3113,6 +3153,14 @@ class $EntregasTable extends Entregas with TableInfo<$EntregasTable, Entrega> {
         DriftSqlType.bool,
         data['${effectivePrefix}sincronizado'],
       )!,
+      loteCodigo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lote_codigo'],
+      ),
+      corregida: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}corregida'],
+      )!,
     );
   }
 
@@ -3134,6 +3182,12 @@ class Entrega extends DataClass implements Insertable<Entrega> {
   final String? attestationUid;
   final DateTime creadoEn;
   final bool sincronizado;
+
+  /// Lote en que va (llega del servidor). En un lote ya no se corrige.
+  final String? loteCodigo;
+
+  /// Tiene correcciones en el historial del servidor.
+  final bool corregida;
   const Entrega({
     required this.id,
     required this.fincaId,
@@ -3144,6 +3198,8 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     this.attestationUid,
     required this.creadoEn,
     required this.sincronizado,
+    this.loteCodigo,
+    required this.corregida,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3161,6 +3217,10 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     }
     map['creado_en'] = Variable<DateTime>(creadoEn);
     map['sincronizado'] = Variable<bool>(sincronizado);
+    if (!nullToAbsent || loteCodigo != null) {
+      map['lote_codigo'] = Variable<String>(loteCodigo);
+    }
+    map['corregida'] = Variable<bool>(corregida);
     return map;
   }
 
@@ -3179,6 +3239,10 @@ class Entrega extends DataClass implements Insertable<Entrega> {
           : Value(attestationUid),
       creadoEn: Value(creadoEn),
       sincronizado: Value(sincronizado),
+      loteCodigo: loteCodigo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(loteCodigo),
+      corregida: Value(corregida),
     );
   }
 
@@ -3197,6 +3261,8 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       attestationUid: serializer.fromJson<String?>(json['attestationUid']),
       creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
       sincronizado: serializer.fromJson<bool>(json['sincronizado']),
+      loteCodigo: serializer.fromJson<String?>(json['loteCodigo']),
+      corregida: serializer.fromJson<bool>(json['corregida']),
     );
   }
   @override
@@ -3212,6 +3278,8 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       'attestationUid': serializer.toJson<String?>(attestationUid),
       'creadoEn': serializer.toJson<DateTime>(creadoEn),
       'sincronizado': serializer.toJson<bool>(sincronizado),
+      'loteCodigo': serializer.toJson<String?>(loteCodigo),
+      'corregida': serializer.toJson<bool>(corregida),
     };
   }
 
@@ -3225,6 +3293,8 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     Value<String?> attestationUid = const Value.absent(),
     DateTime? creadoEn,
     bool? sincronizado,
+    Value<String?> loteCodigo = const Value.absent(),
+    bool? corregida,
   }) => Entrega(
     id: id ?? this.id,
     fincaId: fincaId ?? this.fincaId,
@@ -3237,6 +3307,8 @@ class Entrega extends DataClass implements Insertable<Entrega> {
         : this.attestationUid,
     creadoEn: creadoEn ?? this.creadoEn,
     sincronizado: sincronizado ?? this.sincronizado,
+    loteCodigo: loteCodigo.present ? loteCodigo.value : this.loteCodigo,
+    corregida: corregida ?? this.corregida,
   );
   Entrega copyWithCompanion(EntregasCompanion data) {
     return Entrega(
@@ -3255,6 +3327,10 @@ class Entrega extends DataClass implements Insertable<Entrega> {
       sincronizado: data.sincronizado.present
           ? data.sincronizado.value
           : this.sincronizado,
+      loteCodigo: data.loteCodigo.present
+          ? data.loteCodigo.value
+          : this.loteCodigo,
+      corregida: data.corregida.present ? data.corregida.value : this.corregida,
     );
   }
 
@@ -3269,7 +3345,9 @@ class Entrega extends DataClass implements Insertable<Entrega> {
           ..write('fecha: $fecha, ')
           ..write('attestationUid: $attestationUid, ')
           ..write('creadoEn: $creadoEn, ')
-          ..write('sincronizado: $sincronizado')
+          ..write('sincronizado: $sincronizado, ')
+          ..write('loteCodigo: $loteCodigo, ')
+          ..write('corregida: $corregida')
           ..write(')'))
         .toString();
   }
@@ -3285,6 +3363,8 @@ class Entrega extends DataClass implements Insertable<Entrega> {
     attestationUid,
     creadoEn,
     sincronizado,
+    loteCodigo,
+    corregida,
   );
   @override
   bool operator ==(Object other) =>
@@ -3298,7 +3378,9 @@ class Entrega extends DataClass implements Insertable<Entrega> {
           other.fecha == this.fecha &&
           other.attestationUid == this.attestationUid &&
           other.creadoEn == this.creadoEn &&
-          other.sincronizado == this.sincronizado);
+          other.sincronizado == this.sincronizado &&
+          other.loteCodigo == this.loteCodigo &&
+          other.corregida == this.corregida);
 }
 
 class EntregasCompanion extends UpdateCompanion<Entrega> {
@@ -3311,6 +3393,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
   final Value<String?> attestationUid;
   final Value<DateTime> creadoEn;
   final Value<bool> sincronizado;
+  final Value<String?> loteCodigo;
+  final Value<bool> corregida;
   final Value<int> rowid;
   const EntregasCompanion({
     this.id = const Value.absent(),
@@ -3322,6 +3406,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     this.attestationUid = const Value.absent(),
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.loteCodigo = const Value.absent(),
+    this.corregida = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EntregasCompanion.insert({
@@ -3334,6 +3420,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     this.attestationUid = const Value.absent(),
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.loteCodigo = const Value.absent(),
+    this.corregida = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        fincaId = Value(fincaId),
@@ -3350,6 +3438,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     Expression<String>? attestationUid,
     Expression<DateTime>? creadoEn,
     Expression<bool>? sincronizado,
+    Expression<String>? loteCodigo,
+    Expression<bool>? corregida,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3362,6 +3452,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
       if (attestationUid != null) 'attestation_uid': attestationUid,
       if (creadoEn != null) 'creado_en': creadoEn,
       if (sincronizado != null) 'sincronizado': sincronizado,
+      if (loteCodigo != null) 'lote_codigo': loteCodigo,
+      if (corregida != null) 'corregida': corregida,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3376,6 +3468,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     Value<String?>? attestationUid,
     Value<DateTime>? creadoEn,
     Value<bool>? sincronizado,
+    Value<String?>? loteCodigo,
+    Value<bool>? corregida,
     Value<int>? rowid,
   }) {
     return EntregasCompanion(
@@ -3388,6 +3482,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
       attestationUid: attestationUid ?? this.attestationUid,
       creadoEn: creadoEn ?? this.creadoEn,
       sincronizado: sincronizado ?? this.sincronizado,
+      loteCodigo: loteCodigo ?? this.loteCodigo,
+      corregida: corregida ?? this.corregida,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3422,6 +3518,12 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
     if (sincronizado.present) {
       map['sincronizado'] = Variable<bool>(sincronizado.value);
     }
+    if (loteCodigo.present) {
+      map['lote_codigo'] = Variable<String>(loteCodigo.value);
+    }
+    if (corregida.present) {
+      map['corregida'] = Variable<bool>(corregida.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3440,6 +3542,8 @@ class EntregasCompanion extends UpdateCompanion<Entrega> {
           ..write('attestationUid: $attestationUid, ')
           ..write('creadoEn: $creadoEn, ')
           ..write('sincronizado: $sincronizado, ')
+          ..write('loteCodigo: $loteCodigo, ')
+          ..write('corregida: $corregida, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6278,6 +6382,8 @@ typedef $$EntregasTableCreateCompanionBuilder = EntregasCompanion Function({
   Value<String?> attestationUid,
   Value<DateTime> creadoEn,
   Value<bool> sincronizado,
+  Value<String?> loteCodigo,
+  Value<bool> corregida,
   Value<int> rowid,
 });
 typedef $$EntregasTableUpdateCompanionBuilder = EntregasCompanion Function({
@@ -6290,6 +6396,8 @@ typedef $$EntregasTableUpdateCompanionBuilder = EntregasCompanion Function({
   Value<String?> attestationUid,
   Value<DateTime> creadoEn,
   Value<bool> sincronizado,
+  Value<String?> loteCodigo,
+  Value<bool> corregida,
   Value<int> rowid,
 });
 
@@ -6361,6 +6469,16 @@ class $$EntregasTableFilterComposer
 
   ColumnFilters<bool> get sincronizado => $composableBuilder(
     column: $table.sincronizado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get loteCodigo => $composableBuilder(
+    column: $table.loteCodigo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get corregida => $composableBuilder(
+    column: $table.corregida,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6437,6 +6555,16 @@ class $$EntregasTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get loteCodigo => $composableBuilder(
+    column: $table.loteCodigo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get corregida => $composableBuilder(
+    column: $table.corregida,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FincasTableOrderingComposer get fincaId {
     final $$FincasTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6500,6 +6628,14 @@ class $$EntregasTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get loteCodigo => $composableBuilder(
+    column: $table.loteCodigo,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get corregida =>
+      $composableBuilder(column: $table.corregida, builder: (column) => column);
+
   $$FincasTableAnnotationComposer get fincaId {
     final $$FincasTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -6561,6 +6697,8 @@ class $$EntregasTableTableManager
                 Value<String?> attestationUid = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<String?> loteCodigo = const Value.absent(),
+                Value<bool> corregida = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntregasCompanion(
                 id: id,
@@ -6572,6 +6710,8 @@ class $$EntregasTableTableManager
                 attestationUid: attestationUid,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                loteCodigo: loteCodigo,
+                corregida: corregida,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6585,6 +6725,8 @@ class $$EntregasTableTableManager
                 Value<String?> attestationUid = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<String?> loteCodigo = const Value.absent(),
+                Value<bool> corregida = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EntregasCompanion.insert(
                 id: id,
@@ -6596,6 +6738,8 @@ class $$EntregasTableTableManager
                 attestationUid: attestationUid,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                loteCodigo: loteCodigo,
+                corregida: corregida,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

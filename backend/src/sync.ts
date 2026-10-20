@@ -19,7 +19,7 @@ const MENSAJES_POLIGONO: Record<ProblemaPoligono, string> = {
 const coordenada = z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]);
 
 /** Fecha con zona horaria que no esté en el futuro (margen de un día). */
-const fechaPasada = (que: string) =>
+export const fechaPasada = (que: string) =>
   z.iso.datetime({ offset: true }).refine((f) => Date.parse(f) <= Date.now() + 24 * 3600_000, {
     message: `La fecha de ${que} no puede estar en el futuro`,
   });
@@ -48,10 +48,29 @@ function validarGeometria(
   }
 }
 
+/**
+ * Cédula nicaragüense normalizada (`001-010190-0001A`), o `null` si no tiene
+ * el formato: municipio (3 dígitos), fecha de nacimiento DDMMAA y 4 dígitos
+ * con una letra. Se acepta sin guiones y en minúsculas.
+ */
+export function normalizarCedula(texto: string): string | null {
+  const m = texto.trim().toUpperCase().replace(/[\s-]/g, "").match(/^(\d{3})(\d{2})(\d{2})(\d{2})(\d{4})([A-Z])$/);
+  if (!m) return null;
+  const [, municipio, dia, mes, anio, numero, letra] = m;
+  if (Number(dia) < 1 || Number(dia) > 31 || Number(mes) < 1 || Number(mes) > 12) return null;
+  return `${municipio}-${dia}${mes}${anio}-${numero}${letra}`;
+}
+
 export const productorSchema = z.object({
   id: z.uuid(),
   nombre: z.string().min(1),
-  cedula: z.string().nullish(),
+  // Se normaliza si tiene el formato; si no, se guarda como vino para no
+  // trabar la sincronización de versiones anteriores de la app (que no la
+  // validaban). La app nueva la valida al escribirla.
+  cedula: z
+    .string()
+    .nullish()
+    .transform((c) => (c ? (normalizarCedula(c) ?? c.trim()) : c)),
   comunidad: z.string().nullish(),
   consentimientoFirmado: z.literal(true, {
     error: "Falta el consentimiento firmado del productor (Ley 787)",

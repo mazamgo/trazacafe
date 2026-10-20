@@ -9,6 +9,7 @@ import {
   type NombreEsquema,
 } from "@trazacafe/eudr-eas-schemas";
 import type pg from "pg";
+import { AREA_OFICIAL } from "./repo.ts";
 import {
   createPublicClient,
   createWalletClient,
@@ -177,7 +178,7 @@ export class ColaPg implements ColaAttestations {
   private async fincas(limite: number): Promise<Pendiente[]> {
     const { rows } = await this.pool.query(
       `SELECT ap.id AS "colaId", fv.finca_id AS "fincaId", fv.version, f.cultivo, fv.geo_hash AS "geoHash",
-              fv.area_oficial_ha::float8 AS area, prev.attestation_uid AS ref,
+              ${AREA_OFICIAL("fv")}::float8 AS area, prev.attestation_uid AS ref,
               coalesce((SELECT array_agg(fo.sha256) FROM fotos fo
                         WHERE fo.entidad_tipo = 'finca' AND fo.entidad_id = f.id), '{}') AS fotos
        FROM attestations_pendientes ap

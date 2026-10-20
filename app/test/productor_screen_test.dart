@@ -46,7 +46,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Consentimiento de datos'), findsOneWidget);
-    expect(find.text('Todas las fotos están guardadas en el servidor ✓'), findsOneWidget);
+    expect(find.textContaining('Todas las fotos están guardadas en el servidor ✓'), findsOneWidget);
     expect(find.text('Leona II'), findsOneWidget);
     expect(find.text('Café · 1.92 ha'), findsOneWidget);
   });

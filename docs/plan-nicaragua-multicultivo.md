@@ -108,6 +108,7 @@ Es la parte que **paga el cliente**.
   - La clave HSM ya está creada (dirección `0xBFC2333a01536EdFDB3e6aB987c544CDeAC8CB99`).
   - Faltan: ETH de prueba, registrar los esquemas en OP Sepolia, aplicar la 011, desplegar y programar el worker.
 - **Chequeo satelital propio: hecho.** Mapas públicos JRC GFC2020 V4 (bosque 2020, la referencia de la UE) y Hansen/UMD v1.12 (pérdida 2021-2024), leídos por partes. Ya no se depende de la key de GFW, que queda como complemento opcional para alertas recientes. Detalle en `infra/README.md` §4d.
+- **Correcciones de datos: hechas** (migración 012). Se pueden corregir o anular entregas, lotes, productores, fincas, fotos, visitas y temporadas mientras no estén sellados, con historial y motivo. Detalle en `infra/README.md` §4i.
 - Sigue el verificador público.
 
 - **Lotes** (beneficio o centro de acopio):

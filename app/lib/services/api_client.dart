@@ -443,6 +443,67 @@ class ApiClient {
   Future<void> eliminarExportacion(String id) =>
       _pedir('DELETE', '/v1/exportaciones/${Uri.encodeComponent(id)}');
 
+  // Correcciones (plan de correcciones): solo mientras el dato no esté en un
+  // lote, en un contenedor o firmado. Los kg, áreas y fechas llevan motivo.
+
+  /// Corrige kg, estado o fecha de una entrega ya enviada. Devuelve la
+  /// entrega como quedó (la temporada puede cambiar con la fecha).
+  Future<Map<String, dynamic>> corregirEntrega(
+    String id,
+    Map<String, Object?> cambios,
+  ) => _pedir('PATCH', '/v1/entregas/${Uri.encodeComponent(id)}', cambios);
+
+  /// Anula una entrega ya enviada. No se repite sola si se corta la conexión.
+  Future<void> anularEntrega(String id, String motivo) => _pedirJson(
+    'POST',
+    '/v1/entregas/${Uri.encodeComponent(id)}/anular',
+    {'motivo': motivo},
+    reintentable: false,
+  );
+
+  /// Corrige peso, código, beneficio o proceso de un lote (administradores).
+  Future<Lote> corregirLote(String id, Map<String, Object?> cambios) async =>
+      Lote.desdeJson(
+        await _pedir('PATCH', '/v1/lotes/${Uri.encodeComponent(id)}', cambios),
+      );
+
+  Future<void> corregirProductor(String id, Map<String, Object?> cambios) =>
+      _pedir('PATCH', '/v1/productores/${Uri.encodeComponent(id)}', cambios);
+
+  /// Nombre de la finca y, en las de un punto, el área declarada.
+  Future<void> corregirFinca(String id, Map<String, Object?> cambios) =>
+      _pedir('PATCH', '/v1/fincas/${Uri.encodeComponent(id)}', cambios);
+
+  /// Quita una foto equivocada (y su archivo en Storage).
+  Future<void> eliminarFoto(String id) => _pedirJson(
+    'DELETE',
+    '/v1/fotos/${Uri.encodeComponent(id)}',
+    null,
+    reintentable: false,
+  );
+
+  Future<void> corregirVisita(String id, Map<String, Object?> cambios) =>
+      _pedir('PATCH', '/v1/verificaciones/${Uri.encodeComponent(id)}', cambios);
+
+  Future<void> anularVisita(String id, String motivo) => _pedirJson(
+    'POST',
+    '/v1/verificaciones/${Uri.encodeComponent(id)}/anular',
+    {'motivo': motivo},
+    reintentable: false,
+  );
+
+  /// Nombre o fechas de una temporada (administradores). Las fechas solo si
+  /// no tiene lotes; las entregas y visitas se reasignan solas.
+  Future<void> corregirTemporada(String id, Map<String, Object?> cambios) =>
+      _pedir('PATCH', '/v1/temporadas/${Uri.encodeComponent(id)}', cambios);
+
+  Future<void> eliminarTemporada(String id) => _pedirJson(
+    'DELETE',
+    '/v1/temporadas/${Uri.encodeComponent(id)}',
+    null,
+    reintentable: false,
+  );
+
   Future<List<Invitacion>> invitaciones() async {
     final r = await _pedir('GET', '/v1/invitaciones');
     return [

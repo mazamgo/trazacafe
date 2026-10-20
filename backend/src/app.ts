@@ -3,6 +3,17 @@ import { z } from "zod";
 import { rutaFoto, sha256Hex, type Almacen } from "./almacen.ts";
 import { estaActivo, type Identidad, type Usuario, type UsuarioActivo, type VerificarToken } from "./auth.ts";
 import { procesarCola, type ColaAttestations, type RedEAS } from "./atestador.ts";
+import {
+  anulacionSchema,
+  correccionEntregaSchema,
+  correccionFincaSchema,
+  correccionLoteSchema,
+  correccionProductorSchema,
+  correccionTemporadaSchema,
+  correccionVisitaSchema,
+  type Correcciones,
+  type Resultado,
+} from "./correcciones.ts";
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
 import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
 import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
@@ -29,6 +40,7 @@ export function buildApp({
   satelite,
   verificarTarea,
   atestador = null,
+  correcciones = null,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
@@ -39,6 +51,8 @@ export function buildApp({
   verificarTarea: VerificarTarea;
   /** `null` mientras no haya clave de firma en Cloud KMS. */
   atestador?: { cola: ColaAttestations; red: RedEAS } | null;
+  /** Corregir y anular datos con errores (CorreccionesPg). */
+  correcciones?: Correcciones | null;
 }) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -511,6 +525,100 @@ export function buildApp({
     if (r === "no_encontrada") return reply.code(404).send({ error: "no_encontrada" });
     if (r === "cerrada") return reply.code(409).send(respuestaCerrada);
     return reply.code(204).send();
+  });
+
+  /**
+   * Corrección común: sesión activa (o administrador), id válido, cuerpo
+   * válido; el resultado se traduce a 200, 403, 404, 409 o 422.
+   */
+  async function corregir<S extends z.ZodType, T>(
+    req: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+    opciones: { soloAdmin?: boolean; schema?: S },
+    hacer: (u: UsuarioActivo, id: string, datos: z.infer<S>) => Promise<Resultado<T>>,
+  ): Promise<{ u: UsuarioActivo; valor: T } | null> {
+    const u = await activo(req, reply, opciones.soloAdmin ?? false);
+    if (!u) return null;
+    if (!correcciones) {
+      reply.code(503).send({ error: "sin_correcciones" });
+      return null;
+    }
+    if (!z.uuid().safeParse(req.params.id).success) {
+      reply.code(404).send({ error: "no_encontrado" });
+      return null;
+    }
+    let datos: z.infer<S> = undefined as z.infer<S>;
+    if (opciones.schema) {
+      const r = opciones.schema.safeParse(req.body);
+      if (!r.success) {
+        const propio = r.error.issues.find((i) => i.path.includes("motivo") || i.path.includes("cedula"))?.message;
+        reply.code(422).send({ error: "Datos inválidos", mensaje: propio, detalles: r.error.issues });
+        return null;
+      }
+      datos = r.data;
+    }
+    const r = await hacer(u, req.params.id, datos);
+    if (!r.ok) {
+      reply.code(r.status).send({ error: "no_corregible", mensaje: r.mensaje });
+      return null;
+    }
+    return { u, valor: r.valor };
+  }
+
+  app.patch<{ Params: { id: string } }>("/v1/entregas/:id", async (req, reply) => {
+    const r = await corregir(req, reply, { schema: correccionEntregaSchema }, (u, id, d) => correcciones!.corregirEntrega(u, id, d));
+    return r ? r.valor : undefined;
+  });
+
+  app.post<{ Params: { id: string } }>("/v1/entregas/:id/anular", async (req, reply) => {
+    const r = await corregir(req, reply, { schema: anulacionSchema }, (u, id, d) => correcciones!.anularEntrega(u, id, d.motivo));
+    return r ? reply.code(204).send() : undefined;
+  });
+
+  app.patch<{ Params: { id: string } }>("/v1/lotes/:id", async (req, reply) => {
+    const r = await corregir(req, reply, { soloAdmin: true, schema: correccionLoteSchema }, (u, id, d) => correcciones!.corregirLote(u, id, d));
+    return r ? (await repo.listarLotes(r.u.organizacionId)).find((l) => l.id === req.params.id) : undefined;
+  });
+
+  app.patch<{ Params: { id: string } }>("/v1/productores/:id", async (req, reply) => {
+    const r = await corregir(req, reply, { schema: correccionProductorSchema }, (u, id, d) => correcciones!.corregirProductor(u, id, d));
+    return r ? reply.code(204).send() : undefined;
+  });
+
+  app.patch<{ Params: { id: string } }>("/v1/fincas/:id", async (req, reply) => {
+    const r = await corregir(req, reply, { schema: correccionFincaSchema }, (u, id, d) => correcciones!.corregirFinca(u, id, d));
+    return r ? reply.code(204).send() : undefined;
+  });
+
+  app.delete<{ Params: { id: string } }>("/v1/fotos/:id", async (req, reply) => {
+    const r = await corregir(req, reply, {}, (u, id) => correcciones!.eliminarFoto(u, id));
+    if (!r) return;
+    // Si falla borrar el archivo, la foto ya no está en la base: queda un
+    // archivo huérfano en Storage que solo ve la organización.
+    if (r.valor.storagePath) await almacen.borrar(r.valor.storagePath).catch(() => {});
+    return reply.code(204).send();
+  });
+
+  app.patch<{ Params: { id: string } }>("/v1/verificaciones/:id", async (req, reply) => {
+    const r = await corregir(req, reply, { schema: correccionVisitaSchema }, (u, id, d) => correcciones!.corregirVerificacion(u, id, d));
+    return r ? reply.code(204).send() : undefined;
+  });
+
+  app.post<{ Params: { id: string } }>("/v1/verificaciones/:id/anular", async (req, reply) => {
+    const r = await corregir(req, reply, { schema: anulacionSchema }, (u, id, d) => correcciones!.anularVerificacion(u, id, d.motivo));
+    return r ? reply.code(204).send() : undefined;
+  });
+
+  app.patch<{ Params: { id: string } }>("/v1/temporadas/:id", async (req, reply) => {
+    const r = await corregir(req, reply, { soloAdmin: true, schema: correccionTemporadaSchema }, (u, id, d) =>
+      correcciones!.corregirTemporada(u, id, d),
+    );
+    return r ? reply.code(204).send() : undefined;
+  });
+
+  app.delete<{ Params: { id: string } }>("/v1/temporadas/:id", async (req, reply) => {
+    const r = await corregir(req, reply, { soloAdmin: true }, (u, id) => correcciones!.eliminarTemporada(u, id));
+    return r ? reply.code(204).send() : undefined;
   });
 
   app.get("/v1/invitaciones", async (req, reply) => {

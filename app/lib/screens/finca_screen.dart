@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,7 +8,10 @@ import 'package:uuid/uuid.dart';
 import '../data/database.dart';
 import '../domain/cultivos.dart';
 import '../providers.dart';
+import '../services/correcciones_service.dart';
 import '../services/fincas_service.dart';
+import '../widgets/formulario_entrega.dart';
+import '../widgets/motivo.dart';
 import '../widgets/seccion_fotos.dart';
 import 'verificacion_screen.dart';
 
@@ -66,23 +71,30 @@ class FincaScreen extends ConsumerWidget {
       }
     }
     if (!context.mounted) return;
-    final entrega = await showModalBottomSheet<EntregasCompanion>(
+    final accion = await showModalBottomSheet<AccionEntrega>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _FormularioEntrega(
-        fincaId: fincaId,
-        cultivo: cultivoDe(finca.cultivo),
-      ),
+      builder: (_) => _formulario(ref, finca),
     );
-    if (entrega == null) return;
+    if (accion is! GuardarEntrega) return;
     final db = ref.read(databaseProvider);
     final temporada = await db.temporadaDe(
-      entrega.fecha.value,
+      accion.fecha,
       cultivo: finca.cultivo,
     );
     await db
         .into(db.entregas)
-        .insert(entrega.copyWith(temporadaId: Value(temporada?.id)));
+        .insert(
+          EntregasCompanion.insert(
+            id: const Uuid().v4(),
+            fincaId: fincaId,
+            kg: accion.kg,
+            estado: accion.estado,
+            fecha: accion.fecha,
+            creadoEn: Value(DateTime.now()),
+            temporadaId: Value(temporada?.id),
+          ),
+        );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -142,6 +154,166 @@ class FincaScreen extends ConsumerWidget {
     }
   }
 
+  /// Formulario de entrega con los datos para el aviso de rendimiento:
+  /// lo que la finca ya entregó en la temporada (sin [excluir]).
+  FormularioEntrega _formulario(
+    WidgetRef ref,
+    Finca finca, {
+    Entrega? inicial,
+  }) {
+    final cultivo = cultivoDe(finca.cultivo);
+    final exportable = cultivo.estados.firstWhere(
+      (e) => e.factorExportable == 1,
+    );
+    final temporadas =
+        ref.read(temporadasProvider).value ?? const <Temporada>[];
+    final entregas =
+        ref.read(entregasProvider(fincaId)).value ?? const <Entrega>[];
+    return FormularioEntrega(
+      cultivo: cultivo,
+      fincaNombre: finca.nombre,
+      inicial: inicial,
+      areaHa: finca.areaOficialHa ?? finca.areaHa,
+      kgExportablesTemporada: (fecha) {
+        final t = temporadaVigente(temporadas, fecha, cultivo: cultivo.id);
+        if (t == null) return 0;
+        return entregas
+            .where((e) => e.temporadaId == t.id && e.id != inicial?.id)
+            .fold(
+              0.0,
+              (s, e) => s + cultivo.convertirKg(e.kg, e.estado, exportable.id),
+            );
+      },
+    );
+  }
+
+  Future<void> _corregirEntrega(
+    BuildContext context,
+    WidgetRef ref,
+    Finca finca,
+    Entrega e,
+  ) async {
+    final bloqueo = CorreccionesService.bloqueoEntrega(e);
+    if (bloqueo != null) {
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('No se puede corregir'),
+          content: Text(bloqueo),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    final accion = await showModalBottomSheet<AccionEntrega>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _formulario(ref, finca, inicial: e),
+    );
+    if (accion == null || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    final servicio = ref.read(correccionesServiceProvider);
+    try {
+      switch (accion) {
+        case GuardarEntrega(
+          :final kg,
+          :final estado,
+          :final fecha,
+          :final motivo,
+        ):
+          await servicio.corregirEntrega(
+            e,
+            kg: kg,
+            estado: estado,
+            fecha: fecha,
+            motivo: motivo,
+          );
+          mensajero.showSnackBar(
+            const SnackBar(content: Text('Entrega corregida.')),
+          );
+        case AnularEntrega(:final motivo):
+          await servicio.anularEntrega(e, motivo);
+          mensajero.showSnackBar(
+            const SnackBar(content: Text('Entrega anulada.')),
+          );
+      }
+    } catch (error) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo corregir: $error')),
+      );
+    }
+  }
+
+  Future<void> _editarFinca(
+    BuildContext context,
+    WidgetRef ref,
+    Finca finca,
+  ) async {
+    final esPunto = (jsonDecode(finca.coordenadasJson) as List).length == 1;
+    final cambios = await showDialog<(String, double?, String?)>(
+      context: context,
+      builder: (_) => _DialogoFinca(finca: finca, esPunto: esPunto),
+    );
+    if (cambios == null || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(correccionesServiceProvider)
+          .corregirFinca(
+            finca,
+            nombre: cambios.$1,
+            areaHa: cambios.$2,
+            motivo: cambios.$3,
+          );
+      mensajero.showSnackBar(const SnackBar(content: Text('Finca corregida.')));
+    } catch (error) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo corregir: $error')),
+      );
+    }
+  }
+
+  Future<void> _corregirVisita(
+    BuildContext context,
+    WidgetRef ref,
+    Verificacion v,
+  ) async {
+    final accion = await showDialog<_AccionVisita>(
+      context: context,
+      builder: (_) => _DialogoVisita(visita: v),
+    );
+    if (accion == null || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    final servicio = ref.read(correccionesServiceProvider);
+    try {
+      if (accion.anular != null) {
+        await servicio.anularVisita(v, accion.anular!);
+        mensajero.showSnackBar(
+          const SnackBar(content: Text('Visita anulada.')),
+        );
+      } else {
+        await servicio.corregirVisita(
+          v,
+          nota: accion.nota,
+          fecha: accion.fecha,
+          motivo: accion.motivo,
+        );
+        mensajero.showSnackBar(
+          const SnackBar(content: Text('Visita corregida.')),
+        );
+      }
+    } catch (error) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo corregir: $error')),
+      );
+    }
+  }
+
   void _abrirVisita(BuildContext context, Finca finca) => Navigator.of(
     context,
   ).push(MaterialPageRoute(builder: (_) => VerificacionScreen(finca: finca)));
@@ -190,6 +362,7 @@ class FincaScreen extends ConsumerWidget {
                   finca: finca,
                   cultivo: cultivo,
                   esAdmin: esAdmin,
+                  onEditar: () => _editarFinca(context, ref, finca),
                   onCambiarCultivo:
                       FincasService.sePuedeCambiarCultivo(
                             finca,
@@ -206,6 +379,7 @@ class FincaScreen extends ConsumerWidget {
                   temporada: actual,
                   visitas: visitas,
                   onVisita: () => _abrirVisita(context, finca),
+                  onCorregir: (v) => _corregirVisita(context, ref, v),
                 ),
                 SeccionFotos(
                   titulo: 'Fotos de la finca',
@@ -236,9 +410,14 @@ class FincaScreen extends ConsumerWidget {
                     ListTile(
                       leading: const Icon(Icons.local_shipping_outlined),
                       title: Text(
-                        '${_kg(e.kg)} kg · ${cultivo.nombreEstado(e.estado)}',
+                        '${kgLegible(e.kg)} kg · ${cultivo.nombreEstado(e.estado)}',
                       ),
-                      subtitle: Text(fechaHora(e.fecha)),
+                      subtitle: Text(
+                        '${fechaHora(e.fecha)}'
+                        '${e.corregida ? ' · corregida' : ''}'
+                        '${e.loteCodigo != null ? ' · en lote ${e.loteCodigo}' : ''}',
+                      ),
+                      onTap: () => _corregirEntrega(context, ref, finca, e),
                       trailing: Icon(
                         e.sincronizado ? Icons.cloud_done : Icons.cloud_upload,
                         color: e.sincronizado ? Colors.green : Colors.orange,
@@ -256,9 +435,6 @@ class FincaScreen extends ConsumerWidget {
             ),
     );
   }
-
-  static String _kg(double kg) =>
-      kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toStringAsFixed(1);
 }
 
 String _dos(int n) => n.toString().padLeft(2, '0');
@@ -283,7 +459,7 @@ class _EncabezadoTemporada extends StatelessWidget {
       ),
       child: Text(
         '$nombre · ${entregas.length} ${entregas.length == 1 ? 'entrega' : 'entregas'} · '
-        '${FincaScreen._kg(kg)} kg',
+        '${kgLegible(kg)} kg',
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
     );
@@ -295,12 +471,16 @@ class _Resumen extends ConsumerWidget {
     required this.finca,
     required this.cultivo,
     required this.esAdmin,
+    required this.onEditar,
     this.onCambiarCultivo,
   });
 
   final Finca finca;
   final Cultivo cultivo;
   final bool esAdmin;
+
+  /// Corregir nombre y, en fincas de un punto, el área declarada.
+  final VoidCallback onEditar;
 
   /// `null` si el cultivo ya no se puede cambiar (tiene entregas) o la
   /// organización trabaja un solo cultivo.
@@ -360,6 +540,11 @@ class _Resumen extends ConsumerWidget {
                   ),
                 ),
                 const Spacer(),
+                IconButton(
+                  tooltip: 'Corregir nombre o área',
+                  onPressed: onEditar,
+                  icon: const Icon(Icons.edit_outlined),
+                ),
                 if (onCambiarCultivo != null)
                   TextButton(
                     onPressed: onCambiarCultivo,
@@ -421,11 +606,15 @@ class _TarjetaVerificacion extends StatelessWidget {
     required this.temporada,
     required this.visitas,
     required this.onVisita,
+    required this.onCorregir,
   });
 
   final Temporada? temporada;
   final List<Verificacion> visitas;
   final VoidCallback onVisita;
+
+  /// Corregir la nota o la fecha de una visita, o anularla.
+  final void Function(Verificacion) onCorregir;
 
   @override
   Widget build(BuildContext context) {
@@ -462,14 +651,31 @@ class _TarjetaVerificacion extends StatelessWidget {
                 Icon(icono, color: color),
                 const SizedBox(width: 8),
                 Expanded(child: Text(texto)),
+                if (deEsta != null)
+                  IconButton(
+                    tooltip: 'Corregir visita',
+                    onPressed: () => onCorregir(deEsta),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
               ],
             ),
             if (visitas.length > (deEsta == null ? 0 : 1))
               Padding(
                 padding: const EdgeInsets.only(left: 32, top: 4),
-                child: Text(
-                  'Visitas anteriores: ${visitas.where((v) => v != deEsta).map((v) => fecha(v.fecha)).join(', ')}',
-                  style: Theme.of(context).textTheme.bodySmall,
+                child: Wrap(
+                  spacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Visitas anteriores:',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    for (final v in visitas.where((v) => v != deEsta))
+                      ActionChip(
+                        label: Text(fecha(v.fecha)),
+                        onPressed: () => onCorregir(v),
+                      ),
+                  ],
                 ),
               ),
             Align(
@@ -491,27 +697,164 @@ class _TarjetaVerificacion extends StatelessWidget {
   }
 }
 
-class _FormularioEntrega extends StatefulWidget {
-  const _FormularioEntrega({required this.fincaId, required this.cultivo});
+/// Corregir nombre y, en fincas de un punto, el área declarada. Devuelve
+/// (nombre, área o `null` si no cambió, motivo).
+class _DialogoFinca extends StatefulWidget {
+  const _DialogoFinca({required this.finca, required this.esPunto});
 
-  final String fincaId;
-  final Cultivo cultivo;
+  final Finca finca;
+  final bool esPunto;
 
   @override
-  State<_FormularioEntrega> createState() => _FormularioEntregaState();
+  State<_DialogoFinca> createState() => _DialogoFincaState();
 }
 
-class _FormularioEntregaState extends State<_FormularioEntrega> {
-  final _kg = TextEditingController();
-  late String _estado = widget.cultivo.estados.first.id;
-  DateTime _fecha = DateTime.now();
+class _DialogoFincaState extends State<_DialogoFinca> {
+  late final _nombre = TextEditingController(text: widget.finca.nombre);
+  late final _area = TextEditingController(
+    text: widget.finca.areaHa.toString(),
+  );
+  final _motivo = TextEditingController();
   String? _error;
 
   @override
   void dispose() {
-    _kg.dispose();
+    for (final c in [_nombre, _area, _motivo]) {
+      c.dispose();
+    }
     super.dispose();
   }
+
+  void _guardar() {
+    final nombre = _nombre.text.trim();
+    final area = double.tryParse(_area.text.trim().replaceAll(',', '.'));
+    if (nombre.isEmpty) {
+      setState(() => _error = 'Escribe el nombre de la finca.');
+      return;
+    }
+    final cambiaArea = widget.esPunto && area != widget.finca.areaHa;
+    if (cambiaArea) {
+      if (area == null || area <= 0) {
+        setState(() => _error = 'Escribe el área en hectáreas.');
+        return;
+      }
+      if (area >= 4) {
+        setState(
+          () => _error = 'Una finca de 4 ha o más necesita polígono: marca el lindero en una visita.',
+        );
+        return;
+      }
+      if (widget.finca.sincronizado && _motivo.text.trim().length < 3) {
+        setState(() => _error = 'Escribe por qué corriges el área.');
+        return;
+      }
+    }
+    Navigator.pop(context, (
+      nombre,
+      cambiaArea ? area : null,
+      _motivo.text.trim().isEmpty ? null : _motivo.text.trim(),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Corregir finca'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nombre,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nombre de la finca',
+              ),
+            ),
+            if (widget.esPunto) ...[
+              TextField(
+                controller: _area,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Área declarada',
+                  suffixText: 'ha',
+                ),
+              ),
+              if (widget.finca.sincronizado)
+                TextField(
+                  controller: _motivo,
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo (si cambias el área)',
+                  ),
+                ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'El área de un polígono sale del lindero: para corregirla, '
+                  'marca un lindero nuevo en una visita de verificación.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+      ],
+    );
+  }
+}
+
+/// Resultado del diálogo de visita: corregir (nota, fecha, motivo) o anular.
+class _AccionVisita {
+  _AccionVisita({this.nota, this.fecha, this.motivo, this.anular});
+  final String? nota;
+  final DateTime? fecha;
+  final String? motivo;
+
+  /// Motivo de la anulación; `null` si es una corrección.
+  final String? anular;
+}
+
+class _DialogoVisita extends StatefulWidget {
+  const _DialogoVisita({required this.visita});
+
+  final Verificacion visita;
+
+  @override
+  State<_DialogoVisita> createState() => _DialogoVisitaState();
+}
+
+class _DialogoVisitaState extends State<_DialogoVisita> {
+  late final _nota = TextEditingController(text: widget.visita.nota ?? '');
+  final _motivo = TextEditingController();
+  late DateTime _fecha = widget.visita.fecha;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nota.dispose();
+    _motivo.dispose();
+    super.dispose();
+  }
+
+  bool get _cambiaFecha => _fecha != widget.visita.fecha;
 
   Future<void> _elegirFecha() async {
     final hoy = DateTime.now();
@@ -521,103 +864,111 @@ class _FormularioEntregaState extends State<_FormularioEntrega> {
       firstDate: DateTime(hoy.year - 1),
       lastDate: hoy,
     );
-    if (dia == null || !mounted) return;
-    final hora = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_fecha),
-    );
-    final elegido = DateTime(
-      dia.year,
-      dia.month,
-      dia.day,
-      hora?.hour ?? _fecha.hour,
-      hora?.minute ?? _fecha.minute,
-    );
-    setState(() => _fecha = elegido.isAfter(hoy) ? hoy : elegido);
+    if (dia != null) {
+      setState(
+        () => _fecha = DateTime(
+          dia.year,
+          dia.month,
+          dia.day,
+          _fecha.hour,
+          _fecha.minute,
+        ),
+      );
+    }
   }
 
   void _guardar() {
-    final kg = double.tryParse(_kg.text.trim().replaceAll(',', '.'));
-    if (kg == null || kg <= 0) {
-      setState(() => _error = 'Escribe los kilos entregados.');
+    if (_cambiaFecha &&
+        widget.visita.sincronizado &&
+        _motivo.text.trim().length < 3) {
+      setState(() => _error = 'Escribe por qué cambias la fecha.');
       return;
     }
-    // Mismo límite que la API (cultivos.json).
-    final maximo = widget.cultivo.maxKgEntrega;
-    if (kg > maximo) {
-      setState(
-        () => _error =
-            'Más de ${_miles(maximo)} kg en una entrega parece un error.',
-      );
-      return;
-    }
+    final nota = _nota.text.trim();
     Navigator.pop(
       context,
-      EntregasCompanion.insert(
-        id: const Uuid().v4(),
-        fincaId: widget.fincaId,
-        kg: kg,
-        estado: _estado,
-        fecha: _fecha,
-        creadoEn: Value(DateTime.now()),
+      _AccionVisita(
+        nota: nota.isEmpty ? null : nota,
+        fecha: _cambiaFecha ? _fecha : null,
+        motivo: _motivo.text.trim().isEmpty ? null : _motivo.text.trim(),
       ),
     );
+  }
+
+  Future<void> _anular() async {
+    final motivo = await pedirMotivo(
+      context,
+      titulo: 'Anular visita',
+      explicacion:
+          'La finca deja de contar como verificada por esta visita. '
+          'Queda en el historial con el motivo.',
+      accion: 'Anular',
+    );
+    if (motivo != null && mounted) {
+      Navigator.pop(context, _AccionVisita(anular: motivo));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final abajo =
-        MediaQuery.viewInsetsOf(context).bottom +
-        MediaQuery.paddingOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + abajo),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Nueva entrega de ${widget.cultivo.nombre.toLowerCase()}',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _kg,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: 'Kilos entregados',
-              suffixText: 'kg',
-              errorText: _error,
+    final lindero = widget.visita.linderoCambio;
+    return AlertDialog(
+      title: const Text('Corregir visita'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.event),
+              title: Text(fecha(_fecha)),
+              subtitle: Text(
+                lindero
+                    ? 'Registró un lindero nuevo: la fecha no se cambia.'
+                    : 'Fecha de la visita',
+              ),
+              onTap: lindero ? null : _elegirFecha,
             ),
-          ),
-          const SizedBox(height: 12),
-          SegmentedButton<String>(
-            segments: [
-              for (final e in widget.cultivo.estados)
-                ButtonSegment(value: e.id, label: Text(e.corto)),
-            ],
-            selected: {_estado},
-            onSelectionChanged: (s) => setState(() => _estado = s.first),
-          ),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.event),
-            title: Text(fechaHora(_fecha)),
-            subtitle: const Text('Fecha de la entrega'),
-            onTap: _elegirFecha,
-          ),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: _guardar,
-            child: const Text('Guardar entrega'),
-          ),
-        ],
+            TextField(
+              controller: _nota,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Nota'),
+            ),
+            if (_cambiaFecha && widget.visita.sincronizado)
+              TextField(
+                controller: _motivo,
+                decoration: const InputDecoration(
+                  labelText: 'Motivo del cambio de fecha',
+                ),
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            if (!lindero)
+              TextButton.icon(
+                onPressed: _anular,
+                icon: const Icon(Icons.block, color: Colors.red),
+                label: const Text(
+                  'Anular visita',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+      ],
     );
   }
 }
-
-/// 20000 → "20,000".
-String _miles(int n) =>
-    n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');

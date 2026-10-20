@@ -189,6 +189,30 @@ void main() {
     expect((await db.select(db.verificaciones).get()).single.id, 'v1', reason: 'la visita sin enviar se conserva');
   });
 
+  test('migra una base v5 a v6: las entregas quedan sin lote y sin corregir', () async {
+    final archivo = File('${Directory.systemTemp.path}/trazacafe_v5_${DateTime.now().microsecondsSinceEpoch}.sqlite');
+    final actual = AppDatabase(NativeDatabase(archivo));
+    await actual.into(actual.productores).insert(ProductoresCompanion.insert(id: 'p1', nombre: 'P'));
+    await actual.into(actual.fincas).insert(FincasCompanion.insert(
+          id: 'f1', productorId: 'p1', nombre: 'Leona II', coordenadasJson: '[[-86.0,13.0]]', areaHa: 1, geoHash: '0x0'));
+    await actual.into(actual.entregas).insert(EntregasCompanion.insert(
+          id: 'e1', fincaId: 'f1', kg: 500, estado: 'uva', fecha: DateTime(2026, 10, 10)));
+    for (final sql in [
+      'ALTER TABLE entregas DROP COLUMN lote_codigo',
+      'ALTER TABLE entregas DROP COLUMN corregida',
+      'PRAGMA user_version = 5',
+    ]) {
+      await actual.customStatement(sql);
+    }
+    await actual.close();
+
+    final migrada = AppDatabase(NativeDatabase(archivo));
+    final e = (await migrada.select(migrada.entregas).get()).single;
+    expect((e.kg, e.loteCodigo, e.corregida), (500.0, null, false));
+    await migrada.close();
+    archivo.deleteSync();
+  });
+
   test('migra una base v4 a v5: las fincas quedan como café y las temporadas para todos', () async {
     final archivo = File('${Directory.systemTemp.path}/trazacafe_v4_${DateTime.now().microsecondsSinceEpoch}.sqlite');
     final actual = AppDatabase(NativeDatabase(archivo));
@@ -198,6 +222,8 @@ void main() {
     await actual.into(actual.temporadas).insert(TemporadasCompanion.insert(
           id: 't1', nombre: '2026/27', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 9, 30)));
     for (final sql in [
+      'ALTER TABLE entregas DROP COLUMN lote_codigo',
+      'ALTER TABLE entregas DROP COLUMN corregida',
       'DROP TABLE cultivos_organizacion',
       'ALTER TABLE fincas DROP COLUMN cultivo',
       'ALTER TABLE temporadas DROP COLUMN cultivo',
@@ -224,6 +250,8 @@ void main() {
     await v4.into(v4.fincas).insert(FincasCompanion.insert(
           id: 'f1', productorId: 'p1', nombre: 'Leona II', coordenadasJson: '[[-86.0,13.0]]', areaHa: 1, geoHash: '0x0'));
     for (final sql in [
+      'ALTER TABLE entregas DROP COLUMN lote_codigo',
+      'ALTER TABLE entregas DROP COLUMN corregida',
       'DROP TABLE cultivos_organizacion',
       'ALTER TABLE fincas DROP COLUMN cultivo',
       'DROP TABLE temporadas',

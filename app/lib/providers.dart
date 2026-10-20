@@ -9,6 +9,7 @@ import 'data/database.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/compartir_service.dart';
+import 'services/correcciones_service.dart';
 import 'services/fincas_service.dart';
 import 'services/fotos_service.dart';
 import 'services/mapas_service.dart';
@@ -69,6 +70,12 @@ final syncServiceProvider = Provider<SyncService>(
     ref.watch(subidorProvider),
     () => ref.read(sesionProvider).value?.organizacionId,
   ),
+);
+
+/// Corregir o anular datos con errores (ver CorreccionesService).
+final correccionesServiceProvider = Provider<CorreccionesService>(
+  (ref) =>
+      CorreccionesService(ref.watch(databaseProvider), ref.watch(apiProvider)),
 );
 
 final fincasServiceProvider = Provider<FincasService>(

@@ -78,6 +78,21 @@ export function motivoExclusion(e: EntregaCandidata, cultivoLote: string, tempor
 const kg = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
 /**
+ * Aviso de fincas sin chequeo satelital verde, o `null` si todas lo están.
+ * Se calcula con el estado actual de las fincas cada vez que se listan los
+ * lotes: el chequeo puede llegar (o cambiar) después de armar el lote.
+ */
+export function avisoSatelite(sinVerde: number, total: number): Aviso | null {
+  if (sinVerde === 0) return null;
+  return {
+    codigo: "satelite",
+    mensaje:
+      `${sinVerde} de ${total} ${total === 1 ? "finca" : "fincas"} aún sin chequeo satelital verde ` +
+      "(pendiente o con posible pérdida de bosque). El paquete EUDR lo va a pedir.",
+  };
+}
+
+/**
  * Revisa un lote antes de guardarlo. Las entregas que no cumplen las reglas
  * lo rechazan (`rechazos`); el resto son avisos que se guardan con el lote.
  */
@@ -123,14 +138,7 @@ export function evaluarLote(
     }
   }
 
-  const sinVerde = [...fincas.values()].filter((f) => f.deforestacion !== "verde");
-  if (sinVerde.length > 0) {
-    avisos.push({
-      codigo: "satelite",
-      mensaje:
-        `${sinVerde.length} de ${fincas.size} ${fincas.size === 1 ? "finca" : "fincas"} aún sin chequeo satelital verde ` +
-        "(pendiente o con posible pérdida de bosque). El paquete EUDR lo va a pedir.",
-    });
-  }
+  const satelite = avisoSatelite([...fincas.values()].filter((f) => f.deforestacion !== "verde").length, fincas.size);
+  if (satelite) avisos.push(satelite);
   return { rechazos, avisos, kgEsperados };
 }

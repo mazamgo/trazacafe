@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database.dart';
+import '../domain/cedula.dart';
 import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../services/fincas_service.dart';
@@ -51,12 +52,56 @@ class ProductorScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _editar(BuildContext context, WidgetRef ref, Productor p) async {
+    final datos = await showDialog<(String, String?, String?)>(
+      context: context,
+      builder: (_) => _DialogoProductor(productor: p),
+    );
+    if (datos == null || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(correccionesServiceProvider)
+          .corregirProductor(
+            p,
+            nombre: datos.$1,
+            cedula: datos.$2,
+            comunidad: datos.$3,
+          );
+      mensajero.showSnackBar(
+        const SnackBar(content: Text('Productor corregido.')),
+      );
+    } catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo corregir: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fincas = ref.watch(fincasDeProductorProvider(productor.id));
+    // El productor de la lista, para ver al instante lo que se corrija.
+    final p =
+        ref
+            .watch(productoresProvider)
+            .value
+            ?.map((x) => x.productor)
+            .where((x) => x.id == productor.id)
+            .firstOrNull ??
+        productor;
 
     return Scaffold(
-      appBar: AppBar(title: Text(productor.nombre)),
+      appBar: AppBar(
+        title: Text(p.nombre),
+        actions: [
+          IconButton(
+            tooltip: 'Corregir datos del productor',
+            onPressed: () => _editar(context, ref, p),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        ],
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -138,6 +183,105 @@ class ProductorScreen extends ConsumerWidget {
         ),
         child: const Icon(Icons.add_location_alt),
       ),
+    );
+  }
+}
+
+/// Nombre, cédula (validada) y comunidad. Devuelve (nombre, cédula, comunidad).
+class _DialogoProductor extends StatefulWidget {
+  const _DialogoProductor({required this.productor});
+
+  final Productor productor;
+
+  @override
+  State<_DialogoProductor> createState() => _DialogoProductorState();
+}
+
+class _DialogoProductorState extends State<_DialogoProductor> {
+  late final _nombre = TextEditingController(text: widget.productor.nombre);
+  late final _cedula = TextEditingController(
+    text: widget.productor.cedula ?? '',
+  );
+  late final _comunidad = TextEditingController(
+    text: widget.productor.comunidad ?? '',
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    for (final c in [_nombre, _cedula, _comunidad]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _guardar() {
+    final nombre = _nombre.text.trim();
+    final cedula = _cedula.text.trim();
+    if (nombre.isEmpty) {
+      setState(() => _error = 'Escribe el nombre.');
+      return;
+    }
+    if (cedula.isNotEmpty && normalizarCedula(cedula) == null) {
+      setState(
+        () => _error = 'La cédula debe tener el formato 001-010190-0001A.',
+      );
+      return;
+    }
+    final comunidad = _comunidad.text.trim();
+    Navigator.pop(context, (
+      nombre,
+      cedula.isEmpty ? null : normalizarCedula(cedula),
+      comunidad.isEmpty ? null : comunidad,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Corregir productor'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nombre,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Nombre completo'),
+            ),
+            TextField(
+              controller: _cedula,
+              decoration: const InputDecoration(
+                labelText: 'Cédula (opcional)',
+                hintText: '001-010190-0001A',
+              ),
+            ),
+            TextField(
+              controller: _comunidad,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Comunidad (opcional)',
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+      ],
     );
   }
 }

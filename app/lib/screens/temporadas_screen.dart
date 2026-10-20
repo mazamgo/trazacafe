@@ -43,6 +43,42 @@ class TemporadasScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _corregir(
+    BuildContext context,
+    WidgetRef ref,
+    Temporada t,
+  ) async {
+    final cambios = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (_) => _DialogoCorregirTemporada(temporada: t),
+    );
+    if (cambios == null || cambios.isEmpty || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    final api = ref.read(apiProvider);
+    try {
+      if (cambios['eliminar'] == true) {
+        await api.eliminarTemporada(t.id);
+      } else {
+        await api.corregirTemporada(t.id, cambios);
+      }
+      // Las entregas y visitas se reasignan en el servidor: se descargan.
+      await ref.read(syncServiceProvider).sincronizar();
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(
+            cambios['eliminar'] == true
+                ? 'Temporada ${t.nombre} eliminada.'
+                : 'Temporada corregida.',
+          ),
+        ),
+      );
+    } catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo corregir: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final temporadas = ref.watch(temporadasProvider).value ?? const [];
@@ -89,6 +125,7 @@ class TemporadasScreen extends ConsumerWidget {
                     trailing: vigente(t)
                         ? const Chip(label: Text('Actual'))
                         : null,
+                    onTap: esAdmin ? () => _corregir(context, ref, t) : null,
                   ),
               ],
             ),
@@ -193,6 +230,11 @@ class _DialogoTemporadaState extends State<_DialogoTemporada> {
             trailing: Text(fecha(_fin)),
             onTap: () => _elegir(false),
           ),
+          if (_muyLarga(_inicio, _fin))
+            const Text(
+              'Dura más de 18 meses: revisa que el año sea el correcto.',
+              style: TextStyle(color: Colors.orange),
+            ),
           if (!_inicio.isBefore(_fin))
             Text(
               'El fin debe ser después del inicio.',
@@ -216,6 +258,167 @@ class _DialogoTemporadaState extends State<_DialogoTemporada> {
               : null,
           child: const Text('Crear'),
         ),
+      ],
+    );
+  }
+}
+
+String _iso(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// Más de 18 meses suele ser un año mal elegido (2026 en vez de 2027).
+bool _muyLarga(DateTime inicio, DateTime fin) =>
+    fin.difference(inicio).inDays > 548;
+
+/// Corrige nombre o fechas (con motivo) o elimina. Devuelve los cambios
+/// para la API, o {'eliminar': true}.
+class _DialogoCorregirTemporada extends StatefulWidget {
+  const _DialogoCorregirTemporada({required this.temporada});
+
+  final Temporada temporada;
+
+  @override
+  State<_DialogoCorregirTemporada> createState() =>
+      _DialogoCorregirTemporadaState();
+}
+
+class _DialogoCorregirTemporadaState extends State<_DialogoCorregirTemporada> {
+  late final _nombre = TextEditingController(text: widget.temporada.nombre);
+  final _motivo = TextEditingController();
+  late DateTime _inicio = widget.temporada.inicio;
+  late DateTime _fin = widget.temporada.fin;
+  String? _error;
+
+  bool get _cambianFechas =>
+      _inicio != widget.temporada.inicio || _fin != widget.temporada.fin;
+
+  @override
+  void dispose() {
+    _nombre.dispose();
+    _motivo.dispose();
+    super.dispose();
+  }
+
+  Future<void> _elegir(bool inicio) async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: inicio ? _inicio : _fin,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(DateTime.now().year + 3),
+    );
+    if (d != null) setState(() => inicio ? _inicio = d : _fin = d);
+  }
+
+  void _guardar() {
+    if (_nombre.text.trim().isEmpty || !_inicio.isBefore(_fin)) {
+      setState(
+        () => _error = 'Revisa el nombre y que el fin sea después del inicio.',
+      );
+      return;
+    }
+    if (_cambianFechas && _motivo.text.trim().length < 3) {
+      setState(() => _error = 'Escribe por qué cambias las fechas.');
+      return;
+    }
+    Navigator.pop(context, <String, Object?>{
+      if (_nombre.text.trim() != widget.temporada.nombre)
+        'nombre': _nombre.text.trim(),
+      if (_inicio != widget.temporada.inicio) 'inicio': _iso(_inicio),
+      if (_fin != widget.temporada.fin) 'fin': _iso(_fin),
+      if (_motivo.text.trim().isNotEmpty) 'motivo': _motivo.text.trim(),
+    });
+  }
+
+  Future<void> _eliminar() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('¿Eliminar ${widget.temporada.nombre}?'),
+        content: const Text(
+          'Solo se puede si no tiene lotes. Sus entregas y visitas pasan a la '
+          'temporada que les corresponda o quedan sin temporada.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      Navigator.pop(context, <String, Object?>{'eliminar': true});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Corregir temporada'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nombre,
+              decoration: const InputDecoration(labelText: 'Nombre'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Inicio'),
+              trailing: Text(fecha(_inicio)),
+              onTap: () => _elegir(true),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Fin'),
+              trailing: Text(fecha(_fin)),
+              onTap: () => _elegir(false),
+            ),
+            if (_muyLarga(_inicio, _fin))
+              const Text(
+                'Dura más de 18 meses: revisa que el año sea el correcto.',
+                style: TextStyle(color: Colors.orange),
+              ),
+            if (_cambianFechas)
+              TextField(
+                controller: _motivo,
+                decoration: const InputDecoration(
+                  labelText: 'Motivo del cambio de fechas',
+                ),
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _eliminar,
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                label: const Text(
+                  'Eliminar temporada',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _guardar, child: const Text('Guardar')),
       ],
     );
   }

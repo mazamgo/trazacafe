@@ -251,6 +251,8 @@ class SyncService {
             estado: Value(e['estado'] as String),
             fecha: Value(DateTime.parse(e['fecha'] as String).toLocal()),
             attestationUid: Value(e['attestationUid'] as String?),
+            loteCodigo: Value(e['loteCodigo'] as String?),
+            corregida: Value((e['corregida'] as bool?) ?? false),
             sincronizado: enviado,
           ),
       ],

@@ -54,6 +54,40 @@ class SeccionFotos extends ConsumerWidget {
     }
   }
 
+  /// Quitar una foto equivocada (mantenerla presionada).
+  Future<void> _quitar(BuildContext context, WidgetRef ref, Foto foto) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('¿Quitar esta foto?'),
+        content: Text(
+          foto.sincronizado
+              ? 'Se quitará del celular y del servidor (necesitas señal). '
+                    'Queda registrado en el historial.'
+              : 'Se quitará del celular. Todavía no se había enviado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(correccionesServiceProvider).eliminarFoto(foto);
+      mensajero.showSnackBar(const SnackBar(content: Text('Foto quitada.')));
+    } catch (e) {
+      mensajero.showSnackBar(SnackBar(content: Text('No se pudo quitar: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fotos =
@@ -90,14 +124,16 @@ class SeccionFotos extends ConsumerWidget {
                 scrollDirection: Axis.horizontal,
                 itemCount: fotos.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) => _Miniatura(foto: fotos[i]),
+                itemBuilder: (_, i) => GestureDetector(
+                  onLongPress: () => _quitar(context, ref, fotos[i]),
+                  child: _Miniatura(foto: fotos[i]),
+                ),
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              subidas == fotos.length
-                  ? 'Todas las fotos están guardadas en el servidor ✓'
-                  : '${fotos.length - subidas} de ${fotos.length} se subirán al sincronizar',
+              '${subidas == fotos.length ? 'Todas las fotos están guardadas en el servidor ✓' : '${fotos.length - subidas} de ${fotos.length} se subirán al sincronizar'}'
+              ' · mantén presionada una foto para quitarla',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

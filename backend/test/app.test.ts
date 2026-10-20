@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { rutaFoto, sha256Hex, type Almacen } from "../src/almacen.ts";
 import { buildApp } from "../src/app.ts";
 import type { ColaAttestations, RedEAS } from "../src/atestador.ts";
+import type { Correcciones, Resultado } from "../src/correcciones.ts";
 import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
 import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/deforestacion.ts";
 import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "../src/exportaciones.ts";
@@ -319,7 +320,12 @@ class SateliteFalso implements FuenteSatelital {
 function crearApp({
   conSatelite = true,
   atestador = null,
-}: { conSatelite?: boolean; atestador?: { cola: ColaAttestations; red: RedEAS } | null } = {}) {
+  correcciones = null,
+}: {
+  conSatelite?: boolean;
+  atestador?: { cola: ColaAttestations; red: RedEAS } | null;
+  correcciones?: Correcciones | null;
+} = {}) {
   const repo = new RepoMemoria();
   const identidad = new IdentidadFalsa();
   const almacen = new AlmacenMemoria();
@@ -332,6 +338,7 @@ function crearApp({
     verificarToken: async (t) => usuarios[t] ?? null,
     verificarTarea: async (t) => t === "oidc-scheduler",
     atestador,
+    correcciones,
   });
   return { app, repo, identidad, almacen, satelite };
 }
@@ -992,6 +999,85 @@ describe("paquete EUDR del contenedor", () => {
     const otro = "77777777-7777-4777-8777-777777777777";
     expect((await pedir(app, "GET", `/v1/exportaciones/${otro}/geojson`, "admin")).statusCode).toBe(404);
     expect((await pedir(app, "POST", `/v1/exportaciones/${otro}/cerrar`, "admin")).statusCode).toBe(404);
+  });
+});
+
+describe("correcciones", () => {
+  const ID = "88888888-8888-4888-8888-888888888888";
+
+  /** Servicio falso: registra las llamadas y responde lo que diga [respuesta]. */
+  function falso(respuesta: Resultado<unknown> = { ok: true, valor: null }) {
+    const llamadas: [string, string, string, unknown][] = [];
+    const registrar =
+      (nombre: string, valor: unknown = null) =>
+      async (u: { uid: string }, id: string, datos?: unknown) => {
+        llamadas.push([nombre, u.uid, id, datos]);
+        return respuesta.ok ? { ok: true as const, valor } : respuesta;
+      };
+    const servicio = {
+      corregirEntrega: registrar("corregirEntrega", { id: ID, kg: 500, estado: "uva", fecha: "2026-10-16T17:00:00.000Z", temporadaId: null }),
+      anularEntrega: registrar("anularEntrega"),
+      corregirLote: registrar("corregirLote"),
+      corregirProductor: registrar("corregirProductor"),
+      corregirFinca: registrar("corregirFinca"),
+      eliminarFoto: registrar("eliminarFoto", { storagePath: "organizaciones/x/fotos/f.jpg" }),
+      corregirVerificacion: registrar("corregirVerificacion"),
+      anularVerificacion: registrar("anularVerificacion"),
+      corregirTemporada: registrar("corregirTemporada"),
+      eliminarTemporada: registrar("eliminarTemporada"),
+    } as unknown as Correcciones;
+    return { servicio, llamadas };
+  }
+
+  it("corrige una entrega con motivo y devuelve sus datos nuevos", async () => {
+    const { servicio, llamadas } = falso();
+    const { app } = crearApp({ correcciones: servicio });
+    const res = await pedir(app, "PATCH", `/v1/entregas/${ID}`, "tecnico", { kg: 500, motivo: "un cero de más" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().kg).toBe(500);
+    expect(llamadas).toEqual([["corregirEntrega", "u-tec", ID, { kg: 500, motivo: "un cero de más" }]]);
+  });
+
+  it("sin motivo al corregir kg responde 422 con el mensaje para la app", async () => {
+    const { servicio, llamadas } = falso();
+    const { app } = crearApp({ correcciones: servicio });
+    const res = await pedir(app, "PATCH", `/v1/entregas/${ID}`, "tecnico", { kg: 500 });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().mensaje).toBe("Escribe el motivo de la corrección");
+    expect(llamadas).toHaveLength(0);
+  });
+
+  it("traduce los rechazos del servicio (en lote → 409, ajena → 403)", async () => {
+    const enLote = falso({ ok: false, status: 409, mensaje: "La entrega está en el lote CAFE-001; para corregirla, primero deshaz el lote." });
+    const r1 = await pedir(crearApp({ correcciones: enLote.servicio }).app, "POST", `/v1/entregas/${ID}/anular`, "tecnico", { motivo: "duplicada" });
+    expect(r1.statusCode).toBe(409);
+    expect(r1.json().mensaje).toContain("CAFE-001");
+    const ajena = falso({ ok: false, status: 403, mensaje: "Solo quien lo registró o un administrador puede corregirlo." });
+    expect((await pedir(crearApp({ correcciones: ajena.servicio }).app, "PATCH", `/v1/productores/${ID}`, "tecnico", { nombre: "Ana" })).statusCode).toBe(403);
+  });
+
+  it("anular responde 204; lotes y temporadas solo los corrige el administrador", async () => {
+    const { servicio } = falso();
+    const { app } = crearApp({ correcciones: servicio });
+    expect((await pedir(app, "POST", `/v1/entregas/${ID}/anular`, "tecnico", { motivo: "duplicada" })).statusCode).toBe(204);
+    expect((await pedir(app, "PATCH", `/v1/lotes/${ID}`, "tecnico", { codigo: "X" })).statusCode).toBe(403);
+    expect((await pedir(app, "DELETE", `/v1/temporadas/${ID}`, "tecnico")).statusCode).toBe(403);
+    expect((await pedir(app, "DELETE", `/v1/temporadas/${ID}`, "admin")).statusCode).toBe(204);
+    expect((await pedir(app, "PATCH", `/v1/fincas/${ID}`, "tecnico", { nombre: "La Leonesa II" })).statusCode).toBe(204);
+    expect((await pedir(app, "PATCH", `/v1/verificaciones/${ID}`, "tecnico", { nota: "sin cambios" })).statusCode).toBe(204);
+  });
+
+  it("quitar una foto también borra su archivo en Storage", async () => {
+    const { servicio } = falso();
+    const { app, almacen } = crearApp({ correcciones: servicio });
+    expect((await pedir(app, "DELETE", `/v1/fotos/${ID}`, "tecnico")).statusCode).toBe(204);
+    expect(almacen.borrados).toEqual(["organizaciones/x/fotos/f.jpg"]);
+  });
+
+  it("valida el id y que el servicio esté configurado", async () => {
+    const { servicio } = falso();
+    expect((await pedir(crearApp({ correcciones: servicio }).app, "PATCH", "/v1/entregas/no-es-uuid", "tecnico", { estado: "uva" })).statusCode).toBe(404);
+    expect((await pedir(crearApp().app, "PATCH", `/v1/entregas/${ID}`, "tecnico", { estado: "uva" })).statusCode).toBe(503);
   });
 });
 

@@ -54,6 +54,26 @@ class LotesScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _corregir(BuildContext context, WidgetRef ref, Lote l) async {
+    final cambios = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (_) => _DialogoLote(lote: l),
+    );
+    if (cambios == null || cambios.isEmpty || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(apiProvider).corregirLote(l.id, cambios);
+      ref.invalidate(lotesProvider);
+      mensajero.showSnackBar(
+        SnackBar(content: Text('Lote ${l.codigo} corregido.')),
+      );
+    } catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudo corregir: $e')),
+      );
+    }
+  }
+
   Future<void> _deshacer(BuildContext context, WidgetRef ref, Lote l) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -139,6 +159,9 @@ class LotesScreen extends ConsumerWidget {
                     for (final l in lista)
                       _TarjetaLote(
                         lote: l,
+                        onCorregir: l.atestado || l.exportacionCodigo != null
+                            ? null
+                            : () => _corregir(context, ref, l),
                         onDeshacer: l.atestado || l.exportacionCodigo != null
                             ? null
                             : () => _deshacer(context, ref, l),
@@ -157,10 +180,17 @@ class LotesScreen extends ConsumerWidget {
 }
 
 class _TarjetaLote extends StatelessWidget {
-  const _TarjetaLote({required this.lote, required this.onDeshacer});
+  const _TarjetaLote({
+    required this.lote,
+    required this.onDeshacer,
+    required this.onCorregir,
+  });
 
   final Lote lote;
   final VoidCallback? onDeshacer;
+
+  /// Peso, código, beneficio o proceso; `null` si ya no se puede.
+  final VoidCallback? onCorregir;
 
   @override
   Widget build(BuildContext context) {
@@ -227,16 +257,153 @@ class _TarjetaLote extends StatelessWidget {
           else if (lote.exportacionCodigo != null)
             Text('Va en el contenedor ${lote.exportacionCodigo}.')
           else
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onDeshacer,
-                icon: const Icon(Icons.undo),
-                label: const Text('Deshacer lote'),
-              ),
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: onDeshacer,
+                  icon: const Icon(Icons.undo),
+                  label: const Text('Deshacer lote'),
+                ),
+                TextButton.icon(
+                  onPressed: onCorregir,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Corregir'),
+                ),
+              ],
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Corrige peso de báscula, código, beneficio y proceso. Devuelve solo lo
+/// que cambió (con motivo si cambia el peso).
+class _DialogoLote extends StatefulWidget {
+  const _DialogoLote({required this.lote});
+
+  final Lote lote;
+
+  @override
+  State<_DialogoLote> createState() => _DialogoLoteState();
+}
+
+class _DialogoLoteState extends State<_DialogoLote> {
+  late final _kg = TextEditingController(text: widget.lote.kg.toString());
+  late final _codigo = TextEditingController(text: widget.lote.codigo);
+  late final _beneficio = TextEditingController(text: widget.lote.beneficio);
+  late final _proceso = TextEditingController(text: widget.lote.proceso ?? '');
+  final _motivo = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    for (final c in [_kg, _codigo, _beneficio, _proceso, _motivo]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  double? get _kgNuevo => double.tryParse(_kg.text.trim().replaceAll(',', '.'));
+
+  void _guardar() {
+    final l = widget.lote;
+    final kg = _kgNuevo;
+    if (kg == null ||
+        kg <= 0 ||
+        _codigo.text.trim().isEmpty ||
+        _beneficio.text.trim().isEmpty) {
+      setState(() => _error = 'Revisa el peso, el código y el beneficio.');
+      return;
+    }
+    final motivo = _motivo.text.trim();
+    if (kg != l.kg && motivo.length < 3) {
+      setState(() => _error = 'Escribe por qué corriges el peso.');
+      return;
+    }
+    final proceso = _proceso.text.trim();
+    Navigator.pop(context, <String, Object?>{
+      if (kg != l.kg) 'kg': kg,
+      if (_codigo.text.trim() != l.codigo) 'codigo': _codigo.text.trim(),
+      if (_beneficio.text.trim() != l.beneficio)
+        'beneficio': _beneficio.text.trim(),
+      if ((proceso.isEmpty ? null : proceso) != l.proceso)
+        'proceso': proceso.isEmpty ? null : proceso,
+      if (motivo.isNotEmpty) 'motivo': motivo,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kg = _kgNuevo;
+    // Mismo umbral que la API (TOLERANCIA_VOLUMEN, 10 %).
+    final excede = kg != null && kg > widget.lote.kgEsperados * 1.1;
+    return AlertDialog(
+      title: Text('Corregir ${widget.lote.codigo}'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _kg,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Peso del lote en la báscula',
+                suffixText: 'kg',
+                helperText: excede
+                    ? 'Pesa más de lo que rinden sus entregas '
+                          '(unos ${kgTexto(widget.lote.kgEsperados)} kg).'
+                    : 'Sus entregas rinden unos ${kgTexto(widget.lote.kgEsperados)} kg.',
+                helperStyle: excede
+                    ? const TextStyle(color: Colors.orange)
+                    : null,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            TextField(
+              controller: _motivo,
+              decoration: const InputDecoration(
+                labelText: 'Motivo (si cambias el peso)',
+              ),
+            ),
+            TextField(
+              controller: _codigo,
+              decoration: const InputDecoration(labelText: 'Código del lote'),
+            ),
+            TextField(
+              controller: _beneficio,
+              decoration: const InputDecoration(
+                labelText: 'Beneficio o centro de acopio',
+              ),
+            ),
+            TextField(
+              controller: _proceso,
+              decoration: const InputDecoration(
+                labelText: 'Proceso (opcional)',
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+      ],
     );
   }
 }

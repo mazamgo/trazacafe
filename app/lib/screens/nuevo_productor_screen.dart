@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/database.dart';
+import '../domain/cedula.dart';
 import '../providers.dart';
 import '../services/fotos_service.dart';
 
@@ -44,6 +45,11 @@ class _NuevoProductorScreenState extends ConsumerState<NuevoProductorScreen> {
       _aviso('Escribe el nombre del productor.');
       return;
     }
+    final cedula = _cedula.text.trim();
+    if (cedula.isNotEmpty && normalizarCedula(cedula) == null) {
+      _aviso('La cédula debe tener el formato 001-010190-0001A.');
+      return;
+    }
     if (_consentimiento == null) {
       _aviso('Toma la foto del consentimiento firmado (Ley 787).');
       return;
@@ -61,7 +67,7 @@ class _NuevoProductorScreenState extends ConsumerState<NuevoProductorScreen> {
             ProductoresCompanion.insert(
               id: id,
               nombre: _nombre.text.trim(),
-              cedula: Value(opcional(_cedula)),
+              cedula: Value(cedula.isEmpty ? null : normalizarCedula(cedula)),
               comunidad: Value(opcional(_comunidad)),
               consentimientoFirmado: const Value(true),
             ),
@@ -105,7 +111,10 @@ class _NuevoProductorScreenState extends ConsumerState<NuevoProductorScreen> {
           ),
           TextField(
             controller: _cedula,
-            decoration: const InputDecoration(labelText: 'Cédula (opcional)'),
+            decoration: const InputDecoration(
+              labelText: 'Cédula (opcional)',
+              hintText: '001-010190-0001A',
+            ),
           ),
           TextField(
             controller: _comunidad,

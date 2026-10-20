@@ -216,6 +216,44 @@ Desde la tarjeta del contenedor (`backend/src/paquete.ts`):
 - **Cerrar** (`POST /v1/exportaciones/:id/cerrar`): exige el número de contenedor y **todas las fincas en verde**; si no, responde 409 con los motivos. Al cerrar, encola la attestation `Exportacion`. Cerrado, solo se puede anotar la referencia de la DDS, mientras la attestation no esté firmada.
 - En la app, el PDF y el GeoJSON se comparten con el menú del celular (WhatsApp, correo, Drive) usando `share_plus`.
 
+## 4i. Correcciones de datos
+
+Para errores de campo: un cero de más, la fecha o el estado equivocado, un nombre o una cédula mal escritos (`backend/src/correcciones.ts`, migración 012).
+
+- **Quién:** cada técnico corrige lo que él registró; el administrador, todo. Lotes y temporadas solo los corrige el administrador.
+- **Motivo:** obligatorio al corregir kg, áreas y fechas, y al anular.
+- **Historial:** cada corrección queda en la tabla `correcciones` (antes, después, motivo, usuario y fecha).
+- **Anular no borra:** las entregas y visitas anuladas quedan en la base, marcadas, pero dejan de contar en listas, lotes, paquete EUDR y attestations.
+- **Qué se corrige y hasta cuándo:**
+
+  | Dato | Se corrige mientras… |
+  |---|---|
+  | Entrega (kg, estado, fecha) o anularla | no esté en un lote ni firmada |
+  | Lote (peso, código, beneficio, proceso) | no esté en un contenedor ni firmado; se recalculan sus avisos |
+  | Productor (nombre, cédula, comunidad) | siempre |
+  | Finca: nombre | siempre |
+  | Finca de un punto: área declarada | su lindero no esté firmado |
+  | Foto (quitarla) | su finca o visita no esté firmada |
+  | Visita: nota | siempre |
+  | Visita: fecha, o anularla | no esté firmada ni haya cambiado el lindero |
+  | Temporada: nombre | siempre |
+  | Temporada: fechas, o eliminarla | no tenga lotes; entregas y visitas se reasignan |
+
+- **En la app:**
+  - tocar una entrega → Corregir o Anular;
+  - lápiz en la finca, el productor y la visita;
+  - mantener presionada una foto para quitarla;
+  - Corregir en la tarjeta del lote;
+  - tocar una temporada (administradores).
+
+  Si el dato todavía no se envió, se corrige solo en el celular; si ya se envió, primero en la API (necesita señal).
+- **Prevención:**
+  - al registrar una entrega sale un resumen en letra grande, que avisa si con esa entrega la finca superaría lo que puede producir en la temporada (`maxKgExportableHa`) o si la fecha tiene más de 30 días;
+  - la cédula se valida con el formato nicaragüense `001-010190-0001A`;
+  - las temporadas de más de 18 meses muestran un aviso.
+- **Área de las fincas de un punto:** un punto no tiene área en PostGIS, así que su área oficial es la **declarada**. Antes salía 0 en el PDF, en el GeoJSON (TRACES exige `Area` en los puntos) y en la regla de rendimiento.
+- **Fuera de alcance:** corregir lo ya firmado en la blockchain requiere revocar la attestation y emitir una nueva. Se hará al pasar a OP Mainnet.
+
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints:
@@ -224,6 +262,7 @@ Endpoints:
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
 - Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `DELETE /v1/lotes/:id`.
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
+- Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`.
 

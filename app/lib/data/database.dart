@@ -133,6 +133,12 @@ class Entregas extends Table {
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
   BoolColumn get sincronizado => boolean().withDefault(const Constant(false))();
 
+  /// Lote en que va (llega del servidor). En un lote ya no se corrige.
+  TextColumn get loteCodigo => text().nullable()();
+
+  /// Tiene correcciones en el historial del servidor.
+  BoolColumn get corregida => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -219,7 +225,7 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -246,6 +252,10 @@ class AppDatabase extends _$AppDatabase {
         // Si venía de v3, createTable(temporadas) ya la creó con la columna.
         if (from >= 4) await m.addColumn(temporadas, temporadas.cultivo);
         await m.createTable(cultivosOrganizacion);
+      }
+      if (from < 6) {
+        await m.addColumn(entregas, entregas.loteCodigo);
+        await m.addColumn(entregas, entregas.corregida);
       }
     },
   );

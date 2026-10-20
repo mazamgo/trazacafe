@@ -103,6 +103,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   }
 
+  /// Acepta el resumen "¿Registrar así?" que sale antes de guardar.
+  Future<void> confirmar(WidgetTester tester) async {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Sí, guardar'));
+  }
+
   /// Abre el formulario aceptando el aviso si aparece.
   Future<void> abrirFormulario(WidgetTester tester) async {
     await tocarEntrega(tester);
@@ -148,6 +155,7 @@ void main() {
     await abrirFormulario(tester);
     await tester.enterText(find.widgetWithText(TextField, 'Kilos entregados'), '345,5');
     await tester.tap(find.text('Guardar entrega'));
+    await confirmar(tester);
     await tester.pump(const Duration(milliseconds: 500));
     await esperar(tester);
 
@@ -167,6 +175,7 @@ void main() {
     await tester.tap(find.text('Fermentado'));
     await tester.pump();
     await tester.tap(find.text('Guardar entrega'));
+    await confirmar(tester);
     await tester.pump(const Duration(milliseconds: 500));
     await esperar(tester);
 
@@ -208,6 +217,71 @@ void main() {
     expect(find.text('Cambiar cultivo'), findsNothing);
   });
 
+  testWidgets('un cero de más: el resumen avisa que la finca no produce tanto', (tester) async {
+    await abrir(tester, visitaHecha: true);
+    await abrirFormulario(tester);
+    await tester.enterText(find.widgetWithText(TextField, 'Kilos entregados'), '5000');
+    await tester.tap(find.text('Oro'));
+    await tester.pump();
+    await tester.tap(find.text('Guardar entrega'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('¿Registrar así?'), findsOneWidget);
+    expect(find.text('5,000 kg'), findsOneWidget);
+    expect(find.textContaining('¿No sobra un cero?'), findsOneWidget);
+    // "Revisar" vuelve al formulario sin guardar nada.
+    await tester.tap(find.text('Revisar'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(await entregas(tester), isEmpty);
+    expect(find.text('Guardar entrega'), findsOneWidget);
+  });
+
+  testWidgets('corregir una entrega enviada pide motivo y la corrige en la API', (tester) async {
+    final api = ApiFalsa({
+      'PATCH /v1/entregas/e1': (200, {'id': 'e1', 'kg': 500, 'estado': 'uva', 'fecha': hoy.toUtc().toIso8601String(), 'temporadaId': 't1'}),
+    });
+    await abrir(tester, api: api, antes: () async {
+      await db.into(db.entregas).insert(EntregasCompanion.insert(
+            id: 'e1', fincaId: 'f1', kg: 5000, estado: 'uva', fecha: hoy,
+            temporadaId: const Value('t1'), sincronizado: const Value(true)));
+    });
+    await tester.tap(find.textContaining('5,000 kg · Uva'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Corregir entrega'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Kilos entregados'), '500');
+    await tester.tap(find.text('Guardar corrección'));
+    await tester.pump();
+    expect(find.text('Escribe por qué corriges los kilos o la fecha.'), findsOneWidget);
+    expect(api.peticiones, isEmpty);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Motivo (obligatorio si cambian los kg o la fecha)'), 'un cero de más');
+    await tester.tap(find.text('Guardar corrección'));
+    await confirmar(tester);
+    await tester.pump(const Duration(milliseconds: 500));
+    await esperar(tester);
+    await esperar(tester);
+
+    expect(api.peticiones.single.method, 'PATCH');
+    final e = (await entregas(tester)).single;
+    expect((e.kg, e.corregida), (500.0, true));
+    expect(find.textContaining('· corregida'), findsOneWidget);
+  });
+
+  testWidgets('una entrega que ya está en un lote no se corrige', (tester) async {
+    await abrir(tester, antes: () async {
+      await db.into(db.entregas).insert(EntregasCompanion.insert(
+            id: 'e1', fincaId: 'f1', kg: 500, estado: 'uva', fecha: hoy,
+            temporadaId: const Value('t1'), sincronizado: const Value(true), loteCodigo: const Value('CAFE-001')));
+    });
+    expect(find.textContaining('en lote CAFE-001'), findsOneWidget);
+    await tester.tap(find.textContaining('500 kg · Uva'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('No se puede corregir'), findsOneWidget);
+    expect(find.textContaining('primero hay que deshacer el lote'), findsOneWidget);
+  });
+
   testWidgets('agrupa las entregas por temporada con el total de kg', (tester) async {
     await abrir(tester, antes: () async {
       for (final (id, kg, temporada) in [('e1', 1000.0, 't1'), ('e2', 500.0, 't1'), ('e3', 80.0, null)]) {
@@ -221,7 +295,7 @@ void main() {
             ));
       }
     });
-    expect(find.text('Actual · 2 entregas · 1500 kg'), findsOneWidget);
+    expect(find.text('Actual · 2 entregas · 1,500 kg'), findsOneWidget);
     expect(find.text('Sin temporada · 1 entrega · 80 kg'), findsOneWidget);
   });
 
@@ -254,7 +328,7 @@ void main() {
     });
     await esperar(tester);
 
-    expect(find.text('1 de 2 se subirán al sincronizar'), findsOneWidget);
+    expect(find.textContaining('1 de 2 se subirán al sincronizar'), findsOneWidget);
     expect(find.byIcon(Icons.cloud_done), findsOneWidget);
   });
 

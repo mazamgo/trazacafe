@@ -9,6 +9,7 @@ import { MapasPublicos } from "./mapas.ts";
 import type { Identidad, Rol, VerificarToken } from "./auth.ts";
 import { optimism, optimismSepolia } from "viem/chains";
 import { ColaPg, EasViem } from "./atestador.ts";
+import { CorreccionesPg } from "./correcciones.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { PgRepo } from "./repo.ts";
@@ -100,6 +101,15 @@ const atestador = process.env.KMS_KEY_VERSION
     }
   : null;
 
-const app = buildApp({ repo: new PgRepo(pool), verificarToken, identidad, almacen, satelite, verificarTarea, atestador });
+const app = buildApp({
+  repo: new PgRepo(pool),
+  verificarToken,
+  identidad,
+  almacen,
+  satelite,
+  verificarTarea,
+  atestador,
+  correcciones: new CorreccionesPg(pool),
+});
 
 await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 8080) });
