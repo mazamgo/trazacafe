@@ -5,7 +5,7 @@ Un solo proyecto Flutter da dos productos:
 | Producto | Plataforma | Quién lo usa |
 |---|---|---|
 | **App de campo** | Android (APK) | Técnicos y administradores de la cooperativa o exportadora. Funciona sin internet y sincroniza cuando hay señal. |
-| **Verificador público** | Web (Firebase Hosting, `/v/{uid}`) | El comprador que escanea el QR del contenedor. Sin cuenta. |
+| **Verificador público** | Web (Firebase Hosting, `/v/{uid}`) | El comprador que escanea el QR del contenedor o del lote. Sin cuenta, en español o inglés. |
 
 En la web solo se abre el verificador (`lib/main.dart`). El manual para las personas que usan la app está en [`docs/guia-de-uso.md`](../docs/guia-de-uso.md); la infraestructura, en [`infra/README.md`](../infra/README.md).
 
@@ -13,11 +13,11 @@ En la web solo se abre el verificador (`lib/main.dart`). El manual para las pers
 
 | Carpeta | Contenido |
 |---|---|
-| `lib/screens/` | Pantallas: login, productores, fincas, visitas, entregas, temporadas, equipo, cultivos, lotes, contenedores y verificador |
-| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión), sincronización, fincas, fotos, mapas, correcciones, compartir archivos y verificador |
+| `lib/screens/` | Pantallas: login, productores, fincas, visitas, entregas, temporadas, equipo, cultivos, lotes, contenedores y verificador (con sus textos en español e inglés en `verificador_textos.dart`) |
+| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión), sincronización, fincas, fotos, mapas, correcciones, compartir archivos, verificador y preferencias (tema e idioma, en `SharedPreferences`) |
 | `lib/data/` | Base local SQLite con drift (`database.dart`; `database.g.dart` es generado) |
 | `lib/domain/` | Reglas puras: geometría y polígonos, cédula nicaragüense, cultivos (`cultivos_generados.dart` sale de `schemas/cultivos.json`) |
-| `lib/widgets/` | Formulario de entrega, mapa de Google, motivo de corrección, fotos |
+| `lib/widgets/` | Formulario de entrega, mapa de Google, motivo de corrección, fotos, diálogo del QR del verificador |
 | `test/` | Pruebas de pantallas, servicios y base local |
 | `web/` | Página base del verificador (`index.html`, íconos) |
 

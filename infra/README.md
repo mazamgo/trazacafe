@@ -325,7 +325,11 @@ Es la página que abre el comprador al escanear el QR del contenedor: `https://t
   - que el esquema y los datos (kg, contenedor, destino, DDS, lotes) coinciden con lo que muestra la API.
 
   Si algo no coincide, la página lo dice en rojo.
-- **QR en la app:** en **Contenedores**, un contenedor ya firmado tiene el botón **QR del verificador**. Ahí se puede copiar el enlace o compartir el QR como imagen PNG, con el número de contenedor debajo, para la etiqueta o para mandarlo al comprador.
+- **QR en la app:** en **Contenedores** y en **Lotes**, lo que ya está firmado tiene el botón **QR del verificador** (`app/lib/widgets/qr_verificador.dart`). Ahí se puede copiar el enlace o compartir el QR como imagen PNG, con el número de contenedor o el código del lote debajo, para la etiqueta del contenedor o de los sacos, o para mandarlo al comprador.
+- **Idioma y tema:**
+  - **Idioma:** español o inglés (`app/lib/screens/verificador_textos.dart`); por defecto, el del navegador (español si está en español, inglés si no).
+  - **Tema:** automático, claro u oscuro.
+  - **Recordar:** las dos elecciones se guardan en el navegador (`app/lib/services/preferencias.dart`). La app de campo usa el mismo tema (menú ⋮ → Tema) y sigue solo en español.
 - **Red:** `--dart-define=EAS_RED=optimism` al pasar a OP Mainnet. Con Sepolia, la página avisa que son registros de prueba.
 
 Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas las rutas a `index.html`):

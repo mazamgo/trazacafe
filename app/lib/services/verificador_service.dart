@@ -377,6 +377,7 @@ Comprobacion comprobar(CadenaPublica c, AttestationEnCadena a) {
   }
   final d = a.data;
   final diferencias = <String>[];
+  final esquemaCorrecto = a.schema.toLowerCase() == esquemaUid[c.tipo];
   void igual(String que, Object? pagina, Object? firmado) {
     if (pagina != firmado) diferencias.add(que);
   }
@@ -386,39 +387,47 @@ Comprobacion comprobar(CadenaPublica c, AttestationEnCadena a) {
     for (final u in uids)
       if (u != null) u.toLowerCase(),
   ]..sort()).join(',');
-  if (c.tipo == 'Exportacion' && c.exportacion != null) {
-    final x = c.exportacion!;
-    igual('cultivo', c.cultivo, d.texto(1));
-    igual(
-      'lotes',
-      conjunto(c.lotes.map((l) => l.firma?.uid)),
-      conjunto(d.listaBytes32(2)),
-    );
-    igual('kg', BigInt.from((x.kg * 100).round()), d.entero(3));
-    igual('contenedor', x.contenedor ?? '', d.texto(4));
-    igual('destino', x.destino, d.texto(5));
-    igual('DDS', x.ddsRef ?? '', d.texto(6));
-  } else if (c.tipo == 'Lote' && c.lotes.length == 1) {
-    final l = c.lotes.single;
-    igual('cultivo', c.cultivo, d.texto(1));
-    igual('temporada', l.temporada, d.texto(2));
-    igual(
-      'entregas',
-      conjunto(c.fincas.expand((f) => f.entregas).map((e) => e.firma?.uid)),
-      conjunto(d.listaBytes32(3)),
-    );
-    igual('kg', BigInt.from((l.kg * 100).round()), d.entero(4));
-    igual('estado', l.estado, d.texto(5));
-    igual('beneficio', l.beneficio, d.texto(6));
-    igual('proceso', l.proceso ?? '', d.texto(7));
-  } else {
-    diferencias.add('tipo');
+  // Los datos solo se leen con el esquema esperado; si no se pueden leer
+  // (datos de otro tipo o mal formados), no coinciden.
+  try {
+    if (!esquemaCorrecto) {
+      // Ya se reporta como tipo de registro equivocado.
+    } else if (c.tipo == 'Exportacion' && c.exportacion != null) {
+      final x = c.exportacion!;
+      igual('cultivo', c.cultivo, d.texto(1));
+      igual(
+        'lotes',
+        conjunto(c.lotes.map((l) => l.firma?.uid)),
+        conjunto(d.listaBytes32(2)),
+      );
+      igual('kg', BigInt.from((x.kg * 100).round()), d.entero(3));
+      igual('contenedor', x.contenedor ?? '', d.texto(4));
+      igual('destino', x.destino, d.texto(5));
+      igual('DDS', x.ddsRef ?? '', d.texto(6));
+    } else if (c.tipo == 'Lote' && c.lotes.length == 1) {
+      final l = c.lotes.single;
+      igual('cultivo', c.cultivo, d.texto(1));
+      igual('temporada', l.temporada, d.texto(2));
+      igual(
+        'entregas',
+        conjunto(c.fincas.expand((f) => f.entregas).map((e) => e.firma?.uid)),
+        conjunto(d.listaBytes32(3)),
+      );
+      igual('kg', BigInt.from((l.kg * 100).round()), d.entero(4));
+      igual('estado', l.estado, d.texto(5));
+      igual('beneficio', l.beneficio, d.texto(6));
+      igual('proceso', l.proceso ?? '', d.texto(7));
+    } else {
+      diferencias.add('tipo');
+    }
+  } catch (_) {
+    diferencias.add('datos');
   }
   return Comprobacion(
     existe: true,
     firmanteOficial: a.attester.toLowerCase() == atestadorOficial,
     vigente: a.revocationTime == 0,
-    esquemaCorrecto: a.schema.toLowerCase() == esquemaUid[c.tipo],
+    esquemaCorrecto: esquemaCorrecto,
     diferencias: diferencias,
     firmadaEn: DateTime.fromMillisecondsSinceEpoch(a.time * 1000),
   );

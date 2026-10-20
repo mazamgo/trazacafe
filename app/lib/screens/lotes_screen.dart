@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../services/api_client.dart';
+import '../widgets/qr_verificador.dart';
 import 'finca_screen.dart' show fecha;
 import 'nuevo_lote_screen.dart';
 
@@ -252,9 +253,27 @@ class _TarjetaLote extends StatelessWidget {
                 '${c.nombreEstado(e.estado).toLowerCase()} · ${fecha(e.fecha)}',
               ),
             ),
-          if (lote.atestado)
-            const Text('Registrado en la blockchain ✓')
-          else if (lote.exportacionCodigo != null)
+          if (lote.atestado) ...[
+            if (lote.exportacionCodigo != null)
+              Text('Va en el contenedor ${lote.exportacionCodigo}.'),
+            Row(
+              children: [
+                const Expanded(child: Text('Registrado en la blockchain ✓')),
+                FilledButton.tonalIcon(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => DialogoQr(
+                      uid: lote.attestationUid!,
+                      titulo: 'Lote ${lote.codigo}',
+                      archivo: lote.codigo,
+                    ),
+                  ),
+                  icon: const Icon(Icons.qr_code_2),
+                  label: const Text('QR del verificador'),
+                ),
+              ],
+            ),
+          ] else if (lote.exportacionCodigo != null)
             Text('Va en el contenedor ${lote.exportacionCodigo}.')
           else
             OverflowBar(

@@ -11,6 +11,7 @@ import 'screens/login_screen.dart';
 import 'screens/productores_screen.dart';
 import 'screens/verificador_screen.dart';
 import 'services/auth_service.dart';
+import 'services/preferencias.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,17 +21,17 @@ Future<void> main() async {
   runApp(const ProviderScope(child: TrazaCafeApp()));
 }
 
-class TrazaCafeApp extends StatelessWidget {
+class TrazaCafeApp extends ConsumerWidget {
   const TrazaCafeApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'TrazaCafé',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6F4E37)),
-      ),
+      theme: temaClaro,
+      darkTheme: temaOscuro,
+      themeMode: ref.watch(temaProvider),
       // En la web solo se publica el verificador (/v/{uid}); la app de campo
       // es para Android. Una sola ruta inicial: sin "atrás" hacia `/` y `/v`.
       onGenerateInitialRoutes: (ruta) => [_ruta(RouteSettings(name: ruta))],

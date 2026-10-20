@@ -99,7 +99,7 @@ class Lote {
     required this.beneficio,
     required this.proceso,
     required this.avisos,
-    required this.atestado,
+    required this.attestationUid,
     required this.creadoEn,
     required this.entregas,
     this.exportacionCodigo,
@@ -119,7 +119,7 @@ class Lote {
       for (final a in (j['avisos'] as List? ?? const []).cast<Map>())
         AvisoLote(a['codigo'] as String, a['mensaje'] as String),
     ],
-    atestado: j['attestationUid'] != null,
+    attestationUid: j['attestationUid'] as String?,
     exportacionCodigo: j['exportacionCodigo'] as String?,
     creadoEn: DateTime.parse(j['creadoEn'] as String).toLocal(),
     entregas: [
@@ -147,8 +147,11 @@ class Lote {
   final String? proceso;
   final List<AvisoLote> avisos;
 
+  /// UID de su attestation: el QR del saco apunta a ella.
+  final String? attestationUid;
+
   /// Ya está en la blockchain: no se puede deshacer.
-  final bool atestado;
+  bool get atestado => attestationUid != null;
 
   /// Contenedor en que va, o `null` si está libre.
   final String? exportacionCodigo;

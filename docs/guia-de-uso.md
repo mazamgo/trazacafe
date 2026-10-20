@@ -34,6 +34,9 @@ Los productores no entran a la app; son registros que lleva el técnico.
 - **Recomendación:** sincroniza al terminar cada día de campo.
 - **Lo que necesita señal siempre:** corregir algo que ya se envió, los lotes, los contenedores y la revisión satelital.
 
+### Tema claro u oscuro
+En **⋮ → Tema** elige **Automático** (el que tenga el celular), **Claro** u **Oscuro**. El oscuro descansa la vista de noche y gasta menos batería en muchas pantallas. El celular recuerda la elección.
+
 ### Temporadas
 Las entregas y visitas se agrupan por **temporada de cosecha** (por ejemplo, 2026/27). Si sale "No hay temporada de cosecha para hoy", el administrador debe crearla (sección 4.3). Mientras tanto, lo que registres se guarda igual y se asigna solo cuando exista la temporada.
 
@@ -177,6 +180,8 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
 - **Deshacer lote:** sus entregas quedan libres.
 - **Límite:** las dos cosas solo mientras el lote no esté en un contenedor ni firmado en la blockchain.
 
+**QR del lote (saco):** cuando el lote ya está firmado en la blockchain (**Registrado en la blockchain ✓**), su tarjeta tiene el botón **QR del verificador**, igual que los contenedores (sección 4.5). Sirve para etiquetar los sacos: quien lo escanea ve ese lote, sus entregas y sus fincas de origen.
+
 ### 4.5 Contenedores y paquete EUDR
 Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 
@@ -202,11 +207,16 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 5. **Firma en la blockchain:** en la hora siguiente, TrazaCafé registra el contenedor en la blockchain. La tarjeta muestra **Registrado en la blockchain ✓** y desde ese momento **ni la DDS se puede cambiar**.
 6. **QR del verificador:**
    - **Copiar enlace**, o **Compartir QR** como imagen, con el número de contenedor debajo;
-   - sirve para la etiqueta del contenedor o para mandarlo al comprador por WhatsApp o correo.
+   - sirve para la etiqueta del contenedor o para mandarlo al comprador por WhatsApp o correo;
+   - el QR va en blanco y negro aunque el celular esté en tema oscuro, para que cualquier cámara lo lea.
 
 ## 5. Qué ve el comprador
 
-Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta.
+Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Puede ser el QR de un **contenedor** o de un **lote** (saco).
+
+- **Idioma:** sale en **español** si el navegador está en español y en **inglés** para los demás. Arriba se puede cambiar con el botón **English / Español**.
+- **Tema:** el ícono de arriba elige **Automático**, **Claro** u **Oscuro**.
+- El navegador recuerda las dos elecciones.
 
 **Qué muestra:**
 - el contenedor, el destino, los kg y la DDS;

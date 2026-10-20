@@ -14,7 +14,7 @@ import 'fakes.dart';
 const admin = Sesion(uid: 'u-admin', email: 'admin@coop.org', organizacionId: 'org-1', rol: 'admin');
 const t = '33333333-3333-4333-8333-333333333333';
 
-Map<String, dynamic> loteJson({List<Map<String, String>> avisos = const []}) => {
+Map<String, dynamic> loteJson({List<Map<String, String>> avisos = const [], String? uid, String? contenedor}) => {
   'id': 'l1',
   'codigo': 'CAFE-2026/27-001',
   'cultivo': 'cafe',
@@ -26,7 +26,8 @@ Map<String, dynamic> loteJson({List<Map<String, String>> avisos = const []}) => 
   'beneficio': 'Beneficio La Esperanza',
   'proceso': 'lavado',
   'avisos': avisos,
-  'attestationUid': null,
+  'attestationUid': uid,
+  'exportacionCodigo': contenedor,
   'creadoEn': '2026-10-16T20:00:00.000Z',
   'entregas': [
     {'id': 'e1', 'fincaId': 'f1', 'fincaNombre': 'La Leonesa', 'productorNombre': 'Ana', 'kg': 500, 'estado': 'uva', 'fecha': '2026-10-16T17:00:00.000Z'},
@@ -91,6 +92,22 @@ void main() {
     expect(find.textContaining('sin chequeo satelital verde'), findsOneWidget);
     expect(find.textContaining('La Leonesa (Ana) · 500 kg uva'), findsOneWidget);
     expect(find.text('Deshacer lote'), findsOneWidget);
+  });
+
+  testWidgets('firmado: no se corrige ni se deshace y tiene QR del verificador', (tester) async {
+    final uid = '0x${'cd' * 32}';
+    await abrir(tester, const LotesScreen(), {
+      'GET /v1/lotes': (200, {'lotes': [loteJson(uid: uid, contenedor: 'EXP-2026-001')]}),
+    });
+    await tester.tap(find.text('CAFE-2026/27-001 · 160 kg'));
+    await tester.pumpAndSettle();
+    expect(find.text('Deshacer lote'), findsNothing);
+    expect(find.text('Corregir'), findsNothing);
+    expect(find.text('Va en el contenedor EXP-2026-001.'), findsOneWidget);
+    await tester.tap(find.text('QR del verificador'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lote CAFE-2026/27-001'), findsOneWidget);
+    expect(find.text('https://trazacafe-dev.web.app/v/$uid'), findsOneWidget);
   });
 
   testWidgets('sin lotes explica qué es un lote', (tester) async {

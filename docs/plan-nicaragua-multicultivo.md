@@ -112,7 +112,8 @@ Es la parte que **paga el cliente**.
 - **Verificador público: hecho.**
   - **Página:** `trazacafe-dev.web.app/v/{uid}` (Flutter Web), con la cadena del contenedor sin datos personales.
   - **Comprobación propia:** la página compara los datos con la attestation que lee directo de la blockchain.
-  - **QR:** se genera en la app, en Contenedores.
+  - **QR:** se genera en la app, en Contenedores y en Lotes (QR del saco).
+  - **Idioma y tema:** la página está en español e inglés, con tema claro u oscuro. La app de campo también tiene tema claro u oscuro.
   - Detalle en `infra/README.md` §6.
 
 - **Lotes** (beneficio o centro de acopio):
