@@ -29,6 +29,7 @@ import {
   type Temporada,
 } from "../src/repo.ts";
 import type { LoteSync, TemporadaNueva } from "../src/sync.ts";
+import type { CadenaPublica, Verificador } from "../src/verificador.ts";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const OTRA_ORG = "22222222-2222-4222-8222-222222222222";
@@ -321,10 +322,12 @@ function crearApp({
   conSatelite = true,
   atestador = null,
   correcciones = null,
+  verificador = null,
 }: {
   conSatelite?: boolean;
   atestador?: { cola: ColaAttestations; red: RedEAS } | null;
   correcciones?: Correcciones | null;
+  verificador?: Verificador | null;
 } = {}) {
   const repo = new RepoMemoria();
   const identidad = new IdentidadFalsa();
@@ -339,6 +342,7 @@ function crearApp({
     verificarTarea: async (t) => t === "oidc-scheduler",
     atestador,
     correcciones,
+    verificador,
   });
   return { app, repo, identidad, almacen, satelite };
 }
@@ -1251,5 +1255,36 @@ describe("aGeometria", () => {
 
   it("usa Point para una sola coordenada", () => {
     expect(aGeometria([[-86.235, 13.6305]]).type).toBe("Point");
+  });
+});
+
+describe("GET /v1/publico/:uid (verificador)", () => {
+  const UID = `0x${"ab".repeat(32)}`;
+  const cadena = { red: "optimism-sepolia", tipo: "Exportacion", uid: UID, fincas: [] } as unknown as CadenaPublica;
+  const verificador: Verificador = { cadena: async (uid) => (uid === UID ? cadena : null) };
+
+  it("responde sin sesión y desde cualquier página, con caché", async () => {
+    const { app } = crearApp({ verificador });
+    const res = await app.inject({ method: "GET", url: `/v1/publico/${UID}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(cadena);
+    expect(res.headers["access-control-allow-origin"]).toBe("*");
+    expect(res.headers["cache-control"]).toBe("public, max-age=300");
+  });
+
+  it("un UID que no es de un contenedor o lote firmado da 404 con mensaje", async () => {
+    const { app } = crearApp({ verificador });
+    const res = await app.inject({ method: "GET", url: `/v1/publico/0x${"cd".repeat(32)}` });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().mensaje).toContain("no corresponde");
+    expect(res.headers["access-control-allow-origin"]).toBe("*");
+  });
+
+  it("un código mal formado da 400 sin consultar la base", async () => {
+    let consultas = 0;
+    const { app } = crearApp({ verificador: { cadena: async () => (consultas++, null) } });
+    const res = await app.inject({ method: "GET", url: "/v1/publico/0x123" });
+    expect(res.statusCode).toBe(400);
+    expect(consultas).toBe(0);
   });
 });

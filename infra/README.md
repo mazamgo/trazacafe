@@ -271,6 +271,7 @@ Endpoints:
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
+- Verificador público (sin sesión, con CORS): `GET /v1/publico/:uid`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`, `POST /v1/tareas/attestations`.
 
 **URL de la API:** https://trazacafe-api-85528878949.us-east4.run.app
@@ -306,11 +307,32 @@ flutter build apk --release --dart-define=API_URL=https://trazacafe-api-85528878
 
 El APK release va firmado con el certificado de depuración (el SHA-1 registrado). Para Play Console hace falta un certificado de subida propio y agregar el SHA-1 de Play App Signing (sección 4).
 
-## 6. Verificador en Firebase Hosting
+## 6. Verificador público (Flutter Web en Firebase Hosting)
+
+Es la página que abre el comprador al escanear el QR del contenedor: `https://trazacafe-dev.web.app/v/{uid}`, donde `uid` es la attestation del contenedor (o de un lote).
+
+- **Qué muestra** (`app/lib/screens/verificador_screen.dart`):
+  - contenedor, destino, kg y DDS, con sus lotes;
+  - las fincas de origen como "Finca 1", "Finca 2"…, con área, chequeo satelital, última visita y entregas;
+  - un mapa de OpenStreetMap con la ubicación redondeada a ~1 km;
+  - en cada dato, un enlace a su attestation en easscan.
+- **Qué no muestra:** nombres de productores o fincas, cédulas, comprador ni coordenadas exactas.
+- **Datos:** `GET /v1/publico/:uid` (`backend/src/verificador.ts`). No pide sesión y responde con CORS abierto y 5 minutos de caché. Solo da contenedores y lotes **ya firmados**; cualquier otro código responde 404.
+- **Comprobación independiente:** la página lee la attestation directamente del contrato de EAS por el RPC público de OP y comprueba:
+  - que existe;
+  - que la firmó la clave de TrazaCafé (`0xBFC2…CB99`, fija en la página);
+  - que no está revocada;
+  - que el esquema y los datos (kg, contenedor, destino, DDS, lotes) coinciden con lo que muestra la API.
+
+  Si algo no coincide, la página lo dice en rojo.
+- **QR en la app:** en **Contenedores**, un contenedor ya firmado tiene el botón **QR del verificador**. Ahí se puede copiar el enlace o compartir el QR como imagen PNG, con el número de contenedor debajo, para la etiqueta o para mandarlo al comprador.
+- **Red:** `--dart-define=EAS_RED=optimism` al pasar a OP Mainnet. Con Sepolia, la página avisa que son registros de prueba.
+
+Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas las rutas a `index.html`):
 
 ```powershell
 cd app
-flutter build web --release
-firebase init hosting     # carpeta pública: build/web, SPA: sí
-firebase deploy --only hosting
+flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
+cd ..
+firebase deploy --only hosting --project trazacafe-dev
 ```

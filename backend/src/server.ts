@@ -13,6 +13,7 @@ import { CorreccionesPg } from "./correcciones.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { PgRepo } from "./repo.ts";
+import { VerificadorPg } from "./verificador.ts";
 
 initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID });
 const auth = getAuth();
@@ -110,6 +111,7 @@ const app = buildApp({
   verificarTarea,
   atestador,
   correcciones: new CorreccionesPg(pool),
+  verificador: new VerificadorPg(pool),
 });
 
 await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 8080) });

@@ -168,7 +168,7 @@ class Exportacion {
     required this.fechaEmbarque,
     required this.ddsRef,
     required this.abierta,
-    required this.atestada,
+    required this.attestationUid,
     required this.kg,
     required this.lotes,
     required this.entregas,
@@ -191,7 +191,7 @@ class Exportacion {
           : DateTime.parse(j['fechaEmbarque'] as String),
       ddsRef: j['ddsRef'] as String?,
       abierta: j['estado'] == 'abierta',
-      atestada: j['attestationUid'] != null,
+      attestationUid: j['attestationUid'] as String?,
       kg: (j['kg'] as num).toDouble(),
       lotes: [
         for (final l in (j['lotes'] as List).cast<Map>())
@@ -225,8 +225,11 @@ class Exportacion {
   /// Abierta: se puede editar o deshacer.
   final bool abierta;
 
+  /// UID de su attestation: el QR del verificador apunta a ella.
+  final String? attestationUid;
+
   /// Ya está en la blockchain: ni la DDS se puede cambiar.
-  final bool atestada;
+  bool get atestada => attestationUid != null;
   final double kg;
   final List<({String codigo, double kg, String estado, String temporada})>
   lotes;

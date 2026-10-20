@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'firebase_options.dart';
 import 'providers.dart';
@@ -13,6 +14,8 @@ import 'services/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // El QR lleva `/v/{uid}` sin `#`.
+  if (kIsWeb) usePathUrlStrategy();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const ProviderScope(child: TrazaCafeApp()));
 }
@@ -29,21 +32,24 @@ class TrazaCafeApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6F4E37)),
       ),
       // En la web solo se publica el verificador (/v/{uid}); la app de campo
-      // es para Android.
-      onGenerateRoute: (settings) {
-        final ruta = Uri.parse(settings.name ?? '/');
-        if (ruta.pathSegments.length == 2 && ruta.pathSegments.first == 'v') {
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => VerificadorScreen(uid: ruta.pathSegments[1]),
-          );
-        }
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) =>
-              kIsWeb ? const VerificadorScreen(uid: null) : const _Inicio(),
-        );
-      },
+      // es para Android. Una sola ruta inicial: sin "atrás" hacia `/` y `/v`.
+      onGenerateInitialRoutes: (ruta) => [_ruta(RouteSettings(name: ruta))],
+      onGenerateRoute: _ruta,
+    );
+  }
+
+  static Route<void> _ruta(RouteSettings settings) {
+    final ruta = Uri.parse(settings.name ?? '/');
+    if (ruta.pathSegments.length == 2 && ruta.pathSegments.first == 'v') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => VerificadorScreen(uid: ruta.pathSegments[1]),
+      );
+    }
+    return MaterialPageRoute(
+      settings: settings,
+      builder: (_) =>
+          kIsWeb ? const VerificadorScreen(uid: null) : const _Inicio(),
     );
   }
 }

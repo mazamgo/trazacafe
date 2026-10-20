@@ -20,6 +20,7 @@ import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
 import { geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
+import { UID_VALIDO, type Verificador } from "./verificador.ts";
 
 const invitacionSchema = z.object({
   email: z.email().transform((e) => e.toLowerCase()),
@@ -41,6 +42,7 @@ export function buildApp({
   verificarTarea,
   atestador = null,
   correcciones = null,
+  verificador = null,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
@@ -53,6 +55,8 @@ export function buildApp({
   atestador?: { cola: ColaAttestations; red: RedEAS } | null;
   /** Corregir y anular datos con errores (CorreccionesPg). */
   correcciones?: Correcciones | null;
+  /** Cadena pública de un contenedor o lote firmado (VerificadorPg). */
+  verificador?: Verificador | null;
 }) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -79,6 +83,28 @@ export function buildApp({
   }
 
   app.get("/health", async () => ({ ok: true }));
+
+  /**
+   * Verificador público (QR del contenedor o del lote): sin sesión y desde
+   * cualquier página, porque lo abre el comprador. Solo lo firmado y nada
+   * personal (`verificador.ts`).
+   */
+  app.get<{ Params: { uid: string } }>("/v1/publico/:uid", async (req, reply) => {
+    reply.header("access-control-allow-origin", "*");
+    if (!UID_VALIDO.test(req.params.uid)) {
+      return reply.code(400).send({ error: "uid_invalido", mensaje: "El código no es válido." });
+    }
+    if (!verificador) return reply.code(503).send({ error: "sin_verificador" });
+    const cadena = await verificador.cadena(req.params.uid);
+    if (!cadena) {
+      return reply.code(404).send({
+        error: "no_encontrado",
+        mensaje: "Este código no corresponde a ningún contenedor ni lote registrado en la blockchain.",
+      });
+    }
+    reply.header("cache-control", "public, max-age=300");
+    return cadena;
+  });
 
   /**
    * Primer inicio de sesión: si el correo de Google tiene invitación, guarda

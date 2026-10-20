@@ -21,7 +21,7 @@ class CompartidorFalso implements Compartidor {
   }
 }
 
-Map<String, dynamic> exportacionJson({String? contenedor, int sinVerde = 1, String estado = 'abierta'}) => {
+Map<String, dynamic> exportacionJson({String? contenedor, int sinVerde = 1, String estado = 'abierta', String? uid}) => {
   'id': 'x1',
   'codigo': 'EXP-2026-001',
   'cultivo': 'cafe',
@@ -31,7 +31,7 @@ Map<String, dynamic> exportacionJson({String? contenedor, int sinVerde = 1, Stri
   'fechaEmbarque': null,
   'ddsRef': null,
   'estado': estado,
-  'attestationUid': null,
+  'attestationUid': uid,
   'creadoEn': '2026-10-16T20:00:00.000Z',
   'kg': 160,
   'lotes': [
@@ -181,6 +181,41 @@ void main() {
     await tester.pumpAndSettle();
     final patch = api.peticiones.firstWhere((p) => p.method == 'PATCH');
     expect(jsonDecode(patch.body), {'ddsRef': '26NI000123'});
+  });
+
+  testWidgets('firmado: muestra el QR del verificador y lo comparte como imagen', (tester) async {
+    final uid = '0x${'ab' * 32}';
+    await abrir(tester, const ContenedoresScreen(), {
+      'GET /v1/exportaciones': (200, {
+        'exportaciones': [exportacionJson(contenedor: 'CSQU3054383', sinVerde: 0, estado: 'cerrada', uid: uid)],
+      }),
+    });
+    await expandir(tester);
+    expect(find.text('Anotar DDS'), findsNothing);
+    await tester.tap(find.text('QR del verificador'));
+    await tester.pumpAndSettle();
+    expect(find.text('https://trazacafe-dev.web.app/v/$uid'), findsOneWidget);
+
+    // Dibujar el PNG necesita tiempo real (no el reloj falso de las pruebas).
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Compartir QR'));
+      for (var i = 0; i < 50 && compartidor.compartidos.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    });
+    expect(compartidor.compartidos.single.$1, 'QR-CSQU3054383.png');
+    expect(compartidor.compartidos.single.$2, 'image/png');
+    expect(compartidor.compartidos.single.$3, greaterThan(1000));
+  });
+
+  testWidgets('sin firmar no hay QR', (tester) async {
+    await abrir(tester, const ContenedoresScreen(), {
+      'GET /v1/exportaciones': (200, {
+        'exportaciones': [exportacionJson(contenedor: 'CSQU3054383', sinVerde: 0, estado: 'cerrada')],
+      }),
+    });
+    await expandir(tester);
+    expect(find.text('QR del verificador'), findsNothing);
   });
 
   testWidgets('arma un contenedor: solo lotes libres y de un mismo cultivo', (tester) async {
