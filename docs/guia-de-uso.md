@@ -192,7 +192,7 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 
 **Paquete EUDR**, en la tarjeta del contenedor:
 - **PDF:** resumen para el comprador, con fincas de origen, áreas, chequeos y visitas.
-- **GeoJSON (TRACES):** la ubicación de cada finca, para subir a **TRACES**, el sistema de la Unión Europea donde se presenta la **declaración de diligencia debida (DDS)**.
+- **GeoJSON (TRACES):** la ubicación de cada finca de origen. Se manda al **importador** en la Unión Europea, que lo sube a **TRACES** con su **declaración de diligencia debida (DDS)**.
   - La app pregunta si incluir los nombres de los productores. TRACES no los exige y son datos personales; lo normal es **Sin nombres**.
 
 **Pasos hasta la exportación:**
@@ -203,8 +203,13 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
    - **todas sus fincas en verde**.
 
    Si falta algo, la app dice qué. Al cerrarlo ya no se cambian sus lotes ni sus datos.
-3. **Presentar la DDS en TRACES** con el GeoJSON. Lo hace el exportador o su agente aduanal, fuera de la app.
-4. **Anotar DDS:** escribe la **referencia** que devolvió TRACES.
+3. **Enviar el paquete al importador:**
+   - manda el **GeoJSON** y el **PDF** al comprador o importador en la Unión Europea, con los botones de la tarjeta (correo, WhatsApp);
+   - con ellos, el importador presenta la **DDS** en **TRACES**, desde su propia cuenta y antes de que el café entre a la UE;
+   - la aduana europea le pide la referencia de esa DDS al despachar la carga.
+
+   La DDS la presenta el **"operador"**: la empresa que pone el café o cacao por primera vez en el mercado de la UE. Normalmente es el importador. Si tu empresa tiene sede en la UE y vende ella misma allá, entonces la presenta tu empresa.
+4. **Anotar DDS:** el importador te devuelve el **número de referencia** de su DDS; TRACES también le da un número de verificación. Escribe la referencia en **Anotar DDS**. Se puede anotar con el contenedor ya cerrado, mientras no esté firmado.
 5. **Firma en la blockchain:** en la hora siguiente, TrazaCafé registra el contenedor en la blockchain. La tarjeta muestra **Registrado en la blockchain ✓** y desde ese momento **ni la DDS se puede cambiar**.
 6. **QR del verificador:**
    - **Copiar enlace**, o **Compartir QR** como imagen, con el número de contenedor debajo;
@@ -250,7 +255,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | **Área declarada** | Hectáreas que dice el productor, en fincas de un solo punto. |
 | **Temporada** | Período de cosecha que agrupa entregas y visitas. |
 | **Lote** | Entregas juntas en el beneficio, de un cultivo y una temporada. |
-| **DDS** | Declaración de diligencia debida: el documento que se presenta en **TRACES** antes de exportar a la Unión Europea. |
+| **DDS** | Declaración de diligencia debida: la presenta en **TRACES** el importador (el "operador") antes de poner el café o cacao en el mercado de la Unión Europea. Lleva la ubicación de las fincas de origen. |
 | **TRACES** | Sistema de la Comisión Europea donde se presentan las DDS. |
 | **Blockchain / attestation** | Registro público que nadie puede alterar. TrazaCafé firma ahí cada finca, visita, entrega, lote y contenedor, para que el comprador pueda comprobarlo. Hoy en red de pruebas (OP Sepolia). |
 | **QR del verificador** | Código que lleva a la página pública del contenedor. |
