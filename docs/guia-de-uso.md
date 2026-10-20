@@ -133,6 +133,7 @@ Todos nos equivocamos: un cero de más, la fecha o el estado equivocado, un nomb
 - **Con o sin señal:**
   - si el dato **todavía no se envió**, se corrige en el celular, sin señal;
   - si **ya se envió**, la corrección necesita señal.
+- **Plazo de 7 días:** una entrega o visita enviada se puede corregir durante **7 días** después de sincronizarla. Pasado ese plazo se registra en la blockchain, con su fecha real. Si antes entra en un lote, se registra en ese momento.
 - **Cuándo ya no se puede:** si la entrega ya está **en un lote** o el dato ya está **registrado en la blockchain**. La app explica por qué. En ese caso, avisa al administrador; por ejemplo, puede deshacer el lote si todavía no está firmado.
 
 ## 4. Para el administrador

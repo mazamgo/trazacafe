@@ -185,6 +185,16 @@ export class EasViem implements RedEAS {
 const segundos = (d: Date | string) => BigInt(Math.floor(new Date(d).getTime() / 1000));
 const ESPERA = "(ap.ultimo_intento IS NULL OR ap.ultimo_intento < now() - interval '15 minutes')";
 
+/**
+ * Período de gracia: entregas y visitas se firman a los [DIAS_GRACIA] días
+ * de llegar al servidor (cuando entran a la cola), para que el técnico
+ * pueda corregir sus errores sin revocar nada. Si antes entran a un lote
+ * (o, en las visitas, alguna entrega de su finca), se firman ya: el lote
+ * las necesita firmadas. La firma lleva la fecha real de la entrega o visita.
+ */
+export const DIAS_GRACIA = 7;
+const GRACIA_VENCIDA = `ap.creado_en < now() - interval '${DIAS_GRACIA} days'`;
+
 /** Cola en Postgres: qué está listo para atestarse y dónde guardar los UIDs. */
 export class ColaPg implements ColaAttestations {
   constructor(private readonly pool: pg.Pool) {}
@@ -259,6 +269,9 @@ export class ColaPg implements ColaAttestations {
        JOIN fincas_versiones fv ON fv.finca_id = v.finca_id AND fv.version = v.version_finca
        LEFT JOIN temporadas t ON t.id = v.temporada_id
        WHERE ap.esquema = 'Verificacion' AND fv.attestation_uid IS NOT NULL AND ${ESPERA}
+         AND (${GRACIA_VENCIDA} OR EXISTS (
+               SELECT 1 FROM entregas e JOIN lote_entregas le ON le.entrega_id = e.id
+               WHERE e.finca_id = v.finca_id AND e.anulada_en IS NULL))
        ORDER BY ap.id LIMIT $1`,
       [limite],
     );
@@ -275,7 +288,7 @@ export class ColaPg implements ColaAttestations {
     }));
   }
 
-  /** Apuntan a la versión vigente de su finca ya firmada. */
+  /** Apuntan a la versión vigente de su finca ya firmada; con período de gracia. */
   private async entregas(limite: number): Promise<Pendiente[]> {
     const { rows } = await this.pool.query(
       `SELECT ap.id AS "colaId", e.id, f.attestation_uid AS ref, f.cultivo, e.kg::float8 AS kg, e.fecha, e.estado
@@ -283,6 +296,7 @@ export class ColaPg implements ColaAttestations {
        JOIN entregas e ON e.id = ap.entidad_id
        JOIN fincas f ON f.id = e.finca_id
        WHERE ap.esquema = 'Entrega' AND f.attestation_uid IS NOT NULL AND ${ESPERA}
+         AND (${GRACIA_VENCIDA} OR EXISTS (SELECT 1 FROM lote_entregas le WHERE le.entrega_id = e.id))
        ORDER BY ap.id LIMIT $1`,
       [limite],
     );

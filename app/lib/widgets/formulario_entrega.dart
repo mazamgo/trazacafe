@@ -269,7 +269,9 @@ class _FormularioEntregaState extends State<FormularioEntrega> {
             ),
             if (_corrigiendo && enviada)
               Text(
-                'Ya se envió: la corrección necesita señal y queda en el historial.',
+                'Ya se envió: la corrección necesita señal y queda en el historial. '
+                'Se puede corregir hasta 7 días después de enviarla, mientras '
+                'no entre en un lote; después se firma en la blockchain.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             const SizedBox(height: 12),

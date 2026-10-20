@@ -76,6 +76,11 @@ El worker firma en cuatro olas, una transacción por ola, para que cada attestat
 | 3 | `Lote` | Lleva los UIDs de sus entregas |
 | 4 | `Exportacion` | Lleva los UIDs de sus lotes; solo cerrada y con la referencia de la DDS |
 
+- **Período de gracia de 7 días** (`DIAS_GRACIA` en `backend/src/atestador.ts`):
+  - **Entregas y visitas** se firman 7 días después de llegar al servidor, para que el técnico pueda corregir sus errores sin revocar nada.
+  - **Antes de los 7 días** se firman si entran a un lote; una visita, si alguna entrega de su finca entró a un lote.
+  - **Fecha:** la firma lleva la fecha real de la entrega o la visita.
+  - **Sin espera:** fincas, chequeos, lotes y contenedores se firman en la siguiente ejecución.
 - **Fallos:** si una ola falla, se reintenta a los 15 minutos. Si falla con `NotFound` porque el nodo del RPC público todavía no ve la ola anterior, se reintenta en el momento (hasta 5 veces, cada 3 s).
 - **Activado en OP Sepolia (20/10/2026):**
   - los 6 esquemas están registrados con la clave KMS (`0xBFC2…CB99`);
@@ -235,7 +240,7 @@ Para errores de campo: un cero de más, la fecha o el estado equivocado, un nomb
 
   | Dato | Se corrige mientras… |
   |---|---|
-  | Entrega (kg, estado, fecha) o anularla | no esté en un lote ni firmada |
+  | Entrega (kg, estado, fecha) o anularla | no esté en un lote ni firmada (se firma a los 7 días de enviarla) |
   | Lote (peso, código, beneficio, proceso) | no esté en un contenedor ni firmado; se recalculan sus avisos |
   | Productor (nombre, cédula, comunidad) | siempre |
   | Finca: nombre | siempre |

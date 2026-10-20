@@ -25,7 +25,8 @@ class CorreccionesService {
           'primero hay que deshacer el lote.';
     }
     if (e.attestationUid != null) {
-      return 'Esta entrega ya está firmada en la blockchain: no se puede corregir.';
+      return 'Esta entrega ya está firmada en la blockchain (se firma 7 días '
+          'después de enviarla, o al entrar en un lote): no se puede corregir.';
     }
     return null;
   }

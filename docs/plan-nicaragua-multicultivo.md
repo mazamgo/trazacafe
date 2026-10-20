@@ -109,6 +109,7 @@ Es la parte que **paga el cliente**.
   - Faltan: ETH de prueba, registrar los esquemas en OP Sepolia, aplicar la 011, desplegar y programar el worker.
 - **Chequeo satelital propio: hecho.** Mapas públicos JRC GFC2020 V4 (bosque 2020, la referencia de la UE) y Hansen/UMD v1.12 (pérdida 2021-2024), leídos por partes. Ya no se depende de la key de GFW, que queda como complemento opcional para alertas recientes. Detalle en `infra/README.md` §4d.
 - **Correcciones de datos: hechas** (migración 012). Se pueden corregir o anular entregas, lotes, productores, fincas, fotos, visitas y temporadas mientras no estén sellados, con historial y motivo. Detalle en `infra/README.md` §4i.
+- **Período de gracia: hecho.** Entregas y visitas se firman a los 7 días de enviarlas, o antes si entran a un lote, para poder corregirlas sin revocar. La revocación de lo ya firmado sigue pendiente, para antes de OP Mainnet.
 - **Verificador público: hecho.**
   - **Página:** `trazacafe-dev.web.app/v/{uid}` (Flutter Web), con la cadena del contenedor sin datos personales.
   - **Comprobación propia:** la página compara los datos con la attestation que lee directo de la blockchain.
