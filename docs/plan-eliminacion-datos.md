@@ -21,7 +21,8 @@
 | App: ⋮ → Privacidad y datos, solicitudes, eliminar productor, avisos, base local v7 | Hecho |
 | Página web `/eliminar-datos` y `/privacidad` (borrador) | Hecho |
 | Documentación: guía de uso, `app/README.md`, `infra/README.md` §4j, borrador de Seguridad de los datos | Hecho |
-| Aplicar la migración 013, desplegar la API y Hosting, crear la tarea `eliminaciones` en Scheduler, nuevo APK | Pendiente de aprobación |
+| Aplicar la migración 013, desplegar la API y Hosting, crear la tarea `eliminaciones` en Scheduler, nuevo APK | Hecho el 21/10/2026 (API `trazacafe-api-00017`; la tarea respondió 200 en su primera ejecución) |
+| Prueba de punta a punta en el Samsung (abajo) | Pendiente |
 | Revisar la política de privacidad y Seguridad de los datos con el abogado; correo de soporte (`SOPORTE_EMAIL`) | Pendiente |
 | URL definitiva en Play Console (proyecto de producción o dominio propio) | Fase 4 |
 

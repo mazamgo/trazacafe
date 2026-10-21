@@ -298,7 +298,7 @@ Google Play exige una opción dentro de la app y una página web para pedir la e
   - borra hasta 500 archivos por ejecución;
   - avisa en el log (`eliminaciones: solicitudes de productores sin respuesta`) si hay solicitudes con más de 15 días.
 
-  Crearla (una vez, después de desplegar la API):
+  Ya está creada (todos los días a las 6:30, hora de Managua). Así se creó:
 
   ```powershell
   gcloud scheduler jobs create http eliminaciones --location=us-east4 --project=trazacafe-dev `
