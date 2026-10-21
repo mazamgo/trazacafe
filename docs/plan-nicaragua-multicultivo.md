@@ -148,6 +148,7 @@ Es la parte que **paga el cliente**.
   - clave de subida;
   - agregar el SHA-1 de Play App Signing a Firebase, a la key de Android y a la key de mapas (`--dart-define=ANDROID_CERT_SHA1`);
   - ficha en español y política de privacidad;
+  - **eliminación de datos (requisito de Play): hecha en la app, la API y la página web** ([`docs/plan-eliminacion-datos.md`](plan-eliminacion-datos.md)). Falta revisar la política con el abogado, poner la URL definitiva en Play Console al pasar a producción y llenar Seguridad de los datos ([`docs/seguridad-de-datos-play.md`](seguridad-de-datos-play.md));
   - pruebas cerradas con el piloto.
 - **Calidad:**
   - arreglar la prueba de Equipo intermitente;

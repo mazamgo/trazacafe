@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -91,6 +92,19 @@ class FirebaseAuthService implements AuthService {
 
   @override
   Future<void> entrarConGoogle() async {
+    // En el navegador (página de eliminación de datos), la ventana de Google de Firebase.
+    if (kIsWeb) {
+      try {
+        await _auth.signInWithPopup(GoogleAuthProvider());
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'popup-closed-by-user' ||
+            e.code == 'cancelled-popup-request') {
+          throw AuthCancelado();
+        }
+        throw AuthError('No se pudo iniciar sesión con Google (${e.code}).');
+      }
+      return;
+    }
     _inicializado ??= _google.initialize(serverClientId: googleWebClientId);
     await _inicializado;
     try {

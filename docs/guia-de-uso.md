@@ -40,6 +40,13 @@ En **⋮ → Tema** elige **Automático** (el que tenga el celular), **Claro** u
 ### Temporadas
 Las entregas y visitas se agrupan por **temporada de cosecha** (por ejemplo, 2026/27). Si sale "No hay temporada de cosecha para hoy", el administrador debe crearla (sección 4.3). Mientras tanto, lo que registres se guarda igual y se asigna solo cuando exista la temporada.
 
+### Eliminar tu cuenta
+En **⋮ → Privacidad y datos → Eliminar mi cuenta**. La app primero envía lo pendiente; si no hay señal, avisa y puedes esperar o eliminarla de todos modos (lo pendiente se pierde). Después se borran tu cuenta y los datos del celular, y la app vuelve a la pantalla de entrar.
+
+- Lo que registraste (productores, fincas, entregas) es de la organización y se queda con ella, sin tu nombre ni tu correo.
+- Si eres el **único administrador**, primero nombra a otro en **Equipo** o elimina la organización.
+- También se puede hacer sin la app, desde la página **https://trazacafe-dev.web.app/eliminar-datos** (entrando con Google).
+
 ## 3. Para el técnico
 
 ### 3.1 Registrar un productor
@@ -216,6 +223,20 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
    - sirve para la etiqueta del contenedor o para mandarlo al comprador por WhatsApp o correo;
    - el QR va en blanco y negro aunque el celular esté en tema oscuro, para que cualquier cámara lo lea.
 
+### 4.6 Eliminación de datos (Privacidad y datos)
+Un productor puede pedir que se borren sus datos (Ley 787). Lo pide en la página **https://trazacafe-dev.web.app/eliminar-datos** o en persona; la cooperativa confirma que es él y lo elimina.
+
+- **Solicitudes de la página web:** aparece un aviso en **Productores** y en **⋮ → Privacidad y datos → Solicitudes de eliminación**. Cada solicitud muestra lo que escribió el productor (nombre, cédula, comunidad y un teléfono o correo).
+  - **Buscar y eliminar:** busca al productor por nombre o cédula, elígelo y confirma.
+  - **Rechazar:** con el motivo, por ejemplo "no es productor nuestro". Avísale antes al contacto que dejó: al cerrar la solicitud se borran sus datos.
+  - Respóndelas en menos de 30 días. Si pasan 15 días sin respuesta, GoProduction te va a escribir.
+- **En persona:** abre al productor y toca **⋮ → Eliminar datos del productor** (necesita señal).
+- **Qué pasa:**
+  - se borran nombre, cédula, comunidad, la foto del consentimiento, las fotos de sus fincas y visitas, y las fincas sin entregas en lotes ni firmadas;
+  - si alguna finca tiene entregas en un lote o un contenedor, el EUDR obliga a guardarla **5 años** desde la exportación: queda como **"Productor eliminado"** y **"Finca eliminada · xxxx"**, sin datos personales, y se borra sola al vencer el plazo;
+  - no se puede deshacer.
+- **Eliminar la organización:** **⋮ → Privacidad y datos → Eliminar la organización**. Se ejecuta a los **30 días**; hasta entonces todos ven un aviso con la fecha y el administrador puede **Cancelar**. Descarga antes lo que necesites (paquetes EUDR, PDF). Ese día se borran el equipo, los productores, las fincas y las fotos, salvo lo que el EUDR obliga a guardar, que queda anónimo 5 años.
+
 ## 5. Qué ve el comprador
 
 Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Puede ser el QR de un **contenedor** o de un **lote** (saco).
@@ -244,6 +265,8 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | Una entrega "no puede ir en un lote" | Revisa el motivo: falta la visita de la temporada, la finca está en rojo, o es de otra temporada o cultivo. |
 | El contenedor "todavía no se puede cerrar" | Falta el número de contenedor o hay fincas sin chequeo verde. La app las nombra. |
 | El mapa no carga | Sin señal no hay mapa, pero el GPS sigue marcando puntos con **Agregar mi ubicación**. |
+| "Eres el único administrador" al eliminar tu cuenta | Invita a otro administrador en **Equipo** (o elimina la organización) y vuelve a intentarlo. |
+| Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |
 | Celular nuevo o reinstalación | Entra con la misma cuenta y toca **Sincronizar**: se descargan los datos de la organización. Lo que **no** se había sincronizado en el celular anterior se pierde. |
 
 ## 7. Palabras que aparecen en la app
@@ -257,5 +280,6 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | **Lote** | Entregas juntas en el beneficio, de un cultivo y una temporada. |
 | **DDS** | Declaración de diligencia debida: la presenta en **TRACES** el importador (el "operador") antes de poner el café o cacao en el mercado de la Unión Europea. Lleva la ubicación de las fincas de origen. |
 | **TRACES** | Sistema de la Comisión Europea donde se presentan las DDS. |
+| **Anonimizar** | Quitar los datos personales (nombre, cédula, fotos) y dejar solo lo que el EUDR obliga a guardar, sin que se sepa de quién es. |
 | **Blockchain / attestation** | Registro público que nadie puede alterar. TrazaCafé firma ahí cada finca, visita, entrega, lote y contenedor, para que el comprador pueda comprobarlo. Hoy en red de pruebas (OP Sepolia). |
 | **QR del verificador** | Código que lleva a la página pública del contenedor. |

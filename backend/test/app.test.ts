@@ -206,7 +206,7 @@ class RepoMemoria implements Repo {
     f.cultivo = cultivo;
     return "cambiado" as const;
   }
-  org: Organizacion = { id: ORG, nombre: "Prueba", tipo: "cooperativa", cultivos: ["cafe"] };
+  org: Organizacion = { id: ORG, nombre: "Prueba", tipo: "cooperativa", cultivos: ["cafe"], eliminacionProgramada: null };
   /** Cultivos que ya tienen fincas (no se pueden quitar). */
   cultivosConFincas: string[] = [];
   async organizacion(organizacionId: string) {
@@ -285,6 +285,10 @@ class IdentidadFalsa implements Identidad {
   async quitarAcceso(uid: string) {
     this.claims.delete(uid);
     this.quitados.push(uid);
+  }
+  borrados: string[] = [];
+  async eliminarUsuario(uid: string) {
+    this.borrados.push(uid);
   }
 }
 

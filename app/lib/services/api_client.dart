@@ -9,6 +9,64 @@ const apiUrl = String.fromEnvironment(
   defaultValue: 'http://10.0.2.2:8080',
 );
 
+/// Lo que escribió un productor en la página de eliminación de datos.
+class SolicitudEliminacion {
+  SolicitudEliminacion({
+    required this.id,
+    required this.nombre,
+    required this.contacto,
+    required this.creadaEn,
+    this.cedula,
+    this.comunidad,
+    this.mensaje,
+  });
+
+  factory SolicitudEliminacion.desdeJson(Map<String, dynamic> j) =>
+      SolicitudEliminacion(
+        id: j['id'] as String,
+        nombre: j['nombre'] as String,
+        cedula: j['cedula'] as String?,
+        comunidad: j['comunidad'] as String?,
+        contacto: j['contacto'] as String,
+        mensaje: j['mensaje'] as String?,
+        creadaEn: DateTime.parse(j['creadaEn'] as String).toLocal(),
+      );
+
+  final String id;
+  final String nombre;
+  final String? cedula;
+  final String? comunidad;
+  final String contacto;
+  final String? mensaje;
+  final DateTime creadaEn;
+}
+
+/// Qué pasó al eliminar a un productor.
+class ResumenEliminacion {
+  ResumenEliminacion({
+    required this.anonimizado,
+    required this.fincasBorradas,
+    required this.fincasConservadas,
+    this.conservarHasta,
+  });
+
+  factory ResumenEliminacion.desdeJson(Map<String, dynamic> j) =>
+      ResumenEliminacion(
+        anonimizado: j['productor'] == 'anonimizado',
+        fincasBorradas: j['fincasBorradas'] as int,
+        fincasConservadas: j['fincasConservadas'] as int,
+        conservarHasta: j['conservarHasta'] == null
+            ? null
+            : DateTime.parse(j['conservarHasta'] as String),
+      );
+
+  /// `true` si quedan fincas sin datos personales que el EUDR obliga a guardar.
+  final bool anonimizado;
+  final int fincasBorradas;
+  final int fincasConservadas;
+  final DateTime? conservarHasta;
+}
+
 class Invitacion {
   Invitacion({required this.email, required this.rol, required this.activa});
 
@@ -523,6 +581,59 @@ class ApiClient {
 
   Future<void> quitarAcceso(String email) =>
       _pedir('DELETE', '/v1/invitaciones/${Uri.encodeComponent(email)}');
+
+  /// Solicitudes de productores que pidieron borrar sus datos (administradores).
+  Future<List<SolicitudEliminacion>> solicitudesEliminacion() async {
+    final r = await _pedir('GET', '/v1/solicitudes-eliminacion');
+    return [
+      for (final s in r['solicitudes'] as List)
+        SolicitudEliminacion.desdeJson(s as Map<String, dynamic>),
+    ];
+  }
+
+  /// Aprueba la solicitud: elimina (o anonimiza) al [productorId] elegido.
+  Future<ResumenEliminacion> aprobarSolicitud(
+    String id,
+    String productorId,
+  ) async => ResumenEliminacion.desdeJson(
+    await _pedir(
+      'POST',
+      '/v1/solicitudes-eliminacion/${Uri.encodeComponent(id)}/aprobar',
+      {'productorId': productorId},
+    ),
+  );
+
+  Future<void> rechazarSolicitud(String id, String motivo) => _pedir(
+    'POST',
+    '/v1/solicitudes-eliminacion/${Uri.encodeComponent(id)}/rechazar',
+    {'motivo': motivo},
+  );
+
+  /// Elimina los datos de un productor que lo pidió en persona (administradores).
+  Future<ResumenEliminacion> eliminarProductor(
+    String id, {
+    String? motivo,
+  }) async => ResumenEliminacion.desdeJson(
+    await _pedir('DELETE', '/v1/productores/${Uri.encodeComponent(id)}', {
+      'motivo': ?motivo,
+    }),
+  );
+
+  /// Elimina la cuenta de quien inició sesión (y su acceso a la organización).
+  Future<void> eliminarCuenta() => _pedir('DELETE', '/v1/cuenta');
+
+  /// Programa la eliminación de la organización; devuelve cuándo se ejecuta.
+  Future<DateTime> programarEliminacionOrganizacion() async {
+    final r = await _pedir(
+      'POST',
+      '/v1/organizacion/eliminacion',
+      const <String, dynamic>{},
+    );
+    return DateTime.parse(r['eliminacionProgramada'] as String).toLocal();
+  }
+
+  Future<void> cancelarEliminacionOrganizacion() =>
+      _pedir('DELETE', '/v1/organizacion/eliminacion');
 
   /// Envía la petición. Si la conexión se cae antes de llegar la respuesta
   /// (p. ej. "Connection closed before full header was received": el celular

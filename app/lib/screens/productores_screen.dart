@@ -7,7 +7,10 @@ import 'contenedores_screen.dart';
 import 'cultivos_screen.dart';
 import 'equipo_screen.dart';
 import 'lotes_screen.dart';
+import 'finca_screen.dart' show fecha;
 import 'nuevo_productor_screen.dart';
+import 'privacidad_screen.dart';
+import 'solicitudes_eliminacion_screen.dart';
 import 'productor_screen.dart';
 import 'temporadas_screen.dart';
 
@@ -76,6 +79,12 @@ class ProductoresScreen extends ConsumerWidget {
                 child: const Text('Tema'),
               ),
               PopupMenuItem(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacidadScreen()),
+                ),
+                child: const Text('Privacidad y datos'),
+              ),
+              PopupMenuItem(
                 onTap: () => ref.read(authServiceProvider).cerrarSesion(),
                 child: const Text('Cerrar sesión'),
               ),
@@ -85,6 +94,48 @@ class ProductoresScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          if (ref.watch(eliminacionProgramadaProvider).value case final dia?)
+            MaterialBanner(
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              leading: const Icon(Icons.event_busy),
+              content: Text(
+                'La organización se eliminará el ${fecha(dia)}. '
+                '${sesion?.esAdmin ?? false ? 'Puedes cancelarlo en Privacidad y datos.' : 'Habla con el administrador si es un error.'}',
+              ),
+              actions: [
+                if (sesion?.esAdmin ?? false)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PrivacidadScreen(),
+                      ),
+                    ),
+                    child: const Text('Ver'),
+                  )
+                else
+                  const SizedBox.shrink(),
+              ],
+            ),
+          if ((sesion?.esAdmin ?? false) &&
+              (ref.watch(solicitudesPendientesProvider).value ?? 0) > 0)
+            MaterialBanner(
+              leading: const Icon(Icons.mark_email_unread_outlined),
+              content: Text(
+                '${ref.watch(solicitudesPendientesProvider).value} '
+                '${ref.watch(solicitudesPendientesProvider).value == 1 ? 'productor pide' : 'productores piden'} '
+                'que se borren sus datos.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SolicitudesEliminacionScreen(),
+                    ),
+                  ),
+                  child: const Text('Responder'),
+                ),
+              ],
+            ),
           if (ref.watch(temporadasProvider).hasValue &&
               ref.watch(temporadaActualProvider) == null)
             MaterialBanner(
@@ -119,10 +170,16 @@ class ProductoresScreen extends ConsumerWidget {
                       itemBuilder: (_, i) {
                         final x = lista[i];
                         return ListTile(
-                          leading: const Icon(Icons.person),
+                          leading: Icon(
+                            x.productor.anonimizado
+                                ? Icons.person_off_outlined
+                                : Icons.person,
+                          ),
                           title: Text(x.productor.nombre),
                           subtitle: Text(
                             [
+                              if (x.productor.anonimizado)
+                                'Datos personales eliminados',
                               if (x.productor.comunidad != null)
                                 x.productor.comunidad!,
                               '${x.fincas} ${x.fincas == 1 ? 'finca' : 'fincas'}',

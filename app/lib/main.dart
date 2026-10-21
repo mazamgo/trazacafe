@@ -7,6 +7,8 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'firebase_options.dart';
 import 'providers.dart';
 import 'screens/activacion_screen.dart';
+import 'screens/eliminar_datos_screen.dart';
+import 'screens/privacidad_publica_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/productores_screen.dart';
 import 'screens/verificador_screen.dart';
@@ -32,8 +34,9 @@ class TrazaCafeApp extends ConsumerWidget {
       theme: temaClaro,
       darkTheme: temaOscuro,
       themeMode: ref.watch(temaProvider),
-      // En la web solo se publica el verificador (/v/{uid}); la app de campo
-      // es para Android. Una sola ruta inicial: sin "atrás" hacia `/` y `/v`.
+      // En la web se publican el verificador (/v/{uid}) y las páginas de
+      // eliminación de datos y privacidad; la app de campo es para Android.
+      // Una sola ruta inicial: sin "atrás" hacia `/` y `/v`.
       onGenerateInitialRoutes: (ruta) => [_ruta(RouteSettings(name: ruta))],
       onGenerateRoute: _ruta,
     );
@@ -41,6 +44,19 @@ class TrazaCafeApp extends ConsumerWidget {
 
   static Route<void> _ruta(RouteSettings settings) {
     final ruta = Uri.parse(settings.name ?? '/');
+    // Páginas públicas que pide Google Play (eliminación de datos y privacidad).
+    if (ruta.path == '/eliminar-datos') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const EliminarDatosScreen(),
+      );
+    }
+    if (ruta.path == '/privacidad') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const PrivacidadPublicaScreen(),
+      );
+    }
     if (ruta.pathSegments.length == 2 && ruta.pathSegments.first == 'v') {
       return MaterialPageRoute(
         settings: settings,

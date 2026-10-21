@@ -89,6 +89,33 @@ class $ProductoresTable extends Productores
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _anonimizadoMeta = const VerificationMeta(
+    'anonimizado',
+  );
+  @override
+  late final GeneratedColumn<bool> anonimizado = GeneratedColumn<bool>(
+    'anonimizado',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("anonimizado" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _conservarHastaMeta = const VerificationMeta(
+    'conservarHasta',
+  );
+  @override
+  late final GeneratedColumn<DateTime> conservarHasta =
+      GeneratedColumn<DateTime>(
+        'conservar_hasta',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -98,6 +125,8 @@ class $ProductoresTable extends Productores
     consentimientoFirmado,
     creadoEn,
     sincronizado,
+    anonimizado,
+    conservarHasta,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -160,6 +189,24 @@ class $ProductoresTable extends Productores
         ),
       );
     }
+    if (data.containsKey('anonimizado')) {
+      context.handle(
+        _anonimizadoMeta,
+        anonimizado.isAcceptableOrUnknown(
+          data['anonimizado']!,
+          _anonimizadoMeta,
+        ),
+      );
+    }
+    if (data.containsKey('conservar_hasta')) {
+      context.handle(
+        _conservarHastaMeta,
+        conservarHasta.isAcceptableOrUnknown(
+          data['conservar_hasta']!,
+          _conservarHastaMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -197,6 +244,14 @@ class $ProductoresTable extends Productores
         DriftSqlType.bool,
         data['${effectivePrefix}sincronizado'],
       )!,
+      anonimizado: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}anonimizado'],
+      )!,
+      conservarHasta: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}conservar_hasta'],
+      ),
     );
   }
 
@@ -214,6 +269,13 @@ class Productor extends DataClass implements Insertable<Productor> {
   final bool consentimientoFirmado;
   final DateTime creadoEn;
   final bool sincronizado;
+
+  /// Pidió que borraran sus datos: quedan fincas sin datos personales que el
+  /// EUDR obliga a guardar (llega del servidor).
+  final bool anonimizado;
+
+  /// Hasta cuándo se guardan esas fincas (5 años desde la exportación).
+  final DateTime? conservarHasta;
   const Productor({
     required this.id,
     required this.nombre,
@@ -222,6 +284,8 @@ class Productor extends DataClass implements Insertable<Productor> {
     required this.consentimientoFirmado,
     required this.creadoEn,
     required this.sincronizado,
+    required this.anonimizado,
+    this.conservarHasta,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -237,6 +301,10 @@ class Productor extends DataClass implements Insertable<Productor> {
     map['consentimiento_firmado'] = Variable<bool>(consentimientoFirmado);
     map['creado_en'] = Variable<DateTime>(creadoEn);
     map['sincronizado'] = Variable<bool>(sincronizado);
+    map['anonimizado'] = Variable<bool>(anonimizado);
+    if (!nullToAbsent || conservarHasta != null) {
+      map['conservar_hasta'] = Variable<DateTime>(conservarHasta);
+    }
     return map;
   }
 
@@ -253,6 +321,10 @@ class Productor extends DataClass implements Insertable<Productor> {
       consentimientoFirmado: Value(consentimientoFirmado),
       creadoEn: Value(creadoEn),
       sincronizado: Value(sincronizado),
+      anonimizado: Value(anonimizado),
+      conservarHasta: conservarHasta == null && nullToAbsent
+          ? const Value.absent()
+          : Value(conservarHasta),
     );
   }
 
@@ -271,6 +343,8 @@ class Productor extends DataClass implements Insertable<Productor> {
       ),
       creadoEn: serializer.fromJson<DateTime>(json['creadoEn']),
       sincronizado: serializer.fromJson<bool>(json['sincronizado']),
+      anonimizado: serializer.fromJson<bool>(json['anonimizado']),
+      conservarHasta: serializer.fromJson<DateTime?>(json['conservarHasta']),
     );
   }
   @override
@@ -284,6 +358,8 @@ class Productor extends DataClass implements Insertable<Productor> {
       'consentimientoFirmado': serializer.toJson<bool>(consentimientoFirmado),
       'creadoEn': serializer.toJson<DateTime>(creadoEn),
       'sincronizado': serializer.toJson<bool>(sincronizado),
+      'anonimizado': serializer.toJson<bool>(anonimizado),
+      'conservarHasta': serializer.toJson<DateTime?>(conservarHasta),
     };
   }
 
@@ -295,6 +371,8 @@ class Productor extends DataClass implements Insertable<Productor> {
     bool? consentimientoFirmado,
     DateTime? creadoEn,
     bool? sincronizado,
+    bool? anonimizado,
+    Value<DateTime?> conservarHasta = const Value.absent(),
   }) => Productor(
     id: id ?? this.id,
     nombre: nombre ?? this.nombre,
@@ -303,6 +381,10 @@ class Productor extends DataClass implements Insertable<Productor> {
     consentimientoFirmado: consentimientoFirmado ?? this.consentimientoFirmado,
     creadoEn: creadoEn ?? this.creadoEn,
     sincronizado: sincronizado ?? this.sincronizado,
+    anonimizado: anonimizado ?? this.anonimizado,
+    conservarHasta: conservarHasta.present
+        ? conservarHasta.value
+        : this.conservarHasta,
   );
   Productor copyWithCompanion(ProductoresCompanion data) {
     return Productor(
@@ -317,6 +399,12 @@ class Productor extends DataClass implements Insertable<Productor> {
       sincronizado: data.sincronizado.present
           ? data.sincronizado.value
           : this.sincronizado,
+      anonimizado: data.anonimizado.present
+          ? data.anonimizado.value
+          : this.anonimizado,
+      conservarHasta: data.conservarHasta.present
+          ? data.conservarHasta.value
+          : this.conservarHasta,
     );
   }
 
@@ -329,7 +417,9 @@ class Productor extends DataClass implements Insertable<Productor> {
           ..write('comunidad: $comunidad, ')
           ..write('consentimientoFirmado: $consentimientoFirmado, ')
           ..write('creadoEn: $creadoEn, ')
-          ..write('sincronizado: $sincronizado')
+          ..write('sincronizado: $sincronizado, ')
+          ..write('anonimizado: $anonimizado, ')
+          ..write('conservarHasta: $conservarHasta')
           ..write(')'))
         .toString();
   }
@@ -343,6 +433,8 @@ class Productor extends DataClass implements Insertable<Productor> {
     consentimientoFirmado,
     creadoEn,
     sincronizado,
+    anonimizado,
+    conservarHasta,
   );
   @override
   bool operator ==(Object other) =>
@@ -354,7 +446,9 @@ class Productor extends DataClass implements Insertable<Productor> {
           other.comunidad == this.comunidad &&
           other.consentimientoFirmado == this.consentimientoFirmado &&
           other.creadoEn == this.creadoEn &&
-          other.sincronizado == this.sincronizado);
+          other.sincronizado == this.sincronizado &&
+          other.anonimizado == this.anonimizado &&
+          other.conservarHasta == this.conservarHasta);
 }
 
 class ProductoresCompanion extends UpdateCompanion<Productor> {
@@ -365,6 +459,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
   final Value<bool> consentimientoFirmado;
   final Value<DateTime> creadoEn;
   final Value<bool> sincronizado;
+  final Value<bool> anonimizado;
+  final Value<DateTime?> conservarHasta;
   final Value<int> rowid;
   const ProductoresCompanion({
     this.id = const Value.absent(),
@@ -374,6 +470,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
     this.consentimientoFirmado = const Value.absent(),
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.anonimizado = const Value.absent(),
+    this.conservarHasta = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProductoresCompanion.insert({
@@ -384,6 +482,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
     this.consentimientoFirmado = const Value.absent(),
     this.creadoEn = const Value.absent(),
     this.sincronizado = const Value.absent(),
+    this.anonimizado = const Value.absent(),
+    this.conservarHasta = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        nombre = Value(nombre);
@@ -395,6 +495,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
     Expression<bool>? consentimientoFirmado,
     Expression<DateTime>? creadoEn,
     Expression<bool>? sincronizado,
+    Expression<bool>? anonimizado,
+    Expression<DateTime>? conservarHasta,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -406,6 +508,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
         'consentimiento_firmado': consentimientoFirmado,
       if (creadoEn != null) 'creado_en': creadoEn,
       if (sincronizado != null) 'sincronizado': sincronizado,
+      if (anonimizado != null) 'anonimizado': anonimizado,
+      if (conservarHasta != null) 'conservar_hasta': conservarHasta,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -418,6 +522,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
     Value<bool>? consentimientoFirmado,
     Value<DateTime>? creadoEn,
     Value<bool>? sincronizado,
+    Value<bool>? anonimizado,
+    Value<DateTime?>? conservarHasta,
     Value<int>? rowid,
   }) {
     return ProductoresCompanion(
@@ -429,6 +535,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
           consentimientoFirmado ?? this.consentimientoFirmado,
       creadoEn: creadoEn ?? this.creadoEn,
       sincronizado: sincronizado ?? this.sincronizado,
+      anonimizado: anonimizado ?? this.anonimizado,
+      conservarHasta: conservarHasta ?? this.conservarHasta,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -459,6 +567,12 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
     if (sincronizado.present) {
       map['sincronizado'] = Variable<bool>(sincronizado.value);
     }
+    if (anonimizado.present) {
+      map['anonimizado'] = Variable<bool>(anonimizado.value);
+    }
+    if (conservarHasta.present) {
+      map['conservar_hasta'] = Variable<DateTime>(conservarHasta.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -475,6 +589,8 @@ class ProductoresCompanion extends UpdateCompanion<Productor> {
           ..write('consentimientoFirmado: $consentimientoFirmado, ')
           ..write('creadoEn: $creadoEn, ')
           ..write('sincronizado: $sincronizado, ')
+          ..write('anonimizado: $anonimizado, ')
+          ..write('conservarHasta: $conservarHasta, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1852,6 +1968,222 @@ class CultivosOrganizacionCompanion
   String toString() {
     return (StringBuffer('CultivosOrganizacionCompanion(')
           ..write('id: $id, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AjustesTable extends Ajustes with TableInfo<$AjustesTable, Ajuste> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AjustesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _claveMeta = const VerificationMeta('clave');
+  @override
+  late final GeneratedColumn<String> clave = GeneratedColumn<String>(
+    'clave',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valorMeta = const VerificationMeta('valor');
+  @override
+  late final GeneratedColumn<String> valor = GeneratedColumn<String>(
+    'valor',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [clave, valor];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ajustes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Ajuste> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('clave')) {
+      context.handle(
+        _claveMeta,
+        clave.isAcceptableOrUnknown(data['clave']!, _claveMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_claveMeta);
+    }
+    if (data.containsKey('valor')) {
+      context.handle(
+        _valorMeta,
+        valor.isAcceptableOrUnknown(data['valor']!, _valorMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {clave};
+  @override
+  Ajuste map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Ajuste(
+      clave: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}clave'],
+      )!,
+      valor: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}valor'],
+      ),
+    );
+  }
+
+  @override
+  $AjustesTable createAlias(String alias) {
+    return $AjustesTable(attachedDatabase, alias);
+  }
+}
+
+class Ajuste extends DataClass implements Insertable<Ajuste> {
+  final String clave;
+  final String? valor;
+  const Ajuste({required this.clave, this.valor});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['clave'] = Variable<String>(clave);
+    if (!nullToAbsent || valor != null) {
+      map['valor'] = Variable<String>(valor);
+    }
+    return map;
+  }
+
+  AjustesCompanion toCompanion(bool nullToAbsent) {
+    return AjustesCompanion(
+      clave: Value(clave),
+      valor: valor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(valor),
+    );
+  }
+
+  factory Ajuste.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Ajuste(
+      clave: serializer.fromJson<String>(json['clave']),
+      valor: serializer.fromJson<String?>(json['valor']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'clave': serializer.toJson<String>(clave),
+      'valor': serializer.toJson<String?>(valor),
+    };
+  }
+
+  Ajuste copyWith({
+    String? clave,
+    Value<String?> valor = const Value.absent(),
+  }) => Ajuste(
+    clave: clave ?? this.clave,
+    valor: valor.present ? valor.value : this.valor,
+  );
+  Ajuste copyWithCompanion(AjustesCompanion data) {
+    return Ajuste(
+      clave: data.clave.present ? data.clave.value : this.clave,
+      valor: data.valor.present ? data.valor.value : this.valor,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Ajuste(')
+          ..write('clave: $clave, ')
+          ..write('valor: $valor')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(clave, valor);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Ajuste &&
+          other.clave == this.clave &&
+          other.valor == this.valor);
+}
+
+class AjustesCompanion extends UpdateCompanion<Ajuste> {
+  final Value<String> clave;
+  final Value<String?> valor;
+  final Value<int> rowid;
+  const AjustesCompanion({
+    this.clave = const Value.absent(),
+    this.valor = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AjustesCompanion.insert({
+    required String clave,
+    this.valor = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : clave = Value(clave);
+  static Insertable<Ajuste> custom({
+    Expression<String>? clave,
+    Expression<String>? valor,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (clave != null) 'clave': clave,
+      if (valor != null) 'valor': valor,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AjustesCompanion copyWith({
+    Value<String>? clave,
+    Value<String?>? valor,
+    Value<int>? rowid,
+  }) {
+    return AjustesCompanion(
+      clave: clave ?? this.clave,
+      valor: valor ?? this.valor,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (clave.present) {
+      map['clave'] = Variable<String>(clave.value);
+    }
+    if (valor.present) {
+      map['valor'] = Variable<String>(valor.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AjustesCompanion(')
+          ..write('clave: $clave, ')
+          ..write('valor: $valor, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4123,6 +4455,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TemporadasTable temporadas = $TemporadasTable(this);
   late final $CultivosOrganizacionTable cultivosOrganizacion =
       $CultivosOrganizacionTable(this);
+  late final $AjustesTable ajustes = $AjustesTable(this);
   late final $VersionesFincaTable versionesFinca = $VersionesFincaTable(this);
   late final $VerificacionesTable verificaciones = $VerificacionesTable(this);
   late final $EntregasTable entregas = $EntregasTable(this);
@@ -4136,6 +4469,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     fincas,
     temporadas,
     cultivosOrganizacion,
+    ajustes,
     versionesFinca,
     verificaciones,
     entregas,
@@ -4152,6 +4486,8 @@ typedef $$ProductoresTableCreateCompanionBuilder =
       Value<bool> consentimientoFirmado,
       Value<DateTime> creadoEn,
       Value<bool> sincronizado,
+      Value<bool> anonimizado,
+      Value<DateTime?> conservarHasta,
       Value<int> rowid,
     });
 typedef $$ProductoresTableUpdateCompanionBuilder =
@@ -4163,6 +4499,8 @@ typedef $$ProductoresTableUpdateCompanionBuilder =
       Value<bool> consentimientoFirmado,
       Value<DateTime> creadoEn,
       Value<bool> sincronizado,
+      Value<bool> anonimizado,
+      Value<DateTime?> conservarHasta,
       Value<int> rowid,
     });
 
@@ -4231,6 +4569,16 @@ class $$ProductoresTableFilterComposer
 
   ColumnFilters<bool> get sincronizado => $composableBuilder(
     column: $table.sincronizado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get anonimizado => $composableBuilder(
+    column: $table.anonimizado,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get conservarHasta => $composableBuilder(
+    column: $table.conservarHasta,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4303,6 +4651,16 @@ class $$ProductoresTableOrderingComposer
     column: $table.sincronizado,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get anonimizado => $composableBuilder(
+    column: $table.anonimizado,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get conservarHasta => $composableBuilder(
+    column: $table.conservarHasta,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProductoresTableAnnotationComposer
@@ -4336,6 +4694,16 @@ class $$ProductoresTableAnnotationComposer
 
   GeneratedColumn<bool> get sincronizado => $composableBuilder(
     column: $table.sincronizado,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get anonimizado => $composableBuilder(
+    column: $table.anonimizado,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get conservarHasta => $composableBuilder(
+    column: $table.conservarHasta,
     builder: (column) => column,
   );
 
@@ -4400,6 +4768,8 @@ class $$ProductoresTableTableManager
                 Value<bool> consentimientoFirmado = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<bool> anonimizado = const Value.absent(),
+                Value<DateTime?> conservarHasta = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductoresCompanion(
                 id: id,
@@ -4409,6 +4779,8 @@ class $$ProductoresTableTableManager
                 consentimientoFirmado: consentimientoFirmado,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                anonimizado: anonimizado,
+                conservarHasta: conservarHasta,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4420,6 +4792,8 @@ class $$ProductoresTableTableManager
                 Value<bool> consentimientoFirmado = const Value.absent(),
                 Value<DateTime> creadoEn = const Value.absent(),
                 Value<bool> sincronizado = const Value.absent(),
+                Value<bool> anonimizado = const Value.absent(),
+                Value<DateTime?> conservarHasta = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductoresCompanion.insert(
                 id: id,
@@ -4429,6 +4803,8 @@ class $$ProductoresTableTableManager
                 consentimientoFirmado: consentimientoFirmado,
                 creadoEn: creadoEn,
                 sincronizado: sincronizado,
+                anonimizado: anonimizado,
+                conservarHasta: conservarHasta,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5616,6 +5992,145 @@ typedef $$CultivosOrganizacionTableProcessedTableManager =
         >,
       ),
       CultivosOrganizacionData,
+      PrefetchHooks Function()
+    >;
+typedef $$AjustesTableCreateCompanionBuilder = AjustesCompanion Function({
+  required String clave,
+  Value<String?> valor,
+  Value<int> rowid,
+});
+typedef $$AjustesTableUpdateCompanionBuilder = AjustesCompanion Function({
+  Value<String> clave,
+  Value<String?> valor,
+  Value<int> rowid,
+});
+
+class $$AjustesTableFilterComposer
+    extends Composer<_$AppDatabase, $AjustesTable> {
+  $$AjustesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get clave => $composableBuilder(
+    column: $table.clave,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get valor => $composableBuilder(
+    column: $table.valor,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AjustesTableOrderingComposer
+    extends Composer<_$AppDatabase, $AjustesTable> {
+  $$AjustesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get clave => $composableBuilder(
+    column: $table.clave,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get valor => $composableBuilder(
+    column: $table.valor,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AjustesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AjustesTable> {
+  $$AjustesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get clave =>
+      $composableBuilder(column: $table.clave, builder: (column) => column);
+
+  GeneratedColumn<String> get valor =>
+      $composableBuilder(column: $table.valor, builder: (column) => column);
+}
+
+class $$AjustesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AjustesTable,
+          Ajuste,
+          $$AjustesTableFilterComposer,
+          $$AjustesTableOrderingComposer,
+          $$AjustesTableAnnotationComposer,
+          $$AjustesTableCreateCompanionBuilder,
+          $$AjustesTableUpdateCompanionBuilder,
+          (Ajuste, BaseReferences<_$AppDatabase, $AjustesTable, Ajuste>),
+          Ajuste,
+          PrefetchHooks Function()
+        > {
+  $$AjustesTableTableManager(_$AppDatabase db, $AjustesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AjustesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AjustesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AjustesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> clave = const Value.absent(),
+            Value<String?> valor = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => AjustesCompanion(clave: clave, valor: valor, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String clave,
+                Value<String?> valor = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AjustesCompanion.insert(
+                clave: clave,
+                valor: valor,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AjustesTable, Ajuste>(table),
+                  BaseReferences<_$AppDatabase, $AjustesTable, Ajuste>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AjustesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AjustesTable,
+      Ajuste,
+      $$AjustesTableFilterComposer,
+      $$AjustesTableOrderingComposer,
+      $$AjustesTableAnnotationComposer,
+      $$AjustesTableCreateCompanionBuilder,
+      $$AjustesTableUpdateCompanionBuilder,
+      (Ajuste, BaseReferences<_$AppDatabase, $AjustesTable, Ajuste>),
+      Ajuste,
       PrefetchHooks Function()
     >;
 typedef $$VersionesFincaTableCreateCompanionBuilder =
@@ -7099,6 +7614,8 @@ class $AppDatabaseManager {
       $$TemporadasTableTableManager(_db, _db.temporadas);
   $$CultivosOrganizacionTableTableManager get cultivosOrganizacion =>
       $$CultivosOrganizacionTableTableManager(_db, _db.cultivosOrganizacion);
+  $$AjustesTableTableManager get ajustes =>
+      $$AjustesTableTableManager(_db, _db.ajustes);
   $$VersionesFincaTableTableManager get versionesFinca =>
       $$VersionesFincaTableTableManager(_db, _db.versionesFinca);
   $$VerificacionesTableTableManager get verificaciones =>

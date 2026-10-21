@@ -162,7 +162,8 @@ void main() {
     final api = ApiFalsa({
       'POST /v1/sync': (200, {'recibidos': {}}),
       'POST /v1/fotos/$fotoId/subida': (409, {'error': 'sin_archivo', 'mensaje': 'El archivo todavía no está en Storage.'}),
-      'GET /v1/datos': (200, vacio),
+      // El servidor ya tiene al productor (si no viniera, el celular lo borraría con su foto).
+      'GET /v1/datos': (200, {...vacio, 'productores': ejemplo['productores']}),
     });
     final r = await servicio(api).sincronizar();
 

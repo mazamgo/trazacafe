@@ -198,6 +198,9 @@ void main() {
     await actual.into(actual.entregas).insert(EntregasCompanion.insert(
           id: 'e1', fincaId: 'f1', kg: 500, estado: 'uva', fecha: DateTime(2026, 10, 10)));
     for (final sql in [
+      'DROP TABLE ajustes',
+      'ALTER TABLE productores DROP COLUMN anonimizado',
+      'ALTER TABLE productores DROP COLUMN conservar_hasta',
       'ALTER TABLE entregas DROP COLUMN lote_codigo',
       'ALTER TABLE entregas DROP COLUMN corregida',
       'PRAGMA user_version = 5',
@@ -222,6 +225,9 @@ void main() {
     await actual.into(actual.temporadas).insert(TemporadasCompanion.insert(
           id: 't1', nombre: '2026/27', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 9, 30)));
     for (final sql in [
+      'DROP TABLE ajustes',
+      'ALTER TABLE productores DROP COLUMN anonimizado',
+      'ALTER TABLE productores DROP COLUMN conservar_hasta',
       'ALTER TABLE entregas DROP COLUMN lote_codigo',
       'ALTER TABLE entregas DROP COLUMN corregida',
       'DROP TABLE cultivos_organizacion',
@@ -250,6 +256,9 @@ void main() {
     await v4.into(v4.fincas).insert(FincasCompanion.insert(
           id: 'f1', productorId: 'p1', nombre: 'Leona II', coordenadasJson: '[[-86.0,13.0]]', areaHa: 1, geoHash: '0x0'));
     for (final sql in [
+      'DROP TABLE ajustes',
+      'ALTER TABLE productores DROP COLUMN anonimizado',
+      'ALTER TABLE productores DROP COLUMN conservar_hasta',
       'ALTER TABLE entregas DROP COLUMN lote_codigo',
       'ALTER TABLE entregas DROP COLUMN corregida',
       'DROP TABLE cultivos_organizacion',

@@ -125,6 +125,8 @@ export interface Organizacion {
   nombre: string;
   tipo: string;
   cultivos: string[];
+  /** Cuándo se eliminará la organización (30 días después de pedirlo), o `null`. */
+  eliminacionProgramada: string | null;
 }
 
 export type EstadoDeforestacion = "pendiente" | "verde" | "amarillo" | "rojo";
@@ -139,6 +141,9 @@ export interface DatosOrganizacion {
     cedula: string | null;
     comunidad: string | null;
     consentimientoFirmado: boolean;
+    /** Pidió que borraran sus datos y quedan fincas que el EUDR obliga a guardar. */
+    anonimizado?: boolean;
+    conservarHasta?: string | null;
   }[];
   fincas: {
     id: string;
@@ -324,15 +329,82 @@ const GEOMETRIA_SATELITE = `ST_AsGeoJSON(CASE WHEN GeometryType(f.geom) = 'POINT
     THEN ST_Buffer(f.geom::geography, sqrt(f.area_ha * 10000 / pi()))::geometry
     ELSE f.geom END, 7)::json`;
 
+/**
+ * De [ids], los que ya no aceptan datos nuevos: productores, fincas o visitas
+ * eliminados, y productores o fincas anonimizados.
+ */
+export async function idsEliminados(db: Pick<pg.Pool, "query">, organizacionId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT id::text FROM eliminados WHERE organizacion_id = $1 AND id = ANY($2::uuid[])
+     UNION SELECT id::text FROM productores WHERE organizacion_id = $1 AND anonimizado_en IS NOT NULL AND id = ANY($2::uuid[])
+     UNION SELECT f.id::text FROM fincas f JOIN productores p ON p.id = f.productor_id
+           WHERE p.organizacion_id = $1 AND f.anonimizada_en IS NOT NULL AND f.id = ANY($2::uuid[])`,
+    [organizacionId, [...new Set(ids)]],
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * Borra una finca con todo lo suyo (entregas, visitas, versiones, chequeos,
+ * fotos, attestations pendientes y su paso por lotes) dentro de la
+ * transacción de [client], y deja su id y los de sus visitas en `eliminados`
+ * para que la sincronización no los vuelva a crear. No revisa si se puede:
+ * eso lo decide quien la llama. Devuelve las rutas de Storage de sus fotos.
+ */
+export async function borrarFincaEnTx(client: pg.PoolClient, organizacionId: string, fincaId: string): Promise<string[]> {
+  await client.query(
+    `INSERT INTO eliminados (id, entidad, organizacion_id)
+     SELECT id, 'verificacion', $2::uuid FROM verificaciones WHERE finca_id = $1::uuid
+     UNION ALL SELECT $1::uuid, 'finca', $2::uuid
+     ON CONFLICT (id) DO NOTHING`,
+    [fincaId, organizacionId],
+  );
+  await client.query(
+    `DELETE FROM attestations_pendientes
+     WHERE (esquema = 'Finca' AND entidad_id = $1)
+        OR (esquema = 'Entrega' AND entidad_id IN (SELECT id FROM entregas WHERE finca_id = $1))
+        OR (esquema = 'Verificacion' AND entidad_id IN (SELECT id FROM verificaciones WHERE finca_id = $1))`,
+    [fincaId],
+  );
+  const fotos = await client.query<{ storage_path: string | null }>(
+    `DELETE FROM fotos
+     WHERE (entidad_tipo = 'finca' AND entidad_id = $1)
+        OR (entidad_tipo = 'verificacion' AND entidad_id IN (SELECT id FROM verificaciones WHERE finca_id = $1))
+     RETURNING storage_path`,
+    [fincaId],
+  );
+  await client.query("DELETE FROM lote_entregas WHERE entrega_id IN (SELECT id FROM entregas WHERE finca_id = $1)", [fincaId]);
+  for (const tabla of ["entregas", "verificaciones", "chequeos_deforestacion", "fincas_versiones"]) {
+    await client.query(`DELETE FROM ${tabla} WHERE finca_id = $1`, [fincaId]);
+  }
+  await client.query("DELETE FROM fincas WHERE id = $1", [fincaId]);
+  return fotos.rows.flatMap((f) => (f.storage_path ? [f.storage_path] : []));
+}
+
 export class PgRepo implements Repo {
   constructor(private readonly pool: pg.Pool) {}
 
-  async guardarSync(
-    usuario: UsuarioActivo,
-    { productores, fincas, versionesFinca, verificaciones, entregas, fotos }: LoteSync,
-  ): Promise<void> {
+  async guardarSync(usuario: UsuarioActivo, lote: LoteSync): Promise<void> {
     const org = usuario.organizacionId;
     const client = await this.pool.connect();
+    // Lo que un celular tenía pendiente de un productor o finca ya eliminados
+    // (o anonimizados) se descarta en silencio: así no se vuelve a crear ni
+    // recupera el nombre, y el celular lo quita en la descarga.
+    const ignorar = await idsEliminados(this.pool, org, [
+      ...lote.productores.map((p) => p.id),
+      ...lote.fincas.flatMap((f) => [f.id, f.productorId]),
+      ...lote.versionesFinca.map((v) => v.fincaId),
+      ...lote.verificaciones.flatMap((v) => [v.id, v.fincaId]),
+      ...lote.entregas.map((e) => e.fincaId),
+      ...lote.fotos.map((f) => f.entidadId),
+    ]);
+    const productores = lote.productores.filter((p) => !ignorar.has(p.id));
+    const fincas = lote.fincas.filter((f) => !ignorar.has(f.id) && !ignorar.has(f.productorId));
+    const versionesFinca = lote.versionesFinca.filter((v) => !ignorar.has(v.fincaId));
+    const verificaciones = lote.verificaciones.filter((v) => !ignorar.has(v.id) && !ignorar.has(v.fincaId));
+    const entregas = lote.entregas.filter((e) => !ignorar.has(e.fincaId));
+    const fotos = lote.fotos.filter((f) => !ignorar.has(f.entidadId));
     const fincaDeLaOrganizacion = async (fincaId: string) => {
       const r = await client.query<{ version_actual: number; cultivo: string }>(
         `SELECT f.version_actual, f.cultivo FROM fincas f JOIN productores p ON p.id = f.productor_id
@@ -355,7 +427,7 @@ export class PgRepo implements Repo {
            VALUES ($1, $2, $3, $4, $5, $6, $7)
            ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, cedula = EXCLUDED.cedula,
              comunidad = EXCLUDED.comunidad
-           WHERE productores.organizacion_id = EXCLUDED.organizacion_id`,
+           WHERE productores.organizacion_id = EXCLUDED.organizacion_id AND productores.anonimizado_en IS NULL`,
           [p.id, org, p.nombre, p.cedula ?? null, p.comunidad ?? null, p.consentimientoFirmado, usuario.uid],
         );
       }
@@ -557,26 +629,9 @@ export class PgRepo implements Repo {
         const estado = rows.length === 0 ? "no_encontrada" : rows[0].atestada ? "atestada" : "en_lote";
         return { estado, archivos: [] };
       }
-      await client.query(
-        `DELETE FROM attestations_pendientes
-         WHERE (esquema = 'Finca' AND entidad_id = $1)
-            OR (esquema = 'Entrega' AND entidad_id IN (SELECT id FROM entregas WHERE finca_id = $1))
-            OR (esquema = 'Verificacion' AND entidad_id IN (SELECT id FROM verificaciones WHERE finca_id = $1))`,
-        [fincaId],
-      );
-      const fotos = await client.query<{ storage_path: string | null }>(
-        `DELETE FROM fotos
-         WHERE (entidad_tipo = 'finca' AND entidad_id = $1)
-            OR (entidad_tipo = 'verificacion' AND entidad_id IN (SELECT id FROM verificaciones WHERE finca_id = $1))
-         RETURNING storage_path`,
-        [fincaId],
-      );
-      for (const tabla of ["entregas", "verificaciones", "chequeos_deforestacion", "fincas_versiones"]) {
-        await client.query(`DELETE FROM ${tabla} WHERE finca_id = $1`, [fincaId]);
-      }
-      await client.query("DELETE FROM fincas WHERE id = $1", [fincaId]);
+      const archivos = await borrarFincaEnTx(client, organizacionId, fincaId);
       await client.query("COMMIT");
-      return { estado: "eliminada", archivos: fotos.rows.flatMap((f) => (f.storage_path ? [f.storage_path] : [])) };
+      return { estado: "eliminada", archivos };
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;
@@ -949,7 +1004,8 @@ export class PgRepo implements Repo {
     const organizacion = (await this.organizacion(organizacionId))!;
     const temporadas = await this.listarTemporadas(organizacionId);
     const productores = await this.pool.query(
-      `SELECT id, nombre, cedula, comunidad, consentimiento_firmado AS "consentimientoFirmado"
+      `SELECT id, nombre, cedula, comunidad, consentimiento_firmado AS "consentimientoFirmado",
+              anonimizado_en IS NOT NULL AS anonimizado, to_char(conservar_hasta, 'YYYY-MM-DD') AS "conservarHasta"
        FROM productores WHERE organizacion_id = $1 ORDER BY nombre`,
       [organizacionId],
     );
@@ -1010,7 +1066,8 @@ export class PgRepo implements Repo {
 
   async organizacion(organizacionId: string): Promise<Organizacion | null> {
     const { rows } = await this.pool.query<Organizacion>(
-      "SELECT id, nombre, tipo, cultivos FROM organizaciones WHERE id = $1",
+      `SELECT id, nombre, tipo, cultivos, to_char(eliminacion_programada AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "eliminacionProgramada"
+       FROM organizaciones WHERE id = $1`,
       [organizacionId],
     );
     return rows[0] ?? null;

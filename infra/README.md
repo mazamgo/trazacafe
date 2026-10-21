@@ -266,6 +266,50 @@ Para errores de campo: un cero de más, la fecha o el estado equivocado, un nomb
 - **Área de las fincas de un punto:** un punto no tiene área en PostGIS, así que su área oficial es la **declarada**. Antes salía 0 en el PDF, en el GeoJSON (TRACES exige `Area` en los puntos) y en la regla de rendimiento.
 - **Fuera de alcance:** corregir lo ya firmado en la blockchain requiere revocar la attestation y emitir una nueva. Se hará al pasar a OP Mainnet.
 
+## 4j. Eliminación de datos (Google Play y Ley 787)
+
+Google Play exige una opción dentro de la app y una página web para pedir la eliminación sin instalarla. El enlace va en el formulario **Seguridad de los datos** de Play Console (borrador de respuestas en [`docs/seguridad-de-datos-play.md`](../docs/seguridad-de-datos-play.md)).
+
+- **Página pública:** `https://trazacafe-dev.web.app/eliminar-datos`, con la política de privacidad en `/privacidad` (borrador para el abogado). Las sirve la misma app Flutter Web del verificador (§6).
+  - **Productor:** un formulario sin sesión. Lleva un campo trampa y un límite de 5 solicitudes por IP y por hora.
+  - **Equipo:** entra con Google en la página.
+- **En la app:** menú ⋮ → **Privacidad y datos**.
+- **Código:** `backend/src/eliminacion.ts`, migración `013_eliminacion.sql`.
+- **Reglas al eliminar a un productor** (las mismas en todos los casos):
+
+  | Finca | Qué pasa |
+  |---|---|
+  | Sin nada firmado ni en un lote | Se borra completa. |
+  | Firmada o en un lote, sin exportar | Se borra lo no sellado y el resto se **anonimiza**; se guarda 5 años desde hoy. |
+  | Con entregas en un contenedor | Se **anonimiza** y se guarda 5 años desde el embarque (EUDR, art. 12). |
+
+  - **Anonimizar:** la finca y el productor pierden nombre, cédula, comunidad y notas, y los archivos de sus fotos. Se conservan polígono, área, cultivo, entregas selladas, chequeos y los hashes (que ya están en la blockchain). Las attestations no se revocan.
+  - **Historial:** en `correcciones` se vacían `antes`, `despues` y `motivo` de esos registros, y queda un evento `eliminar` o `anonimizar` con solo los conteos.
+  - **Al cerrarse,** una solicitud borra los datos que escribió el productor.
+  - **Lista de eliminados:** los ids eliminados quedan en la tabla `eliminados`. La sincronización descarta lo que un celular tenía pendiente de ellos (o de los anonimizados), para no revivirlos.
+- **Cuenta propia** (`DELETE /v1/cuenta`): quita los claims, revoca sesiones, borra el usuario de Firebase Auth y la invitación. El último administrador recibe 409, salvo que la organización ya tenga la eliminación programada.
+- **Organización:** `POST /v1/organizacion/eliminacion` la programa a 30 días y `DELETE` la cancela.
+  - **Al ejecutarse:** se elimina o anonimiza a cada productor, se borran el equipo (y sus cuentas de Firebase), el historial y las solicitudes, y lo que quede vacío (lotes, contenedores y temporadas sin uso).
+  - **La fila de la organización queda como "Organización eliminada",** porque la referencian los datos conservados.
+- **Archivos de Storage:** se encolan en `archivos_por_borrar` en la misma transacción y los borra la tarea diaria, con hasta 10 intentos.
+- **Tarea diaria** `POST /v1/tareas/eliminaciones` (OIDC como las demás):
+  - ejecuta las organizaciones vencidas;
+  - borra lo anonimizado cuyo `conservar_hasta` pasó;
+  - borra hasta 500 archivos por ejecución;
+  - avisa en el log (`eliminaciones: solicitudes de productores sin respuesta`) si hay solicitudes con más de 15 días.
+
+  Crearla (una vez, después de desplegar la API):
+
+  ```powershell
+  gcloud scheduler jobs create http eliminaciones --location=us-east4 --project=trazacafe-dev `
+    --schedule="30 6 * * *" --time-zone="America/Managua" --http-method=POST `
+    --uri="https://trazacafe-api-85528878949.us-east4.run.app/v1/tareas/eliminaciones" `
+    --oidc-service-account-email="trazacafe-tareas@trazacafe-dev.iam.gserviceaccount.com" `
+    --oidc-token-audience="https://trazacafe-api-85528878949.us-east4.run.app"
+  ```
+- **CORS:** las rutas que llama la página web (`/v1/publico/organizaciones`, `/v1/publico/solicitudes-eliminacion`, `/v1/cuenta`, `/v1/organizacion` y `/v1/organizacion/eliminacion`) responden con CORS abierto. La sesión va en el encabezado `Authorization`, no en cookies.
+- **Solicitudes sin cooperativa** (el productor eligió "No sé"): quedan con `organizacion_id` vacío y las atiende GoProduction. Consultarlas en la base con `SELECT * FROM solicitudes_eliminacion WHERE organizacion_id IS NULL AND estado = 'pendiente'`.
+
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints:
@@ -276,8 +320,11 @@ Endpoints:
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
-- Verificador público (sin sesión, con CORS): `GET /v1/publico/:uid`.
-- Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`, `POST /v1/tareas/attestations`.
+- Eliminación de datos (§4j):
+  - administradores: `GET /v1/solicitudes-eliminacion`, `POST /v1/solicitudes-eliminacion/:id/aprobar|rechazar`, `DELETE /v1/productores/:id`, `POST|DELETE /v1/organizacion/eliminacion`;
+  - cualquier persona con sesión: `DELETE /v1/cuenta`.
+- Públicas (sin sesión, con CORS): `GET /v1/publico/:uid` (verificador), `GET /v1/publico/organizaciones`, `POST /v1/publico/solicitudes-eliminacion`.
+- Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`, `POST /v1/tareas/attestations`, `POST /v1/tareas/eliminaciones`.
 
 **URL de la API:** https://trazacafe-api-85528878949.us-east4.run.app
 
@@ -336,6 +383,8 @@ Es la página que abre el comprador al escanear el QR del contenedor: `https://t
   - **Tema:** automático, claro u oscuro.
   - **Recordar:** las dos elecciones se guardan en el navegador (`app/lib/services/preferencias.dart`). La app de campo usa el mismo tema (menú ⋮ → Tema) y sigue solo en español.
 - **Red:** `--dart-define=EAS_RED=optimism` al pasar a OP Mainnet. Con Sepolia, la página avisa que son registros de prueba.
+
+La misma publicación sirve también `/eliminar-datos` y `/privacidad` (§4j). Para mostrar un correo de soporte en esas páginas, agrega `--dart-define=SOPORTE_EMAIL=<correo>` al compilar.
 
 Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas las rutas a `index.html`):
 

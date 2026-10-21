@@ -10,6 +10,7 @@ import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/compartir_service.dart';
 import 'services/correcciones_service.dart';
+import 'services/eliminacion_service.dart';
 import 'services/fincas_service.dart';
 import 'services/fotos_service.dart';
 import 'services/mapas_service.dart';
@@ -186,6 +187,41 @@ final compartidorProvider = Provider<Compartidor>(
 /// Equipo de la organización (solo administradores; requiere señal).
 final invitacionesProvider = FutureProvider.autoDispose<List<Invitacion>>(
   (ref) => ref.watch(apiProvider).invitaciones(),
+);
+
+final eliminacionServiceProvider = Provider<EliminacionService>(
+  (ref) => EliminacionService(
+    ref.watch(databaseProvider),
+    ref.watch(apiProvider),
+    ref.watch(syncServiceProvider),
+    ref.watch(authServiceProvider),
+  ),
+);
+
+final eliminacionPublicaProvider = Provider<EliminacionPublica>(
+  (ref) => EliminacionPublica(),
+);
+
+/// Solicitudes de eliminación de productores (solo administradores; requiere señal).
+final solicitudesEliminacionProvider =
+    FutureProvider.autoDispose<List<SolicitudEliminacion>>(
+      (ref) => ref.watch(apiProvider).solicitudesEliminacion(),
+    );
+
+/// Solicitudes pendientes según la última sincronización (para el aviso).
+final solicitudesPendientesProvider = StreamProvider<int>(
+  (ref) => ref
+      .watch(databaseProvider)
+      .observarAjuste(ClaveAjuste.solicitudesPendientes)
+      .map((v) => int.tryParse(v ?? '') ?? 0),
+);
+
+/// Cuándo se eliminará la organización, si el administrador lo pidió.
+final eliminacionProgramadaProvider = StreamProvider<DateTime?>(
+  (ref) => ref
+      .watch(databaseProvider)
+      .observarAjuste(ClaveAjuste.eliminacionProgramada)
+      .map((v) => v == null ? null : DateTime.tryParse(v)?.toLocal()),
 );
 
 /// Sincroniza solo cada vez que vuelve la señal. Los errores se ignoran

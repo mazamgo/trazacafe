@@ -28,4 +28,6 @@ export interface Identidad {
   asignarAcceso(uid: string, acceso: { organizacionId: string; rol: Rol }): Promise<void>;
   /** Borra los claims y cierra todas las sesiones abiertas de esa persona. */
   quitarAcceso(uid: string): Promise<void>;
+  /** Borra la cuenta de Firebase Auth (si ya no existe, no es error). */
+  eliminarUsuario(uid: string): Promise<void>;
 }

@@ -6,6 +6,7 @@ import '../domain/cedula.dart';
 import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../services/fincas_service.dart';
+import '../widgets/eliminacion.dart';
 import '../widgets/seccion_fotos.dart';
 import 'finca_screen.dart';
 import 'nueva_finca_screen.dart';
@@ -78,9 +79,35 @@ class ProductorScreen extends ConsumerWidget {
     }
   }
 
+  /// El productor pidió en persona que se borren sus datos (solo administradores).
+  Future<void> _eliminarDatos(
+    BuildContext context,
+    WidgetRef ref,
+    Productor p,
+  ) async {
+    if (!await confirmarEliminacionProductor(context, p.nombre) ||
+        !context.mounted) {
+      return;
+    }
+    final mensajero = ScaffoldMessenger.of(context);
+    final navegador = Navigator.of(context);
+    try {
+      final r = await ref
+          .read(eliminacionServiceProvider)
+          .eliminarProductor(p.id, motivo: 'Lo pidió en persona');
+      mensajero.showSnackBar(SnackBar(content: Text(resumenEliminacion(r))));
+      if (!r.anonimizado) navegador.pop();
+    } catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudieron eliminar los datos: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fincas = ref.watch(fincasDeProductorProvider(productor.id));
+    final esAdmin = ref.watch(sesionProvider).value?.esAdmin ?? false;
     // El productor de la lista, para ver al instante lo que se corrija.
     final p =
         ref
@@ -95,26 +122,50 @@ class ProductorScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(p.nombre),
         actions: [
-          IconButton(
-            tooltip: 'Corregir datos del productor',
-            onPressed: () => _editar(context, ref, p),
-            icon: const Icon(Icons.edit_outlined),
-          ),
+          if (!p.anonimizado)
+            IconButton(
+              tooltip: 'Corregir datos del productor',
+              onPressed: () => _editar(context, ref, p),
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          if (esAdmin && !p.anonimizado && p.sincronizado)
+            PopupMenuButton<void>(
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  onTap: () => _eliminarDatos(context, ref, p),
+                  child: const Text('Eliminar datos del productor'),
+                ),
+              ],
+            ),
         ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SeccionFotos(
-            titulo: 'Consentimiento de datos',
-            entidadTipo: 'productor',
-            entidadId: productor.id,
-            tipo: 'consentimiento',
-            textoBoton: 'Agregar foto',
-            vacio:
-                'No hay foto del consentimiento en este celular '
-                '(si lo registró otro técnico, está en el servidor).',
-          ),
+          if (p.anonimizado)
+            Card(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: ListTile(
+                leading: const Icon(Icons.person_off_outlined),
+                title: const Text('Sus datos personales se eliminaron'),
+                subtitle: Text(
+                  'A pedido del productor. Estas fincas tienen entregas en '
+                  'lotes o contenedores: el EUDR obliga a guardarlas sin datos '
+                  'personales${p.conservarHasta != null ? ' hasta el ${fecha(p.conservarHasta!)}' : ''}.',
+                ),
+              ),
+            )
+          else
+            SeccionFotos(
+              titulo: 'Consentimiento de datos',
+              entidadTipo: 'productor',
+              entidadId: productor.id,
+              tipo: 'consentimiento',
+              textoBoton: 'Agregar foto',
+              vacio:
+                  'No hay foto del consentimiento en este celular '
+                  '(si lo registró otro técnico, está en el servidor).',
+            ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Text(
@@ -174,15 +225,17 @@ class ProductorScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Nueva finca',
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => NuevaFincaScreen(productorId: productor.id),
-          ),
-        ),
-        child: const Icon(Icons.add_location_alt),
-      ),
+      floatingActionButton: p.anonimizado
+          ? null
+          : FloatingActionButton(
+              tooltip: 'Nueva finca',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => NuevaFincaScreen(productorId: productor.id),
+                ),
+              ),
+              child: const Icon(Icons.add_location_alt),
+            ),
     );
   }
 }

@@ -19,6 +19,13 @@ class Productores extends Table {
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
   BoolColumn get sincronizado => boolean().withDefault(const Constant(false))();
 
+  /// Pidió que borraran sus datos: quedan fincas sin datos personales que el
+  /// EUDR obliga a guardar (llega del servidor).
+  BoolColumn get anonimizado => boolean().withDefault(const Constant(false))();
+
+  /// Hasta cuándo se guardan esas fincas (5 años desde la exportación).
+  DateTimeColumn get conservarHasta => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -84,6 +91,24 @@ class CultivosOrganizacion extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Datos sueltos de la organización que llegan del servidor (ver [ClaveAjuste]).
+class Ajustes extends Table {
+  TextColumn get clave => text()();
+  TextColumn get valor => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {clave};
+}
+
+/// Claves de la tabla [Ajustes].
+abstract final class ClaveAjuste {
+  /// Fecha (ISO) en que se eliminará la organización, si el administrador lo pidió.
+  static const eliminacionProgramada = 'eliminacionProgramada';
+
+  /// Solicitudes de eliminación de productores sin responder (solo administradores).
+  static const solicitudesPendientes = 'solicitudesPendientes';
 }
 
 /// Lindero nuevo de una finca ya enviada, pendiente de enviar. Al enviarse
@@ -205,6 +230,7 @@ class Pendientes {
     Fincas,
     Temporadas,
     CultivosOrganizacion,
+    Ajustes,
     VersionesFinca,
     Verificaciones,
     Entregas,
@@ -225,7 +251,7 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -256,6 +282,11 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         await m.addColumn(entregas, entregas.loteCodigo);
         await m.addColumn(entregas, entregas.corregida);
+      }
+      if (from < 7) {
+        await m.addColumn(productores, productores.anonimizado);
+        await m.addColumn(productores, productores.conservarHasta);
+        await m.createTable(ajustes);
       }
     },
   );
@@ -497,6 +528,56 @@ class AppDatabase extends _$AppDatabase {
         return [for (final f in fotosFinca) f.ruta];
       });
 
+  /// Fotos del productor, de sus fincas y de las visitas de esas fincas.
+  Future<List<Foto>> _fotosDelProductor(String productorId) async {
+    final fincasIds = [
+      for (final f in await (select(
+        fincas,
+      )..where((f) => f.productorId.equals(productorId))).get())
+        f.id,
+    ];
+    final visitas = [
+      for (final v in await (select(
+        verificaciones,
+      )..where((v) => v.fincaId.isIn(fincasIds))).get())
+        v.id,
+    ];
+    return (select(fotos)..where(
+          (f) =>
+              (f.entidadTipo.equals('productor') &
+                  f.entidadId.equals(productorId)) |
+              (f.entidadTipo.equals('finca') & f.entidadId.isIn(fincasIds)) |
+              (f.entidadTipo.equals('verificacion') &
+                  f.entidadId.isIn(visitas)),
+        ))
+        .get();
+  }
+
+  /// Borra del celular todo lo de la organización (al eliminar la cuenta).
+  /// Devuelve las rutas de las fotos para borrar los archivos también.
+  Future<List<String>> borrarTodoLocal() => transaction(() async {
+    final rutas = [for (final f in await select(fotos).get()) f.ruta];
+    for (final tabla in <TableInfo>[
+      fotos,
+      entregas,
+      verificaciones,
+      versionesFinca,
+      fincas,
+      productores,
+      temporadas,
+      cultivosOrganizacion,
+      ajustes,
+    ]) {
+      await delete(tabla).go();
+    }
+    return rutas;
+  });
+
+  Stream<String?> observarAjuste(String clave) =>
+      (select(ajustes)..where((a) => a.clave.equals(clave)))
+          .watchSingleOrNull()
+          .map((a) => a?.valor);
+
   /// Marca como enviados exactamente los registros que viajaron en [enviados].
   Future<void> marcarSincronizados(Pendientes enviados) => transaction(
     () async {
@@ -554,6 +635,12 @@ class AppDatabase extends _$AppDatabase {
               .insert(CultivosOrganizacionCompanion.insert(id: c));
         }
       }
+      for (final MapEntry(key: clave, value: valor)
+          in (d.ajustes ?? const <String, String?>{}).entries) {
+        await into(ajustes).insertOnConflictUpdate(
+          AjustesCompanion.insert(clave: clave, valor: Value(valor)),
+        );
+      }
       for (final p in d.productores) {
         if (productoresLocales.contains(p.id.value)) continue;
         await into(productores).insertOnConflictUpdate(p);
@@ -592,6 +679,37 @@ class AppDatabase extends _$AppDatabase {
       for (final f in borradas) {
         rutas.addAll(await eliminarFincaLocal(f.id));
       }
+
+      // Productores que se eliminaron en el servidor: fuera del celular con
+      // sus fotos. A los anonimizados se les borran las fotos que quedaban
+      // en el celular (en el servidor ya no tienen archivo).
+      final productoresServidor = {for (final p in d.productores) p.id.value};
+      final anonimizados = {
+        for (final p in d.productores)
+          if (p.anonimizado.present && p.anonimizado.value) p.id.value,
+      };
+      final eliminados =
+          await (select(productores)..where(
+                (p) =>
+                    p.sincronizado.equals(true) &
+                    p.id.isNotIn(productoresServidor),
+              ))
+              .get();
+      for (final p in [...eliminados.map((p) => p.id), ...anonimizados]) {
+        final suyas = await _fotosDelProductor(p);
+        rutas.addAll(suyas.map((f) => f.ruta));
+        await (delete(
+          fotos,
+        )..where((f) => f.id.isIn(suyas.map((x) => x.id)))).go();
+      }
+      for (final p in eliminados) {
+        for (final f in await (select(
+          fincas,
+        )..where((f) => f.productorId.equals(p.id))).get()) {
+          rutas.addAll(await eliminarFincaLocal(f.id));
+        }
+        await (delete(productores)..where((x) => x.id.equals(p.id))).go();
+      }
       return rutas;
     },
   );
@@ -606,7 +724,11 @@ class DatosServidor {
     required this.verificaciones,
     required this.entregas,
     this.cultivos,
+    this.ajustes,
   });
+
+  /// Valores para [Ajustes]; `null` si la respuesta no los trae (API anterior).
+  final Map<String, String?>? ajustes;
 
   /// Cultivos de la organización; `null` si la respuesta no los trae.
   final List<String>? cultivos;

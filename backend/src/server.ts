@@ -10,6 +10,7 @@ import type { Identidad, Rol, VerificarToken } from "./auth.ts";
 import { optimism, optimismSepolia } from "viem/chains";
 import { ColaPg, EasViem } from "./atestador.ts";
 import { CorreccionesPg } from "./correcciones.ts";
+import { EliminacionesPg } from "./eliminacion.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { PgRepo } from "./repo.ts";
@@ -41,6 +42,13 @@ const identidad: Identidad = {
   quitarAcceso: async (uid) => {
     await auth.setCustomUserClaims(uid, null);
     await auth.revokeRefreshTokens(uid);
+  },
+  eliminarUsuario: async (uid) => {
+    try {
+      await auth.deleteUser(uid);
+    } catch (e) {
+      if ((e as { code?: string }).code !== "auth/user-not-found") throw e;
+    }
   },
 };
 
@@ -111,6 +119,7 @@ const app = buildApp({
   verificarTarea,
   atestador,
   correcciones: new CorreccionesPg(pool),
+  eliminaciones: new EliminacionesPg(pool),
   verificador: new VerificadorPg(pool),
 });
 

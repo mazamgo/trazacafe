@@ -15,6 +15,13 @@ import {
   type Resultado,
 } from "./correcciones.ts";
 import { revisar, type FuenteSatelital } from "./deforestacion.ts";
+import {
+  aprobarSolicitudSchema,
+  eliminarProductorSchema,
+  rechazarSolicitudSchema,
+  solicitudProductorSchema,
+  type Eliminaciones,
+} from "./eliminacion.ts";
 import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
 import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
 import { geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
@@ -30,6 +37,23 @@ const invitacionSchema = z.object({
 /** Fincas que revisa cada ejecución diaria de la tarea programada. */
 const FINCAS_POR_TAREA = 50;
 
+/** Solicitudes de eliminación que acepta la página pública por IP y por hora. */
+const SOLICITUDES_POR_HORA = 5;
+/** Archivos de Storage que borra cada ejecución de la tarea de eliminaciones. */
+const ARCHIVOS_POR_TAREA = 500;
+
+/**
+ * Rutas que llama la página web pública (eliminar-datos) desde otro dominio.
+ * CORS abierto: la sesión va en el encabezado Authorization, no en cookies.
+ */
+const RUTAS_WEB = [
+  "/v1/publico/organizaciones",
+  "/v1/publico/solicitudes-eliminacion",
+  "/v1/cuenta",
+  "/v1/organizacion",
+  "/v1/organizacion/eliminacion",
+];
+
 /** Valida el token OIDC con el que Cloud Scheduler llama a las tareas. */
 export type VerificarTarea = (token: string) => Promise<boolean>;
 
@@ -43,6 +67,7 @@ export function buildApp({
   atestador = null,
   correcciones = null,
   verificador = null,
+  eliminaciones = null,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
@@ -57,8 +82,20 @@ export function buildApp({
   correcciones?: Correcciones | null;
   /** Cadena pública de un contenedor o lote firmado (VerificadorPg). */
   verificador?: Verificador | null;
+  /** Eliminación de productores, cuentas y organizaciones (EliminacionesPg). */
+  eliminaciones?: Eliminaciones | null;
 }) {
-  const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+  // trustProxy: detrás del frontal de Cloud Run, req.ip es la IP real (límite por IP).
+  const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
+
+  app.addHook("onRequest", async (req, reply) => {
+    if (RUTAS_WEB.includes(req.url.split("?")[0])) {
+      reply.header("access-control-allow-origin", "*");
+      reply.header("access-control-allow-headers", "authorization, content-type");
+      reply.header("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+    }
+  });
+  for (const ruta of RUTAS_WEB) app.options(ruta, async (_req, reply) => reply.code(204).send());
 
   async function autenticar(req: FastifyRequest, reply: FastifyReply): Promise<Usuario | null> {
     const token = req.headers.authorization?.replace(/^Bearer /, "");
@@ -104,6 +141,159 @@ export function buildApp({
     }
     reply.header("cache-control", "public, max-age=300");
     return cadena;
+  });
+
+  /** Sin eliminaciones configuradas (pruebas), las rutas responden 503. */
+  function sinEliminaciones(reply: FastifyReply): boolean {
+    if (eliminaciones) return false;
+    reply.code(503).send({ error: "sin_eliminaciones" });
+    return true;
+  }
+
+  /** Responde el error de [r]; `true` si salió bien. */
+  function salioBien<T>(reply: FastifyReply, r: Resultado<T>): r is Extract<Resultado<T>, { ok: true }> {
+    if (r.ok) return true;
+    reply.code(r.status).send({ error: "no_eliminable", mensaje: r.mensaje });
+    return false;
+  }
+
+  /** Cooperativas que puede elegir un productor en la página de eliminación (solo nombres). */
+  app.get("/v1/publico/organizaciones", async (_req, reply) => {
+    if (sinEliminaciones(reply)) return;
+    reply.header("cache-control", "public, max-age=300");
+    return { organizaciones: await eliminaciones!.organizacionesPublicas() };
+  });
+
+  const solicitudesPorIp = new Map<string, number[]>();
+  /**
+   * Un productor pide que borren sus datos (página web, sin sesión). La
+   * aprueba el administrador de su cooperativa en la app.
+   */
+  app.post("/v1/publico/solicitudes-eliminacion", async (req, reply) => {
+    if (sinEliminaciones(reply)) return;
+    const ahora = Date.now();
+    const recientes = (solicitudesPorIp.get(req.ip) ?? []).filter((t) => ahora - t < 3600_000);
+    if (recientes.length >= SOLICITUDES_POR_HORA) {
+      return reply.code(429).send({ error: "demasiadas", mensaje: "Ya enviaste varias solicitudes. Intenta de nuevo en una hora." });
+    }
+    const datos = solicitudProductorSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", mensaje: datos.error.issues[0]?.message, detalles: datos.error.issues });
+    }
+    solicitudesPorIp.set(req.ip, [...recientes, ahora]);
+    // Un bot llenó el campo escondido: se le responde igual, sin guardar nada.
+    if (datos.data.sitio) return reply.code(201).send({ recibida: true });
+    if (!(await eliminaciones!.crearSolicitud(datos.data))) {
+      return reply.code(422).send({ error: "organizacion_desconocida", mensaje: "Elige tu cooperativa de la lista." });
+    }
+    return reply.code(201).send({ recibida: true });
+  });
+
+  /**
+   * Eliminar la propia cuenta (app o página web): quita el acceso, borra la
+   * invitación y la cuenta de Firebase. Lo que la persona registró se queda
+   * en la organización (es de ella); solo guarda su uid como autor.
+   */
+  app.delete("/v1/cuenta", async (req, reply) => {
+    const usuario = await autenticar(req, reply);
+    if (!usuario || sinEliminaciones(reply)) return;
+    const r = await eliminaciones!.eliminarCuenta(usuario);
+    if (!salioBien(reply, r)) return;
+    await identidad.quitarAcceso(usuario.uid);
+    await identidad.eliminarUsuario(usuario.uid);
+    return reply.code(204).send();
+  });
+
+  app.get("/v1/solicitudes-eliminacion", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin || sinEliminaciones(reply)) return;
+    return { solicitudes: await eliminaciones!.solicitudesPendientes(admin.organizacionId) };
+  });
+
+  app.post<{ Params: { id: string } }>("/v1/solicitudes-eliminacion/:id/aprobar", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin || sinEliminaciones(reply)) return;
+    const datos = aprobarSolicitudSchema.safeParse(req.body);
+    if (!z.uuid().safeParse(req.params.id).success || !datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", mensaje: "Elige el productor que corresponde a la solicitud." });
+    }
+    const r = await eliminaciones!.aprobarSolicitud(admin, req.params.id, datos.data.productorId);
+    return salioBien(reply, r) ? r.valor : undefined;
+  });
+
+  app.post<{ Params: { id: string } }>("/v1/solicitudes-eliminacion/:id/rechazar", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin || sinEliminaciones(reply)) return;
+    const datos = rechazarSolicitudSchema.safeParse(req.body);
+    if (!z.uuid().safeParse(req.params.id).success || !datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", mensaje: datos.error?.issues[0]?.message ?? "No encontrada." });
+    }
+    const r = await eliminaciones!.rechazarSolicitud(admin, req.params.id, datos.data.motivo);
+    return salioBien(reply, r) ? reply.code(204).send() : undefined;
+  });
+
+  /** El administrador elimina los datos de un productor que lo pidió en persona. */
+  app.delete<{ Params: { id: string } }>("/v1/productores/:id", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin || sinEliminaciones(reply)) return;
+    if (!z.uuid().safeParse(req.params.id).success) return reply.code(404).send({ error: "no_encontrado" });
+    const datos = eliminarProductorSchema.safeParse(req.body ?? {});
+    if (!datos.success) return reply.code(422).send({ error: "Datos inválidos", mensaje: datos.error.issues[0]?.message });
+    const r = await eliminaciones!.eliminarProductor(admin, req.params.id, datos.data.motivo ?? null);
+    return salioBien(reply, r) ? r.valor : undefined;
+  });
+
+  /** Programa la eliminación de toda la organización (se ejecuta en 30 días). */
+  app.post("/v1/organizacion/eliminacion", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin || sinEliminaciones(reply)) return;
+    const r = await eliminaciones!.programarEliminacionOrganizacion(admin);
+    return salioBien(reply, r) ? { eliminacionProgramada: r.valor } : undefined;
+  });
+
+  app.delete("/v1/organizacion/eliminacion", async (req, reply) => {
+    const admin = await activo(req, reply, true);
+    if (!admin || sinEliminaciones(reply)) return;
+    const r = await eliminaciones!.cancelarEliminacionOrganizacion(admin);
+    return salioBien(reply, r) ? reply.code(204).send() : undefined;
+  });
+
+  /**
+   * Tarea diaria (Cloud Scheduler): ejecuta las eliminaciones de
+   * organizaciones que cumplieron 30 días, borra lo anonimizado cuyo plazo
+   * EUDR venció y los archivos de Storage pendientes.
+   */
+  app.post("/v1/tareas/eliminaciones", async (req, reply) => {
+    const token = req.headers.authorization?.replace(/^Bearer /, "");
+    if (!token || !(await verificarTarea(token))) return reply.code(401).send({ error: "No autorizado" });
+    if (sinEliminaciones(reply)) return;
+    const r = await eliminaciones!.tareaDiaria();
+    let cuentasBorradas = 0;
+    for (const org of r.organizaciones) {
+      for (const uid of org.usuarios) {
+        try {
+          await identidad.quitarAcceso(uid);
+          await identidad.eliminarUsuario(uid);
+          cuentasBorradas++;
+        } catch (e) {
+          req.log.error({ uid, err: e }, "eliminaciones: no se pudo borrar una cuenta");
+        }
+      }
+    }
+    const rutas = await eliminaciones!.archivosPorBorrar(ARCHIVOS_POR_TAREA);
+    const resultados = await Promise.allSettled(rutas.map((ruta) => almacen.borrar(ruta)));
+    const borrados = rutas.filter((_, i) => resultados[i].status === "fulfilled");
+    await eliminaciones!.archivosBorrados(borrados, rutas.filter((_, i) => resultados[i].status === "rejected"));
+    if (r.solicitudesSinRespuesta > 0) {
+      req.log.warn({ solicitudes: r.solicitudesSinRespuesta }, "eliminaciones: solicitudes de productores sin respuesta");
+    }
+    return {
+      organizaciones: r.organizaciones.length,
+      cuentasBorradas,
+      fincasPurgadas: r.fincasPurgadas,
+      archivosBorrados: borrados.length,
+      solicitudesSinRespuesta: r.solicitudesSinRespuesta,
+    };
   });
 
   /**
@@ -269,7 +459,10 @@ export function buildApp({
   app.get("/v1/datos", async (req, reply) => {
     const usuario = await activo(req, reply);
     if (!usuario) return;
-    return repo.datosOrganizacion(usuario.organizacionId);
+    const datos = await repo.datosOrganizacion(usuario.organizacionId);
+    const solicitudesPendientes =
+      usuario.rol === "admin" && eliminaciones ? await eliminaciones.contarPendientes(usuario.organizacionId) : 0;
+    return { ...datos, solicitudesPendientes };
   });
 
   /**

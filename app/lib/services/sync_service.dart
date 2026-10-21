@@ -184,9 +184,18 @@ class SyncService {
       return DateTime(p[0], p[1], p[2]);
     }
 
-    final cultivos = (d['organizacion'] as Map?)?['cultivos'] as List?;
+    final organizacion = d['organizacion'] as Map?;
+    final cultivos = organizacion?['cultivos'] as List?;
     return DatosServidor(
       cultivos: cultivos?.cast<String>(),
+      ajustes: organizacion == null
+          ? null
+          : {
+              ClaveAjuste.eliminacionProgramada:
+                  organizacion['eliminacionProgramada'] as String?,
+              ClaveAjuste.solicitudesPendientes:
+                  '${(d['solicitudesPendientes'] as int?) ?? 0}',
+            },
       temporadas: [
         for (final t in lista('temporadas'))
           TemporadasCompanion(
@@ -219,6 +228,10 @@ class SyncService {
             comunidad: Value(p['comunidad'] as String?),
             consentimientoFirmado: Value(p['consentimientoFirmado'] as bool),
             sincronizado: enviado,
+            anonimizado: Value((p['anonimizado'] as bool?) ?? false),
+            conservarHasta: Value(
+              p['conservarHasta'] == null ? null : dia(p['conservarHasta']!),
+            ),
           ),
       ],
       fincas: [

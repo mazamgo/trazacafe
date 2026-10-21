@@ -55,6 +55,8 @@ Cada finca es de un cultivo (`cafe` o `cacao`). La configuración (nombre, códi
 
 En la blockchain solo se guardan hashes, IDs y resultados. Los datos personales de los productores (nombres, cédulas, polígonos exactos) se quedan en la base de datos. Esto cumple la Ley 787 de Protección de Datos Personales.
 
+Cualquier productor o persona del equipo puede pedir que se borren sus datos en `/eliminar-datos` (página pública) o desde la app (⋮ → Privacidad y datos). Lo que el EUDR obliga a guardar se conserva 5 años sin datos personales. Ver [docs/plan-eliminacion-datos.md](docs/plan-eliminacion-datos.md).
+
 ## Licencia
 
 MIT
