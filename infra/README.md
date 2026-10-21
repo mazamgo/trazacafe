@@ -384,7 +384,7 @@ Es la página que abre el comprador al escanear el QR del contenedor: `https://t
   - **Recordar:** las dos elecciones se guardan en el navegador (`app/lib/services/preferencias.dart`). La app de campo usa el mismo tema (menú ⋮ → Tema) y sigue solo en español.
 - **Red:** `--dart-define=EAS_RED=optimism` al pasar a OP Mainnet. Con Sepolia, la página avisa que son registros de prueba.
 
-La misma publicación sirve también `/eliminar-datos` y `/privacidad` (§4j). Para mostrar un correo de soporte en esas páginas, agrega `--dart-define=SOPORTE_EMAIL=<correo>` al compilar.
+La misma publicación sirve también `/eliminar-datos` y `/privacidad` (§4j). Esas páginas muestran como correo de soporte `mauricio.zambrana.g@gmail.com`; para cambiarlo, compila con `--dart-define=SOPORTE_EMAIL=<correo>`.
 
 Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas las rutas a `index.html`):
 

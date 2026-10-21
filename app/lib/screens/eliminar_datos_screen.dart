@@ -7,8 +7,12 @@ import '../services/auth_service.dart';
 import '../services/eliminacion_service.dart';
 import 'privacidad_publica_screen.dart';
 
-/// Correo de soporte de GoProduction que muestra la página (vacío = no se muestra).
-const soporteEmail = String.fromEnvironment('SOPORTE_EMAIL');
+/// Correo de soporte de GoProduction que muestran las páginas de eliminación
+/// de datos y privacidad (vacío = no se muestra).
+const soporteEmail = String.fromEnvironment(
+  'SOPORTE_EMAIL',
+  defaultValue: 'mauricio.zambrana.g@gmail.com',
+);
 
 /// Página pública `/eliminar-datos` (requisito de Google Play): se puede
 /// pedir la eliminación sin instalar la app. El productor llena un

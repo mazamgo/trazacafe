@@ -31,7 +31,7 @@ En la web solo se abren esas páginas (`lib/main.dart`). El manual para las pers
 | `VERIFICADOR_URL` | Página que va en el QR | `https://trazacafe-dev.web.app` |
 | `GOOGLE_MAPS_KEY` | Key de Google Map Tiles (solo Android) | la key restringida del proyecto |
 | `ANDROID_CERT_SHA1` | SHA-1 del certificado que firma el APK (Google Map Tiles lo exige) | el certificado de depuración actual |
-| `SOPORTE_EMAIL` | Correo de soporte de GoProduction que muestran las páginas de eliminación de datos y privacidad | vacío (no se muestra) |
+| `SOPORTE_EMAIL` | Correo de soporte de GoProduction que muestran las páginas de eliminación de datos y privacidad (vacío = no se muestra) | `mauricio.zambrana.g@gmail.com` |
 
 ## Comandos
 

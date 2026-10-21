@@ -9,6 +9,7 @@
 | Política de privacidad | `https://trazacafe-dev.web.app/privacidad` (en producción, la URL definitiva: Fase 4) |
 | ¿La app permite crear cuentas? | Sí: inicio de sesión con Google, solo por invitación de la organización. |
 | Enlace para pedir la eliminación de la cuenta y los datos | `https://trazacafe-dev.web.app/eliminar-datos` |
+| Correo de soporte (también en la ficha de Play) | `mauricio.zambrana.g@gmail.com` (aparece en `/eliminar-datos` y `/privacidad`) |
 | ¿Se puede pedir que se borren datos sin borrar la cuenta? | Sí: los productores (que no tienen cuenta) lo piden en la misma página; el administrador puede eliminar a un productor desde la app. |
 
 ## Prácticas generales
