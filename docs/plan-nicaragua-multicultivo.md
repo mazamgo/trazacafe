@@ -138,6 +138,47 @@ Es la parte que **paga el cliente**.
 - **Pantallas:** lotes, contenedores, paquete EUDR, alertas satelitales, avance de visitas por temporada, equipo y temporadas.
 - **Reportes:** % de fincas verificadas, kg por cultivo y temporada, fincas en amarillo o rojo.
 
+### Consola del propietario (GoProduction) (~2 semanas, cuando haya el primer cliente que paga)
+Hoy GoProduction administra la plataforma a mano:
+- crea organizaciones con `npm run crear-organizacion`;
+- atiende las solicitudes de eliminación sin cooperativa con SQL;
+- revisa las tareas en los logs de Google Cloud;
+- no tiene cómo medir el uso para facturar.
+
+Con 5 o 10 organizaciones eso no alcanza.
+
+- **Dónde:**
+  - **Web,** no en la app móvil: es trabajo de escritorio (tablas, filtros, exportar), y los permisos del dueño no deben viajar en una app que se descarga de Play Store.
+  - **Mismo repositorio y mismo código Flutter Web** que el panel de esta fase, pero en un **sitio aparte de Firebase Hosting** (por ejemplo `consola-trazacafe.web.app`), separado de las páginas públicas (verificador, eliminación de datos).
+- **API:**
+  - rutas `/v1/consola/*` en la misma API, solo para el rol **propietario**: un custom claim que se asigna a mano a los correos de GoProduction con un script, nunca por invitación;
+  - cuenta de Google con verificación en dos pasos;
+  - cada acción queda en una tabla de historial de la consola.
+- **Privacidad (Ley 787):** las cooperativas son responsables de los datos y GoProduction solo los procesa. La consola muestra **números por organización, no nombres ni cédulas**. Ver datos de una cooperativa para darle soporte solo con su permiso, y queda registrado.
+- **Pantallas:**
+  1. **Organizaciones:**
+     - crear una con su primer administrador y sus cultivos (lo que hoy hace el script);
+     - ver su plan;
+     - suspenderla por falta de pago: la app y la API dejan de aceptar datos nuevos, pero la organización sigue viendo y descargando lo suyo;
+     - ver si tiene una eliminación programada.
+  2. **Uso y facturación,** por organización y por mes:
+     - productores activos;
+     - fincas y hectáreas;
+     - contenedores con paquete EUDR;
+     - fotos y espacio en Storage;
+     - exportar a Excel para facturar (base de las métricas de la Fase 5).
+  3. **Salud del sistema:**
+     - última ejecución y resultado de cada tarea programada (attestations, chequeo satelital, eliminaciones);
+     - attestations atascadas;
+     - saldo de ETH de la clave de firma;
+     - fincas en rojo por organización.
+  4. **Solicitudes de eliminación:** las que no tienen cooperativa ("No sé") para asignarlas, y las que llevan más de 15 días sin respuesta (para escribirle a esa cooperativa).
+  5. **Soporte:**
+     - ver el equipo de una organización (correos y roles);
+     - reenviar o cancelar una invitación;
+     - nombrar a otro administrador si el único se fue.
+- **Fuera de alcance al inicio:** cobro automático con tarjeta, y entrar como otro usuario ("ver como"). Se evalúan con 10 o más clientes.
+
 ## Fase 4 — Producción y lanzamiento en Nicaragua (~2–3 semanas, antes de que termine la prueba de Cloud SQL)
 - **Proyecto `trazacafe-prod`** separado del de pruebas: Cloud SQL pagado con respaldos y recuperación a un punto en el tiempo, alertas de monitoreo y de presupuesto, keys propias y bucket propio.
 - **Seguridad:**
@@ -200,7 +241,7 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
 | Nov 2026 | Fase 1 (multicultivo) + key de GFW | Fase 0: entrevistas, demo, abogado |
 | Nov–Dic 2026 | Fase 2 (lotes, contenedores, paquete EUDR, attestations) | Carta de intención del piloto |
 | Ene 2027 | Fase 4 (producción, Play Store) antes de que termine la prueba de Cloud SQL | Contratos y entidad legal |
-| Feb–Mar 2027 | Fase 3 (panel web) | Piloto con un contenedor real |
+| Feb–Mar 2027 | Fase 3 (panel web) y consola del propietario (cuando pague el primer cliente) | Piloto con un contenedor real; primera factura |
 | Abr–Jun 2027 | Ajustes con el piloto | 5–10 organizaciones antes del 30/06/2027 |
 | 2º semestre 2027 | — | Decidir el primer país de expansión |
 
@@ -213,7 +254,11 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
   - prueba de un contenedor completo de punta a punta en OP Sepolia: entregas → lote → contenedor → attestations encadenadas visibles en easscan;
   - el GeoJSON validado contra el formato de TRACES;
   - el PDF revisado con el piloto.
-- **Fase 3:** el panel probado con la cuenta de administrador y un técnico sin acceso al panel.
+- **Fase 3:**
+  - el panel probado con la cuenta de administrador y un técnico sin acceso al panel;
+  - la consola del propietario rechaza (403) a administradores y técnicos de las cooperativas;
+  - crear una organización desde la consola reemplaza al script;
+  - la primera factura sale del reporte de uso.
 - **Fase 4:**
   - la app instalada desde Play (pruebas cerradas) con login y mapas funcionando con el SHA-1 de Play;
   - App Check rechaza llamadas que no vienen de la app;
