@@ -133,6 +133,57 @@ Es la parte que **paga el cliente**.
   - fondear la dirección con un poco de ETH en OP.
 - **Verificador público** (Flutter Web en Firebase Hosting): QR del contenedor o del saco → cadena completa sin datos personales.
 
+## Fase 2b — Red de proveedores: cooperativa → exportadora (~3–4 semanas)
+**Por qué:**
+- Hoy cada organización vive aislada: una exportadora no ve nada de las cooperativas que le venden.
+- En la práctica, la exportadora compra lotes a varias cooperativas, arma contenedores con ellos y necesita la geolocalización de todas las fincas de origen (EUDR).
+- **No es otra app:** es un puente entre organizaciones dentro de la misma plataforma. Funciona en la API, en la app móvil y en el panel web de la Fase 3.
+
+**Pasos:**
+1. **Vínculo entre organizaciones.**
+   - La exportadora invita a una cooperativa como proveedora y la cooperativa acepta en su app. Cualquiera de las dos puede terminar el vínculo después.
+   - Al aceptar, la cooperativa elige qué comparte: siempre la ubicación, el área, el estado satelital, las visitas y las attestations; los **nombres de los productores, solo si lo autoriza**.
+   - Lo que se comparte queda escrito como acuerdo de datos entre las dos (Ley 787).
+2. **Venta de lotes.**
+   - La cooperativa marca un lote como vendido a una exportadora vinculada, con kg y fecha.
+   - La exportadora lo **recibe** y confirma los kg. Si no coinciden, queda la diferencia con su aviso.
+   - El lote sigue siendo de la cooperativa (su historial y su attestation), pero pasa al inventario de la exportadora.
+   - Un lote se vende a una sola exportadora. Deshacer la venta solo es posible mientras la exportadora no lo haya puesto en un contenedor.
+3. **Revisión de proveedores (solo lectura, panel web).** Por proveedor y por lote:
+   - **mapa de fincas de origen**, como "Finca 1, Finca 2…" si no hay nombres autorizados;
+   - área oficial y estado satelital (verde, amarillo o rojo);
+   - % de fincas con visita en la temporada;
+   - avisos de volumen y de rendimiento por hectárea;
+   - enlace a cada attestation.
+
+   La exportadora **no corrige** datos de la cooperativa. Puede dejar **observaciones** (por ejemplo "revisar el lindero de la Finca 3") que la cooperativa ve y responde en su app.
+4. **Contenedor con lotes de varias cooperativas.**
+   - El contenedor de la exportadora junta lotes propios y recibidos, del mismo cultivo.
+   - El paquete EUDR (GeoJSON de TRACES y PDF) reúne las fincas de todos los proveedores.
+   - La attestation `Exportacion` de la exportadora apunta a las attestations `Lote` que firmó cada cooperativa, así que la cadena queda completa entre organizaciones.
+   - El verificador público muestra de qué cooperativas viene el contenedor (solo el nombre de la organización).
+5. **Visitas de control (opcional).**
+   - Con permiso de la cooperativa, los técnicos de la exportadora hacen visitas de verificación por muestreo a fincas de sus proveedores, desde la misma app móvil.
+   - La visita queda marcada como "de la exportadora" y la ven las dos organizaciones.
+
+**Datos y API:**
+- Tablas nuevas:
+  - `vinculos_organizaciones`: proveedora, cliente, estado y qué comparte;
+  - `ventas_lotes`: lote, exportadora, kg enviados y recibidos, fechas;
+  - `observaciones`: sobre una finca o un lote, de quién, respuesta.
+- **Rutas:**
+  - `/v1/proveedores` (exportadora): vínculos, lotes recibidos, revisión;
+  - `/v1/clientes` (cooperativa): vínculos, ventas, observaciones.
+- **Permisos:** una exportadora solo lee lo de los lotes que recibió y de las fincas de esos lotes, nunca toda la cooperativa. Ver datos de un proveedor requiere el vínculo activo; al terminarlo deja de ver lo nuevo. Lo ya exportado se conserva por el EUDR.
+- **Eliminación de datos:** si un productor pide eliminar sus datos, sus fincas en lotes vendidos se anonimizan igual. La exportadora ve "Finca eliminada · xxxx", sin datos personales.
+
+**Negocio:**
+- Es la base del paquete **Exportador** (el que más paga, Fase 5).
+- Cuando una exportadora lo usa, les pide a sus cooperativas proveedoras que también lo usen: así crece la plataforma.
+- El portal **Comprador** (importadores y tostadores de la UE) es el mismo puente un eslabón más arriba, después de este.
+
+**Prioridad:** si el primer piloto es una **exportadora**, esta fase va antes que el panel completo de la Fase 3 y que la consola del propietario.
+
 ## Fase 3 — Panel web para administradores (~3 semanas)
 - **Mismo código Flutter compilado para web,** con login de Google (la key de navegador ya está restringida por dominio).
 - **Pantallas:** lotes, contenedores, paquete EUDR, alertas satelitales, avance de visitas por temporada, equipo y temporadas.
@@ -241,7 +292,7 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
 | Nov 2026 | Fase 1 (multicultivo) + key de GFW | Fase 0: entrevistas, demo, abogado |
 | Nov–Dic 2026 | Fase 2 (lotes, contenedores, paquete EUDR, attestations) | Carta de intención del piloto |
 | Ene 2027 | Fase 4 (producción, Play Store) antes de que termine la prueba de Cloud SQL | Contratos y entidad legal |
-| Feb–Mar 2027 | Fase 3 (panel web) y consola del propietario (cuando pague el primer cliente) | Piloto con un contenedor real; primera factura |
+| Feb–Mar 2027 | Fase 2b (red de proveedores) si el piloto es una exportadora; Fase 3 (panel web) y consola del propietario (cuando pague el primer cliente) | Piloto con un contenedor real; primera factura |
 | Abr–Jun 2027 | Ajustes con el piloto | 5–10 organizaciones antes del 30/06/2027 |
 | 2º semestre 2027 | — | Decidir el primer país de expansión |
 
@@ -254,6 +305,13 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
   - prueba de un contenedor completo de punta a punta en OP Sepolia: entregas → lote → contenedor → attestations encadenadas visibles en easscan;
   - el GeoJSON validado contra el formato de TRACES;
   - el PDF revisado con el piloto.
+- **Fase 2b:**
+  - una cooperativa y una exportadora de prueba vinculadas;
+  - un lote vendido y recibido con kg distintos muestra el aviso;
+  - un contenedor con lotes de dos cooperativas genera un paquete EUDR con todas sus fincas;
+  - la cadena de attestations entre organizaciones se ve completa en el verificador;
+  - la exportadora recibe 403 al pedir fincas que no están en sus lotes;
+  - sin autorización no ve nombres de productores.
 - **Fase 3:**
   - el panel probado con la cuenta de administrador y un técnico sin acceso al panel;
   - la consola del propietario rechaza (403) a administradores y técnicos de las cooperativas;
