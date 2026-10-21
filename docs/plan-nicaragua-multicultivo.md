@@ -60,6 +60,10 @@
    - Acuerdo de tratamiento de datos (Ley 787).
    - Política de privacidad y términos para Play Store.
    - Formato de consentimiento del productor (impreso, el que se fotografía en la app).
+   - Para cobrar a importadores de la UE (Fase 2c):
+     - términos de servicio en inglés;
+     - acuerdo de tratamiento de datos conforme al **RGPD**;
+     - revisar con el contador la factura a empresas de la UE (por lo general el IVA lo declara el comprador: inversión del sujeto pasivo).
 5. **Financiamiento complementario (no es la base del negocio):** Optimism Grants o Retro Funding (con el código abierto), Celo, BID Lab y programas de la UE de apoyo al EUDR.
 
 ## Fase 1 — Multicultivo: café y cacao (~3 semanas) — **hecha el 16/10/2026**
@@ -180,9 +184,72 @@ Es la parte que **paga el cliente**.
 **Negocio:**
 - Es la base del paquete **Exportador** (el que más paga, Fase 5).
 - Cuando una exportadora lo usa, les pide a sus cooperativas proveedoras que también lo usen: así crece la plataforma.
-- El portal **Comprador** (importadores y tostadores de la UE) es el mismo puente un eslabón más arriba, después de este.
+- El portal **Comprador** (importadores y tostadores de la UE) es el mismo puente un eslabón más arriba: Fase 2c.
 
 **Prioridad:** si el primer piloto es una **exportadora**, esta fase va antes que el panel completo de la Fase 3 y que la consola del propietario.
+
+## Fase 2c — Portal del importador (plan Comprador) (~3 semanas, después de la Fase 2b y del primer contenedor real)
+**Por qué:**
+- El importador de la UE es el **operador** del EUDR: presenta la declaración de diligencia debida (DDS) en TRACES, responde ante la autoridad y debe guardar la prueba 5 años.
+- Tiene más motivos y más capacidad de pago que la cooperativa.
+- **No es otra app:** es el mismo panel web (Fase 3), con un tipo de organización nuevo, `importador`, conectado con el puente de la Fase 2b un eslabón más arriba (exportadora → importador).
+
+**Qué sigue gratis (no cambia):**
+- El **QR del contenedor** y el verificador público, con la cadena completa y la comprobación en la blockchain.
+- El **paquete EUDR** (GeoJSON para TRACES y PDF) que le manda la exportadora.
+
+Es el argumento de venta del plan Exportador: "tu comprador recibe la prueba lista para su DDS". Cobrarle esto al importador le quitaría ese argumento a la exportadora.
+
+**Niveles de acceso:**
+
+| Nivel | Quién paga | Qué incluye |
+|---|---|---|
+| **Básico** | Incluido en el plan **Exportador** | La exportadora invita a su comprador. El comprador ve **solo los contenedores que le vendieron** (estado, fincas como "Finca 1, Finca 2…", estado satelital, attestations) y descarga su paquete EUDR. 1 o 2 usuarios. |
+| **Comprador** (de pago) | El importador | Todo lo del básico, más las funciones de abajo. |
+
+**Funciones del plan Comprador:**
+1. **Todos sus embarques en un solo lugar,** de varias exportadoras (y, con la Fase 6, de otros países). Filtros por proveedor, cultivo, fecha y estado.
+2. **DDS más rápida:**
+   - GeoJSON listo para TRACES por contenedor o por varios contenedores juntos;
+   - registrar el **número de referencia de su DDS**, que se guarda en el contenedor y lo ve la exportadora (campo `dds_ref`, que ya existe).
+3. **Monitoreo después de la compra:**
+   - las fincas de sus contenedores se siguen revisando por satélite;
+   - si una pasa a amarillo o rojo, aviso por correo con la finca afectada, el contenedor y la fecha;
+   - sirve para su evaluación y mitigación de riesgo (EUDR, art. 10 y 11).
+4. **Archivo de 5 años:**
+   - la prueba de cada contenedor (paquete EUDR, PDF, attestations, chequeos y visitas), congelada como estaba al embarcar y lista para una inspección;
+   - se conserva aunque la exportadora o la cooperativa dejen la plataforma, siempre sin datos personales.
+5. **Conexión con sus sistemas:**
+   - exportación en CSV o GeoJSON y una **API con token** (solo lectura), para importadores que ya usan osapiens, Sourcemap o su propio sistema;
+   - a los importadores grandes se les vende esto, no el portal.
+6. **Equipo y reportes:**
+   - varios usuarios con roles (cumplimiento, compras);
+   - reporte de riesgo por proveedor: % de fincas verificadas, alertas y rendimiento por hectárea.
+7. **Idioma:** inglés y español, como el verificador.
+
+**Datos, permisos y privacidad:**
+- **Tablas:**
+  - `vinculos_organizaciones` (de la Fase 2b) admite también exportadora → importador;
+  - `ventas_contenedores`: contenedor, importador, fecha y referencia de la DDS;
+  - `alertas_comprador`: finca, contenedor, resultado y fecha de aviso;
+  - `tokens_api`: importador, permisos, último uso.
+- **Rutas:** `/v1/comprador/*` (contenedores, paquete, alertas, archivo) y `/v1/api/*` con token para la conexión con sistemas.
+- **Alcance:** el importador **solo lee** los contenedores que le vendieron y sus fincas, nunca el resto de la exportadora ni de la cooperativa.
+- **Datos personales:**
+  - el importador **no ve nombres de productores** salvo que la cooperativa y la exportadora lo autoricen;
+  - en la UE aplica el **RGPD**: la ubicación de la finca de una persona puede ser dato personal, así que se comparte solo lo que exige el EUDR, con acuerdo de tratamiento de datos.
+- **Eliminación de datos:** una finca anonimizada (productor que pidió borrar sus datos) sigue en el archivo del importador como "Finca eliminada · xxxx", con su ubicación y su área, hasta cumplir los 5 años.
+
+**Cobro:**
+- **Precio orientativo:** US$100–300 al mes por importador, según el número de contenedores y de usuarios; o un precio por contenedor declarado. La API, aparte, para importadores grandes. Se valida con el comprador del piloto.
+- **Cómo:** suscripción mensual o anual en USD o EUR, con tarjeta (Stripe) o transferencia, con factura de la entidad legal (Fase 0).
+- **Prueba gratis:** 30 días del plan Comprador para los importadores que invite una exportadora.
+- **Si deja de pagar:** vuelve al nivel básico; su archivo de 5 años se conserva en modo lectura.
+
+**Clientes a buscar:**
+- **Primero:** tostadores medianos y de café de especialidad en Alemania, Bélgica, Holanda, España e Italia, que compran a pocas exportadoras y no tienen herramientas propias.
+- **Los importadores grandes:** la API.
+- **Antes de construir,** preguntarle al comprador del piloto qué usa hoy para el EUDR y cuánto le cuesta. Si ya tiene plataforma, priorizar la API sobre el portal.
 
 ## Fase 3 — Panel web para administradores (~3 semanas)
 - **Mismo código Flutter compilado para web,** con login de Google (la key de navegador ya está restringida por dominio).
@@ -255,7 +322,7 @@ Con 5 o 10 organizaciones eso no alcanza.
 |---|---|---|
 | Básico | Cooperativa de hasta 300 productores | US$2–4 por productor al año (mínimo ~US$50/mes) |
 | Exportador | Exportadora o beneficio | Suscripción + US$30–80 por contenedor con paquete EUDR |
-| Comprador | Importador o tostador de la UE | US$100–300/mes por el portal de sus proveedores |
+| Comprador | Importador o tostador de la UE | Acceso básico incluido en el plan Exportador; plan Comprador US$100–300/mes (monitoreo, archivo de 5 años, varias exportadoras, API). Ver Fase 2c |
 | Servicios | Cualquiera | Mapeo de fincas en campo (con GPS y drones de Nicarobótica), capacitación, limpieza de datos |
 
 **Costos estimados por mes:**
@@ -293,7 +360,7 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
 | Nov–Dic 2026 | Fase 2 (lotes, contenedores, paquete EUDR, attestations) | Carta de intención del piloto |
 | Ene 2027 | Fase 4 (producción, Play Store) antes de que termine la prueba de Cloud SQL | Contratos y entidad legal |
 | Feb–Mar 2027 | Fase 2b (red de proveedores) si el piloto es una exportadora; Fase 3 (panel web) y consola del propietario (cuando pague el primer cliente) | Piloto con un contenedor real; primera factura |
-| Abr–Jun 2027 | Ajustes con el piloto | 5–10 organizaciones antes del 30/06/2027 |
+| Abr–Jun 2027 | Ajustes con el piloto; Fase 2c (portal del importador) después del primer contenedor real | 5–10 organizaciones antes del 30/06/2027; entrevistar al comprador europeo del piloto |
 | 2º semestre 2027 | — | Decidir el primer país de expansión |
 
 ## Verificación por fase
@@ -312,6 +379,13 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
   - la cadena de attestations entre organizaciones se ve completa en el verificador;
   - la exportadora recibe 403 al pedir fincas que no están en sus lotes;
   - sin autorización no ve nombres de productores.
+- **Fase 2c:**
+  - un importador de prueba invitado por una exportadora ve solo sus contenedores (403 en los demás) y descarga el GeoJSON que acepta TRACES;
+  - registra su referencia de DDS y la exportadora la ve;
+  - una finca que cambia a rojo genera el aviso por correo;
+  - el archivo de un contenedor sigue disponible después de terminar el vínculo;
+  - la API con token responde solo lectura;
+  - el primer cobro del plan Comprador.
 - **Fase 3:**
   - el panel probado con la cuenta de administrador y un técnico sin acceso al panel;
   - la consola del propietario rechaza (403) a administradores y técnicos de las cooperativas;
