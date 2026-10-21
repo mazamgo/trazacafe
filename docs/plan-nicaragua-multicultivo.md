@@ -53,8 +53,24 @@
    - mapeo de campo cobrado por finca.
    - Pedir 1 o 2 cotizaciones de competidores comerciales como referencia.
 3. **Empresa legal (bloquea facturar, recibir fondos y publicar en Play Store como empresa):**
-   - Elegir con un abogado entre GoProduction en Nicaragua o una entidad en Costa Rica, Panamá o EE.UU. (banca, KYC de Optimism y facturar a compradores de la UE).
-   - Abrir cuenta para cobrar en USD.
+   - **Ahora, para los primeros pilotos: persona natural en la DGI,** con GoProduction como nombre comercial.
+     - RUC con la actividad de servicios de software o plataformas digitales.
+     - **Régimen general, no cuota fija:** la cuota fija no sirve para facturar al exterior ni para manejar créditos de IVA.
+     - Facturas autorizadas por la DGI, en USD, con el texto también en inglés.
+     - Matrícula en la alcaldía y, si la piden, inscripción como comerciante en el Registro Público Mercantil.
+   - **Preguntas para el contador, antes de inscribirse:**
+     - ¿El servicio a clientes de fuera (cooperativas extranjeras, importadores de la UE) cuenta como exportación de servicios con IVA de tasa cero (Ley 822)? ¿Qué documentos pide la DGI para probarlo?
+     - ¿Cuánto es el anticipo mensual de IR y cómo se calcula la renta de una persona natural con esta actividad?
+     - ¿Conviene persona natural o una sociedad desde el inicio?
+   - **Riesgo de la persona natural:** ante un reclamo (por ejemplo, de un importador por su DDS) responde el patrimonio personal. Muchos departamentos de compras de la UE prefieren contratar con una empresa.
+   - **Después: sociedad.** Cuando haya 2 o 3 clientes que pagan, o un importador grande, pasar a una sociedad. Elegirla con un abogado:
+     - una sociedad en Nicaragua;
+     - o una entidad en Costa Rica, Panamá o EE.UU. (LLC): permite cobro automático con tarjeta (Stripe), banca internacional, el KYC de Optimism y contratos con compradores de la UE.
+   - **Cobros (Stripe no admite negocios en Nicaragua):**
+     - **Al inicio:** transferencia internacional (SWIFT) a una **cuenta en USD** de un banco nicaragüense (BAC, Lafise o Banpro). Guardar facturas y contratos para justificar el origen de los fondos ante el banco.
+     - **A evaluar:** plataformas que cobran por cuenta propia (Paddle, Payoneer); algunas se encargan del IVA de la UE. Confirmar que aceptan cuentas de Nicaragua.
+     - **Tarjeta y cobro automático:** solo con la entidad en un país donde Stripe funcione (Costa Rica, Panamá, Guatemala, El Salvador o EE.UU.).
+   - Abrir la cuenta en USD.
 4. **Documentos legales:**
    - Contrato de servicio con la organización.
    - Acuerdo de tratamiento de datos (Ley 787).
@@ -242,7 +258,11 @@ Es el argumento de venta del plan Exportador: "tu comprador recibe la prueba lis
 
 **Cobro:**
 - **Precio orientativo:** US$100–300 al mes por importador, según el número de contenedores y de usuarios; o un precio por contenedor declarado. La API, aparte, para importadores grandes. Se valida con el comprador del piloto.
-- **Cómo:** suscripción mensual o anual en USD o EUR, con tarjeta (Stripe) o transferencia, con factura de la entidad legal (Fase 0).
+- **Cómo cobrar** (detalle en la Fase 0):
+  - **Mientras GoProduction facture como persona natural en Nicaragua:** factura de la DGI en USD y **transferencia internacional** (SWIFT) a la cuenta en USD. Pago anual o trimestral por adelantado, para reducir comisiones bancarias. Sin tarjeta: Stripe no admite negocios en Nicaragua.
+  - **Con una plataforma que cobre por cuenta propia** (Paddle o Payoneer, si aceptan Nicaragua): tarjeta, factura con el IVA de la UE resuelto y pago a la cuenta en USD.
+  - **Con una entidad en Costa Rica, Panamá o EE.UU.:** suscripción con tarjeta (Stripe) y cobro automático mensual.
+  - **IVA de la UE:** el importador lo declara (inversión del sujeto pasivo). La factura lleva su número de IVA de la UE. Confirmarlo con el contador.
 - **Prueba gratis:** 30 días del plan Comprador para los importadores que invite una exportadora.
 - **Si deja de pagar:** vuelve al nivel básico; su archivo de 5 años se conserva en modo lectura.
 
