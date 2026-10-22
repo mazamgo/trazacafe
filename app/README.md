@@ -15,10 +15,11 @@ En la web solo se abren esas páginas (`lib/main.dart`). El manual para las pers
 | Carpeta | Contenido |
 |---|---|
 | `lib/screens/` | Pantallas: login, productores, fincas, visitas, entregas, temporadas, equipo, cultivos, lotes, contenedores, privacidad y solicitudes de eliminación, verificador (con sus textos en español e inglés en `verificador_textos.dart`) y las páginas web de eliminación de datos y privacidad |
-| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión), sincronización, fincas, fotos, mapas, correcciones, eliminación de datos (`eliminacion_service.dart`, también las llamadas sin sesión de la página web), compartir archivos, verificador y preferencias (tema e idioma, en `SharedPreferences`) |
+| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión), sincronización, fincas, fotos, mapas, lugares del buscador y última vista del mapa (`lugares_service.dart`), correcciones, eliminación de datos (`eliminacion_service.dart`, también las llamadas sin sesión de la página web), compartir archivos, verificador y preferencias (tema e idioma, en `SharedPreferences`) |
 | `lib/data/` | Base local SQLite con drift (`database.dart`; `database.g.dart` es generado) |
-| `lib/domain/` | Reglas puras: geometría y polígonos, cédula nicaragüense, cultivos (`cultivos_generados.dart` sale de `schemas/cultivos.json`) |
-| `lib/widgets/` | Formulario de entrega, mapa de Google, motivo de corrección, fotos, diálogo del QR del verificador |
+| `lib/domain/` | Reglas puras: geometría y polígonos, cédula nicaragüense, cultivos (`cultivos_generados.dart` sale de `schemas/cultivos.json`), búsqueda de lugares y lectura de coordenadas (`busqueda_lugar.dart`) |
+| `lib/widgets/` | Formulario de entrega, mapa de Google, buscador del mapa (`buscador_mapa.dart`), motivo de corrección, fotos, diálogo del QR del verificador |
+| `assets/lugares_ni.json` | Unas 15 000 comunidades, comarcas y pueblos de Nicaragua, de OpenStreetMap (© sus colaboradores, ODbL), con su municipio y departamento. El buscador del mapa los usa sin señal. Lo genera `schemas/scripts/lugares-nicaragua.ts` |
 | `test/` | Pruebas de pantallas, servicios y base local |
 | `web/` | Página base del verificador (`index.html`, íconos) |
 
@@ -54,6 +55,9 @@ dart run build_runner build
 
 # Después de cambiar schemas/cultivos.json (desde la raíz)
 npm run cultivos-dart --workspace schemas
+
+# Actualizar la lista de lugares del buscador (consulta Overpass, 1-5 min; desde la raíz)
+npm run lugares-nicaragua --workspace schemas
 
 # Ícono de la app (assets/icon/icono.png)
 dart run flutter_launcher_icons

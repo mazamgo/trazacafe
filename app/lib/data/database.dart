@@ -435,6 +435,19 @@ class AppDatabase extends _$AppDatabase {
     return q.watch();
   }
 
+  /// Todas las fincas con su productor (las anonimizadas no: no tienen
+  /// nombre que buscar).
+  Stream<List<(Finca, Productor)>> observarFincasConProductor() {
+    final query = select(fincas).join([
+      innerJoin(productores, productores.id.equalsExp(fincas.productorId)),
+    ])..where(productores.anonimizado.equals(false));
+    return query.watch().map(
+      (filas) => [
+        for (final f in filas) (f.readTable(fincas), f.readTable(productores)),
+      ],
+    );
+  }
+
   Stream<Finca?> observarFinca(String id) =>
       (select(fincas)..where((f) => f.id.equals(id))).watchSingleOrNull();
 

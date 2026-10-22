@@ -7,10 +7,13 @@ import 'package:latlong2/latlong.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/database.dart';
+import '../domain/busqueda_lugar.dart';
 import '../domain/cultivos.dart';
 import '../domain/geo.dart';
 import '../providers.dart';
 import '../services/fotos_service.dart';
+import '../services/lugares_service.dart';
+import '../widgets/buscador_mapa.dart';
 import '../widgets/mapa_google.dart';
 
 /// Lindero dibujado en modo "nuevo lindero" (se devuelve, no se guarda aquí).
@@ -21,7 +24,9 @@ typedef LinderoNuevo = ({
 });
 
 /// Registro de una finca: el técnico marca los vértices tocando el mapa o
-/// caminando el lindero con "Agregar mi ubicación".
+/// caminando el lindero con "Agregar mi ubicación". Para llegar rápido al
+/// terreno: el mapa abre cerca (otra finca del productor, su comunidad o la
+/// última vista), y están la lupa y "Ir a mi ubicación".
 ///
 /// Con [linderoAnterior] sirve para volver a dibujar el lindero en una visita
 /// de verificación: muestra el anterior como referencia y devuelve el nuevo
@@ -40,7 +45,7 @@ class NuevaFincaScreen extends ConsumerStatefulWidget {
 }
 
 class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
-  // Centro inicial: Jinotega.
+  // Solo la primera vez, si no hay nada mejor: Jinotega.
   static const _centroInicial = LatLng(13.0910, -86.0023);
 
   final _fincaCtrl = TextEditingController();
@@ -48,6 +53,15 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
   final _puntos = <LatLng>[];
   final _fotos = <FotoTomada>[];
   bool _guardando = false;
+
+  /// Lugar elegido en el buscador o la ubicación del técnico: un pin, no un
+  /// vértice.
+  DestinoMapa? _destino;
+
+  /// El técnico ya movió el mapa: el inicio calculado no lo mueve después.
+  bool _movido = false;
+  MapCamera? _camara;
+  late final Future<VistaMapa?> _inicio = _calcularInicio();
 
   /// Elegido por el técnico; `null` = el primero de la organización.
   String? _cultivoElegido;
@@ -66,12 +80,77 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
 
   @override
   void dispose() {
+    // El próximo registro abre donde quedó este.
+    if (_camara case final c?) {
+      _lugares.guardarVista(c.center, c.zoom);
+    }
     _fincaCtrl.dispose();
     _areaDeclaradaCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _agregarMiUbicacion() async {
+  // Se lee al abrir: en dispose ya no se puede usar ref.
+  late final LugaresService _lugares;
+
+  @override
+  void initState() {
+    super.initState();
+    _lugares = ref.read(lugaresServiceProvider);
+  }
+
+  /// Dónde abrir el mapa, en orden: otra finca del productor, fincas de su
+  /// comunidad, la comunidad en la lista de lugares, la última vista.
+  Future<VistaMapa?> _calcularInicio() async {
+    if (widget.esLindero) return null;
+    final id = widget.productorId!;
+    final fincas = await ref.read(fincasReferenciaProvider.future);
+    final suyas = [
+      for (final f in fincas)
+        if (f.productor.id == id) f,
+    ]..sort((a, b) => b.finca.creadoEn.compareTo(a.finca.creadoEn));
+    if (suyas.isNotEmpty) return (centro: suyas.first.centro, zoom: 16.0);
+
+    final db = ref.read(databaseProvider);
+    final productor = await (db.select(
+      db.productores,
+    )..where((p) => p.id.equals(id))).getSingleOrNull();
+    final comunidad = normalizar(productor?.comunidad ?? '');
+    if (comunidad.isNotEmpty) {
+      final vecinas = [
+        for (final f in fincas)
+          if (normalizar(f.productor.comunidad ?? '') == comunidad) f.centro,
+      ];
+      if (vecinas.isNotEmpty) {
+        return (centro: _promedio(vecinas), zoom: 15.0);
+      }
+      final lugares = await ref.read(lugaresProvider.future);
+      for (final l in buscarLugares(lugares, comunidad, max: 1)) {
+        if (normalizar(l.nombre) == comunidad) {
+          return (centro: l.punto, zoom: 15.0);
+        }
+      }
+    }
+    return _lugares.ultimaVista();
+  }
+
+  static LatLng _promedio(List<LatLng> puntos) => LatLng(
+    puntos.map((p) => p.latitude).reduce((a, b) => a + b) / puntos.length,
+    puntos.map((p) => p.longitude).reduce((a, b) => a + b) / puntos.length,
+  );
+
+  Future<void> _alAbrirMapa() async {
+    try {
+      final inicio = await _inicio;
+      if (inicio != null && mounted && !_movido) {
+        _mapCtrl.move(inicio.centro, inicio.zoom);
+      }
+    } catch (_) {
+      // Sin inicio calculado (o la pantalla se cerró antes) el mapa se queda
+      // donde abrió.
+    }
+  }
+
+  Future<bool> _permisoUbicacion() async {
     var permiso = await Geolocator.checkPermission();
     if (permiso == LocationPermission.denied) {
       permiso = await Geolocator.requestPermission();
@@ -79,8 +158,71 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     if (permiso == LocationPermission.denied ||
         permiso == LocationPermission.deniedForever) {
       _aviso('Sin permiso de ubicación.');
-      return;
+      return false;
     }
+    return true;
+  }
+
+  /// Lleva el mapa a donde está el técnico, sin marcar un vértice. Usa
+  /// primero la última posición conocida (es instantánea) y después afina.
+  Future<void> _irAMiUbicacion() async {
+    if (!await _permisoUbicacion()) return;
+    void ir(Position pos) {
+      if (!mounted) return;
+      final punto = LatLng(pos.latitude, pos.longitude);
+      setState(() {
+        _movido = true;
+        _destino = (
+          punto: punto,
+          zoom: 17,
+          etiqueta: 'Estás aquí',
+          encuadre: null,
+        );
+      });
+      _mapCtrl.move(punto, 17);
+    }
+
+    final conocida = await Geolocator.getLastKnownPosition();
+    if (conocida != null) ir(conocida);
+    try {
+      ir(
+        await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 20),
+          ),
+        ),
+      );
+    } on Exception {
+      if (conocida == null) {
+        _aviso('No se pudo leer el GPS. Sal a un lugar abierto.');
+      }
+    }
+  }
+
+  Future<void> _buscar() async {
+    final destino = await buscarEnMapa(context);
+    if (destino == null || !mounted) return;
+    setState(() {
+      _movido = true;
+      _destino = destino;
+    });
+    final encuadre = destino.encuadre;
+    if (encuadre != null) {
+      _mapCtrl.fitCamera(
+        CameraFit.coordinates(
+          coordinates: encuadre,
+          padding: const EdgeInsets.all(48),
+          maxZoom: 18,
+        ),
+      );
+    } else {
+      _mapCtrl.move(destino.punto, destino.zoom);
+    }
+  }
+
+  Future<void> _agregarMiUbicacion() async {
+    if (!await _permisoUbicacion()) return;
     final pos = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
     );
@@ -176,6 +318,17 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// En modo lindero no se repite la propia finca (ya se ve en blanco).
+  List<FincaReferencia> _fincasVecinas(List<FincaReferencia> todas) {
+    final anterior = widget.linderoAnterior;
+    if (anterior == null || anterior.isEmpty) return todas;
+    final propia = _promedio(anterior);
+    return [
+      for (final f in todas)
+        if (distanciaMetros(f.centro, propia) > 1) f,
+    ];
+  }
+
   void _aviso(String texto) =>
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(texto)));
@@ -192,6 +345,9 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     final cultivos =
         ref.watch(cultivosOrganizacionProvider).value ??
         const [cultivoPorDefecto];
+    final vecinas = _fincasVecinas(
+      ref.watch(fincasReferenciaProvider).value ?? const [],
+    );
 
     final anterior = widget.linderoAnterior;
     // En modo lindero, el mapa arranca sobre la finca.
@@ -207,6 +363,13 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.esLindero ? 'Nuevo lindero' : 'Nueva finca'),
+        actions: [
+          IconButton(
+            tooltip: 'Buscar lugar',
+            onPressed: _buscar,
+            icon: const Icon(Icons.search),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -275,9 +438,39 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                 initialCenter: centro,
                 initialZoom: anterior == null ? 14 : 17,
                 onTap: (_, punto) => setState(() => _puntos.add(punto)),
+                onMapReady: _alAbrirMapa,
+                onPositionChanged: (camara, conGesto) {
+                  _camara = camara;
+                  if (conGesto) _movido = true;
+                },
               ),
               children: [
                 if (sesionMapa != null) capaGoogle(sesionMapa),
+                // Fincas ya registradas, en gris: para ubicarse y no
+                // registrar dos veces el mismo terreno.
+                PolygonLayer(
+                  polygons: [
+                    for (final f in vecinas)
+                      if (f.puntos.length >= 3)
+                        Polygon(
+                          points: f.puntos,
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderColor: Colors.grey.shade300,
+                          borderStrokeWidth: 1.5,
+                        ),
+                  ],
+                ),
+                MarkerLayer(
+                  markers: [
+                    for (final f in vecinas)
+                      Marker(
+                        point: f.centro,
+                        width: 140,
+                        height: 36,
+                        child: _EtiquetaVecina(f.finca.nombre),
+                      ),
+                  ],
+                ),
                 if (anterior != null && anterior.length >= 3)
                   PolygonLayer(
                     polygons: [
@@ -328,6 +521,37 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                         ),
                       ),
                   ],
+                ),
+                if (_destino case final d?)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: d.punto,
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.topCenter,
+                        child: Tooltip(
+                          message: d.etiqueta,
+                          child: const Icon(
+                            Icons.location_on,
+                            color: Colors.lightBlueAccent,
+                            size: 40,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 28),
+                    child: FloatingActionButton.small(
+                      heroTag: null,
+                      tooltip: 'Ir a mi ubicación',
+                      onPressed: _irAMiUbicacion,
+                      child: const Icon(Icons.gps_fixed),
+                    ),
+                  ),
                 ),
                 if (sesionMapa != null)
                   AtribucionGoogle(
@@ -424,6 +648,28 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
       ),
     );
   }
+}
+
+/// Nombre de una finca ya registrada, sobre el mapa.
+class _EtiquetaVecina extends StatelessWidget {
+  const _EtiquetaVecina(this.nombre);
+
+  final String nombre;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Text(
+      nombre,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 11,
+        shadows: [Shadow(blurRadius: 3)],
+      ),
+    ),
+  );
 }
 
 /// Cultivo fijo cuando la organización trabaja uno solo. Al administrador le

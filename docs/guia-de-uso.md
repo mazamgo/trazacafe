@@ -62,17 +62,29 @@ En **⋮ → Privacidad y datos → Eliminar mi cuenta**. La app primero envía 
 3. Revisa el **cultivo**:
    - Si la organización tiene café y cacao, elige con el selector.
    - Si solo tiene uno, aparece fijo.
-4. **Marca el lindero:** camina por el borde de la finca y toca **Agregar mi ubicación** en cada esquina. Si te equivocas, toca **Quitar último punto**.
+4. **Ubica el terreno en el mapa.** El mapa abre cerca de la finca:
+   - si el productor ya tiene otra finca, en ella;
+   - si no, en las fincas de su **comunidad** o en la comunidad misma;
+   - si no, donde quedó el mapa la última vez.
+
+   Para llegar más rápido:
+   - **Ir a mi ubicación** (botón redondo del mapa): lleva el mapa a donde estás, sin marcar ningún punto.
+   - **Lupa** (arriba): escribe una comunidad, comarca o pueblo, el nombre de otra finca o el de un productor. Funciona **sin señal**.
+   - **Coordenadas:** en la lupa también puedes pegar coordenadas (`13.0910, -86.0023` o `13°05'27"N 86°00'08"W`) o la **ubicación que te mandó el productor por WhatsApp** (el enlace de Google Maps). Los enlaces cortos (`maps.app.goo.gl/…`) necesitan señal.
+
+   El lugar elegido queda marcado con un **pin azul**, que no es un punto del lindero. Las fincas ya registradas se ven en **gris** con su nombre: sirven para ubicarte y para no registrar dos veces el mismo terreno.
+5. **Marca el lindero:** camina por el borde de la finca y toca **Agregar mi ubicación** en cada esquina. Si te equivocas, toca **Quitar último punto**.
 
 | Tamaño de la finca | Qué marcar |
 |---|---|
 | **Menos de 4 ha** | Basta **un punto**, idealmente en el centro, y escribir el **área declarada** en hectáreas. |
 | **4 ha o más** | El **polígono completo**: al menos 3 puntos, siguiendo el borde. El área la calcula la app. |
 
-5. Toca **Guardar finca**.
+6. Toca **Guardar finca**.
 
 **Consejos:**
-- **Sin señal** el mapa no carga, pero los puntos se marcan igual con el GPS.
+- **Sin señal** el mapa no carga, pero los puntos se marcan igual con el GPS. La lupa y **Ir a mi ubicación** también funcionan.
+- **Con señal, desde la oficina**, puedes buscar la comunidad y revisar el terreno en el satélite antes de ir. Los puntos se marcan en campo.
 - **El polígono no puede cruzarse** sobre sí mismo. Camina el borde en orden, sin saltar de un lado al otro.
 
 ### 3.3 Visita de verificación (una por temporada)
@@ -267,6 +279,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | Una entrega "no puede ir en un lote" | Revisa el motivo: falta la visita de la temporada, la finca está en rojo, o es de otra temporada o cultivo. |
 | El contenedor "todavía no se puede cerrar" | Falta el número de contenedor o hay fincas sin chequeo verde. La app las nombra. |
 | El mapa no carga | Sin señal no hay mapa, pero el GPS sigue marcando puntos con **Agregar mi ubicación**. |
+| El mapa abre lejos de la finca | Toca **Ir a mi ubicación**, o busca la comunidad con la **lupa**. Si la comunidad no aparece, prueba con una cercana o con el municipio. |
 | "Eres el único administrador" al eliminar tu cuenta | Invita a otro administrador en **Equipo** (o elimina la organización) y vuelve a intentarlo. |
 | Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |
 | Celular nuevo o reinstalación | Entra con la misma cuenta y toca **Sincronizar**: se descargan los datos de la organización. Lo que **no** se había sincronizado en el celular anterior se pierde. |

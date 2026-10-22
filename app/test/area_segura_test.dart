@@ -1,6 +1,9 @@
+import 'package:drift/drift.dart' show DatabaseConnection;
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trazacafe/data/database.dart';
 import 'package:trazacafe/providers.dart';
 import 'package:trazacafe/screens/nueva_finca_screen.dart';
 import 'package:trazacafe/screens/nuevo_productor_screen.dart';
@@ -12,6 +15,8 @@ void main() {
   var alto = 780.0;
 
   Future<void> abrir(WidgetTester tester, Widget pantalla) async {
+    final db = AppDatabase(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    addTearDown(() => tester.runAsync(db.close));
     tester.view
       ..devicePixelRatio = 1
       ..physicalSize = Size(400, alto)
@@ -19,7 +24,11 @@ void main() {
       ..viewPadding = const FakeViewPadding(bottom: barra);
     addTearDown(tester.view.reset);
     await tester.pumpWidget(ProviderScope(
-      overrides: [cultivosOrganizacionProvider.overrideWith((ref) => Stream.value(['cafe']))],
+      overrides: [
+        cultivosOrganizacionProvider.overrideWith((ref) => Stream.value(['cafe'])),
+        fincasReferenciaProvider.overrideWith((ref) => Stream.value(const [])),
+        databaseProvider.overrideWithValue(db),
+      ],
       child: MaterialApp(home: pantalla),
     ));
     await tester.pump();

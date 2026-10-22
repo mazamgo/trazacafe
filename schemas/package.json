@@ -15,6 +15,7 @@
     "register": "node --env-file-if-exists=.env --import tsx scripts/register.ts",
     "vectors": "tsx scripts/vectors.ts",
     "cultivos-dart": "tsx scripts/cultivos-dart.ts",
+    "lugares-nicaragua": "tsx scripts/lugares-nicaragua.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/database.dart';
+import 'domain/busqueda_lugar.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/compartir_service.dart';
@@ -13,6 +14,7 @@ import 'services/correcciones_service.dart';
 import 'services/eliminacion_service.dart';
 import 'services/fincas_service.dart';
 import 'services/fotos_service.dart';
+import 'services/lugares_service.dart';
 import 'services/mapas_service.dart';
 import 'services/sync_service.dart';
 
@@ -93,6 +95,23 @@ final fincasDeProductorProvider = StreamProvider.family<List<Finca>, String>(
 );
 
 final mapasServiceProvider = Provider<MapasService>((ref) => MapasService());
+
+final lugaresServiceProvider = Provider<LugaresService>(
+  (ref) => LugaresService(),
+);
+
+/// Comunidades y pueblos de Nicaragua para el buscador del mapa.
+final lugaresProvider = FutureProvider<List<Lugar>>(
+  (ref) => ref.watch(lugaresServiceProvider).lugares(),
+);
+
+/// Fincas ya registradas, para buscarlas y verlas de referencia en el mapa.
+final fincasReferenciaProvider = StreamProvider<List<FincaReferencia>>(
+  (ref) => ref
+      .watch(databaseProvider)
+      .observarFincasConProductor()
+      .map((filas) => [for (final (f, p) in filas) FincaReferencia(f, p)]),
+);
 
 /// Sesión de mapas de Google, o `null` si no hay señal ni sesión guardada.
 final sesionMapaProvider = FutureProvider<SesionMapa?>(
