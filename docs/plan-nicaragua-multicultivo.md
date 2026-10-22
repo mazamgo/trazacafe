@@ -315,6 +315,12 @@ Con 5 o 10 organizaciones eso no alcanza.
      - ver el equipo de una organización (correos y roles);
      - reenviar o cancelar una invitación;
      - nombrar a otro administrador si el único se fue.
+  6. **Key de Global Forest Watch** (vence al año; hoy se renueva con `infra\gfw-api-key.ps1`):
+     - **Estado:** fecha de vencimiento y días que faltan, y si la última consulta a GFW funcionó. La fecha la guarda el script (y luego la consola) como anotación `vence` del secreto `gfw-api-key`; la consola solo lee los metadatos, nunca el valor de la key.
+     - **Recordatorio por correo** a los propietarios a los 30, 15 y 3 días del vencimiento. Lo revisa la tarea diaria del chequeo satelital.
+     - **Aviso por falla real,** no solo por fecha: si GFW responde 401 o 403 en el chequeo (key vencida o revocada), la pantalla de salud se pone en rojo y sale un correo el mismo día. Mientras tanto, el chequeo sigue con los mapas públicos (JRC + Hansen).
+     - **Renovar desde la consola:** un formulario pide la contraseña de GFW, la API crea la key nueva, agrega una versión al secreto y actualiza `vence`. La contraseña se usa una sola vez, no se guarda ni queda en los registros. Para esto la cuenta de la API necesita `secretmanager.secretVersionAdder` **solo** sobre ese secreto. Cloud Run toma la key nueva sola, porque usa `latest`; las instancias que ya estaban corriendo la toman al reiniciar.
+     - **Cuenta de GFW de la empresa:** pasar la key a un correo de GoProduction (por ejemplo, soporte@), no a uno personal, para que la renovación no dependa de una sola persona.
 - **Fuera de alcance al inicio:** cobro automático con tarjeta, y entrar como otro usuario ("ver como"). Se evalúan con 10 o más clientes.
 
 ## Fase 4 — Producción y lanzamiento en Nicaragua (~2–3 semanas, antes de que termine la prueba de Cloud SQL)
@@ -410,7 +416,8 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
   - el panel probado con la cuenta de administrador y un técnico sin acceso al panel;
   - la consola del propietario rechaza (403) a administradores y técnicos de las cooperativas;
   - crear una organización desde la consola reemplaza al script;
-  - la primera factura sale del reporte de uso.
+  - la primera factura sale del reporte de uso;
+  - con una key de GFW vencida a propósito, la consola se pone en rojo y llega el correo; renovarla desde la consola la deja en verde sin redesplegar.
 - **Fase 4:**
   - la app instalada desde Play (pruebas cerradas) con login y mapas funcionando con el SHA-1 de Play;
   - App Check rechaza llamadas que no vienen de la app;
