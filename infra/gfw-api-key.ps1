@@ -15,16 +15,41 @@
 # Al crear la key, el script anota su vencimiento en el secreto (vence=AAAA-MM-DD).
 # La opción 4 anota el de la key que ya está guardada (pide la contraseña).
 #
+# Opción 5 (rotar, para renovar o si la key se expuso): crea una key nueva, la
+# guarda en el secreto, crea una revisión de Cloud Run para que la tome, y solo
+# entonces borra la key vieja en GFW y deshabilita su versión en el secreto.
+#
 # Opción 3 (a prueba): /auth/apikey solo pide un token de sesión válido. Si
 # entras a globalforestwatch.org con Google, puedes copiar el token de esa
 # sesión desde el navegador (F12) y pegarlo aquí; no se muestra en pantalla.
 
 $ErrorActionPreference = "Stop"
 $proyecto = "trazacafe-dev"
+$region = "us-east4"
+$servicio = "trazacafe-api"
 $cuentaApi = "trazacafe-api@$proyecto.iam.gserviceaccount.com"
 $api = "https://data-api.globalforestwatch.org"
 
-$opcion = Read-Host "¿Qué quieres hacer? [1] Registrar una cuenta nueva con correo  [2] Crear la key (ya tengo contraseña)  [3] Crear la key con el token de mi sesión del navegador  [4] Anotar el vencimiento de la key actual"
+$opcion = Read-Host "¿Qué quieres hacer? [1] Registrar una cuenta nueva con correo  [2] Crear la key (ya tengo contraseña)  [3] Crear la key con el token de mi sesión del navegador  [4] Anotar el vencimiento de la key actual  [5] Rotar: key nueva y borrar la vieja"
+$rotar = $opcion -eq "5"
+
+# Versión vigente del secreto (o $null si no existe). En Windows PowerShell 5.1,
+# "2>$null" con ErrorActionPreference=Stop corta el script si gcloud escribe
+# en stderr (por ejemplo, el aviso de actualizaciones); por eso se baja a Continue.
+function Version-Actual {
+  $ErrorActionPreference = "Continue"
+  $v = gcloud secrets versions describe latest --secret=gfw-api-key --project=$proyecto --format="value(name)" 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $v) { return $null }
+  return ($v | Out-String).Trim().Split("/")[-1]
+}
+
+if ($rotar) {
+  $versionAnterior = Version-Actual
+  if (-not $versionAnterior) {
+    Write-Host "No hay key guardada en gfw-api-key para rotar. Usa la opción 2." -ForegroundColor Red
+    exit 1
+  }
+}
 
 if ($opcion -eq "1") {
   $nombre = Read-Host "Tu nombre"
@@ -78,16 +103,17 @@ if ($opcion -eq "4") {
   exit 0
 }
 
-$cuerpo = @{ alias = "trazacafe-api"; email = $correo; organization = "GoProduction"; domains = @() } | ConvertTo-Json
+# Alias con fecha y hora: al rotar conviven dos keys un momento.
+$alias = "trazacafe-api-$(Get-Date -Format 'yyyyMMdd-HHmm')"
+$cuerpo = @{ alias = $alias; email = $correo; organization = "GoProduction"; domains = @() } | ConvertTo-Json
 try {
   $respuesta = Invoke-RestMethod -Method Post "$api/auth/apikey" `
     -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body $cuerpo
 } catch {
+  $token = $null
   Write-Host "GFW rechazó la solicitud: $($_.ErrorDetails.Message)" -ForegroundColor Red
   if ($opcion -eq "3") { Write-Host "El token de una sesión de Google no sirve o ya venció (dura poco): vuelve a copiarlo recién entrado." -ForegroundColor Yellow }
   exit 1
-} finally {
-  $token = $null
 }
 $dato = @($respuesta.data)[0]
 $key = $dato.api_key
@@ -95,18 +121,45 @@ $key = $dato.api_key
 $archivo = New-TemporaryFile
 try {
   [IO.File]::WriteAllText($archivo, $key)
-  $existe = gcloud secrets describe gfw-api-key --project=$proyecto 2>$null
-  if ($existe) {
+  if (Version-Actual) {
     gcloud secrets versions add gfw-api-key --data-file="$archivo" --project=$proyecto | Out-Null
   } else {
     gcloud secrets create gfw-api-key --data-file="$archivo" --replication-policy=automatic --project=$proyecto | Out-Null
   }
 } finally {
   Remove-Item $archivo -Force
+  $key = $null
 }
 gcloud secrets add-iam-policy-binding gfw-api-key --project=$proyecto `
   --member="serviceAccount:$cuentaApi" --role=roles/secretmanager.secretAccessor | Out-Null
 
 $vence = Anotar-Vencimiento ([string]$dato.expires_on)
+Write-Host "La key nueva ($alias) quedó en Secret Manager (gfw-api-key). Vence el $vence." -ForegroundColor Green
 
-Write-Host "Listo: la key quedó en Secret Manager (gfw-api-key). Vence el $vence." -ForegroundColor Green
+if (-not $rotar) {
+  $token = $null
+  exit 0
+}
+
+# Revisión nueva de Cloud Run: sus instancias leen la versión "latest" del
+# secreto al arrancar. Así nadie sigue usando la key vieja cuando se borre.
+Write-Host "Creando una revisión de $servicio para que tome la key nueva..."
+gcloud run services update $servicio --region=$region --project=$proyecto --update-labels="gfw-key=$vence" | Out-Null
+
+# Borrar la key vieja en GFW (la que estaba en la versión anterior del secreto).
+$anterior = (gcloud secrets versions access $versionAnterior --secret=gfw-api-key --project=$proyecto | Out-String).Trim()
+try {
+  Invoke-RestMethod -Method Delete "$api/auth/apikey/$anterior" -Headers @{ Authorization = "Bearer $token" } | Out-Null
+  Write-Host "Key vieja borrada en GFW." -ForegroundColor Green
+} catch {
+  Write-Host "No se pudo borrar la key vieja en GFW: $($_.ErrorDetails.Message)" -ForegroundColor Red
+  Write-Host "La key nueva ya está en uso. La vieja sigue activa en GFW hasta su vencimiento; pide ayuda para borrarla." -ForegroundColor Yellow
+  $token = $null
+  $anterior = $null
+  exit 1
+}
+$token = $null
+$anterior = $null
+
+gcloud secrets versions disable $versionAnterior --secret=gfw-api-key --project=$proyecto | Out-Null
+Write-Host "Listo: rotada. Versión $versionAnterior del secreto deshabilitada; la API usa la nueva." -ForegroundColor Green
