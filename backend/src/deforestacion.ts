@@ -5,7 +5,7 @@ export const CORTE_EUDR = "2020-12-31";
 
 /** Lo que dice el satélite sobre un polígono. */
 export interface Hallazgos {
-  /** Alertas integradas (GLAD-L, GLAD-S2, RADD) con confianza nominal o alta. */
+  /** Alertas integradas (GLAD-L, GLAD-S2, RADD) con confianza nominal, alta o máxima. */
   alertas: number;
   haAlertas: number;
   /** Pérdida anual de cobertura arbórea (Hansen/UMD) en años posteriores a 2020. */
@@ -82,14 +82,19 @@ export class GlobalForestWatch implements FuenteSatelital {
     );
     const alertas = await this.consulta(
       "gfw_integrated_alerts",
-      `SELECT COUNT(*) AS alertas, SUM(area__ha) AS ha FROM results
+      // La API no acepta IN (responde 422) e ignora el alias de COUNT(*): el
+      // conteo siempre llega como "count". Las confianzas son nominal, high y
+      // highest; las tres cuentan.
+      `SELECT COUNT(*), SUM(area__ha) AS ha FROM results
        WHERE gfw_integrated_alerts__date > '${CORTE_EUDR}'
-         AND gfw_integrated_alerts__confidence IN ('nominal', 'high')`,
+         AND (gfw_integrated_alerts__confidence = 'nominal'
+           OR gfw_integrated_alerts__confidence = 'high'
+           OR gfw_integrated_alerts__confidence = 'highest')`,
       geometria,
     );
     const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
     return {
-      alertas: num(alertas.alertas),
+      alertas: num(alertas.count),
       haAlertas: num(alertas.ha),
       haPerdida: num(perdida.ha),
       detalle: { perdida, alertas, corte: CORTE_EUDR },

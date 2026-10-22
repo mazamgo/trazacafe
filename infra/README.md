@@ -177,9 +177,11 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
   - `npm run explorar-mapas -- <lon> <lat>` muestra la estructura de los mapas y los valores en una coordenada.
   - **Programación:** Cloud Scheduler `chequeo-deforestacion` (us-east4) llama todos los días a las 6:00 (hora de Managua) a `POST /v1/tareas/chequeo-deforestacion`, con un token OIDC de la cuenta `trazacafe-tareas@…`. Cada día revisa hasta 50 fincas que aún no tienen chequeo de su lindero vigente en la temporada actual; en la práctica, cada finca una vez por temporada.
   - **Revisión a mano:** el administrador puede revisar una finca en el momento desde la app (`POST /v1/fincas/:id/chequeo`).
-- **Global Forest Watch (opcional):** agrega las alertas integradas casi en tiempo real. Necesita una cuenta de GFW **con contraseña**; las creadas con Google no sirven. En octubre de 2026 no se pudo crear: la cuenta de Hotmail quedó sin activar y se pidió ayuda a gfw@wri.org.
-  - El script `infra\gfw-api-key.ps1` crea la key y la guarda en Secret Manager (`gfw-api-key`). Tiene una opción 3 para probar con el token de una sesión de Google.
-  - Para usarla, despliega con `--set-secrets=GFW_API_KEY=gfw-api-key:latest --update-env-vars=SATELITE=gfw`. La key vence al año.
+- **Global Forest Watch (opcional):** agrega las alertas integradas casi en tiempo real. Necesita una cuenta de GFW **con contraseña**; las creadas con Google no sirven.
+  - **Estado (22/10/2026):** la key ya está en Secret Manager (`gfw-api-key`, versión 1, con acceso para `trazacafe-api@…`) y GFW la acepta. **Aún no está activada** en Cloud Run.
+  - El script `infra\gfw-api-key.ps1` crea la key y la guarda en Secret Manager. Tiene una opción 3 para probar con el token de una sesión de Google. Las cuentas normales no pueden crear keys sin vencimiento: **la key vence al año** y hay que renovarla con el mismo script (agrega una versión nueva al secreto).
+  - Para usarla, despliega con `--set-secrets=GFW_API_KEY=gfw-api-key:latest --update-env-vars=SATELITE=gfw`. Con eso, el chequeo usa **solo** GFW, en lugar de los mapas públicos. Si la key vence, el chequeo falla hasta renovarla.
+  - **Detalles de la API** que respeta `backend/src/deforestacion.ts`: no acepta `IN` en el `WHERE` (responde 422), así que se usa `OR`; ignora el alias de `COUNT(*)` y siempre lo devuelve como `count`. Las confianzas de las alertas integradas son `nominal`, `high` y `highest`, y cuentan las tres.
 
 ## 4e. Cultivos (café y cacao)
 
