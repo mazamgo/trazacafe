@@ -182,7 +182,7 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
   - **Regla:** JRC + Hansen deciden el semáforo, como siempre. Las alertas posteriores al 31/12/2020 solo se consultan si la finca tenía bosque en 2020 según el JRC, y solo la llevan a **amarillo** para que una persona la revise. Las alertas no distinguen la deforestación de otras perturbaciones (poda de sombra, renovación del cafetal); Hansen las confirma o descarta al publicar el año. El área atestada (`areaAfectadaHa`) es solo la pérdida confirmada; las alertas van en `detalle.alertasGfw`.
   - **Límite:** las alertas se cuentan en todo el lindero, no solo en los píxeles que eran bosque; por eso no ponen rojo.
   - **Si GFW falla** o la key venció, el chequeo sale de los mapas públicos y el error queda en `detalle.alertasGfw.error`.
-  - **Estado (22/10/2026):** la key ya está en Secret Manager (`gfw-api-key`, versión 1, con acceso para `trazacafe-api@…`) y GFW la acepta. **Aún no está activada** en Cloud Run.
+  - **Estado (22/10/2026):** **activado** en Cloud Run desde la revisión `trazacafe-api-00019-xg7` (imagen `871d579`), con `SATELITE=gfw` y la key en Secret Manager (`gfw-api-key`, versión 1, con acceso para `trazacafe-api@…`).
   - El script `infra\gfw-api-key.ps1` crea la key y la guarda en Secret Manager. Tiene una opción 3 para probar con el token de una sesión de Google. Las cuentas normales no pueden crear keys sin vencimiento: **la key vence al año** y hay que renovarla con el mismo script (agrega una versión nueva al secreto).
   - Para activarla: `gcloud run services update trazacafe-api --region=us-east4 --project=trazacafe-dev --set-secrets=GFW_API_KEY=gfw-api-key:latest --update-env-vars=SATELITE=gfw`.
   - **Prueba (22/10/2026), modo combinado contra mapas y GFW reales:** León (polígono de prueba, urbano) sale verde, sin bosque en 2020 y sin consultar GFW. Un cuadro de 2 x 2 km en Bosawás sale rojo por 5.3 ha de pérdida confirmada (Hansen en bosque JRC de 35.1 ha), con 2839 alertas de GFW (34 ha) en el detalle.
@@ -341,7 +341,7 @@ Endpoints:
 | Cuenta de servicio | `trazacafe-api@trazacafe-dev.iam.gserviceaccount.com` con solo `cloudsql.client`, `cloudsql.instanceUser` y `firebaseauth.admin` |
 | Usuario de la base | `trazacafe-api@trazacafe-dev.iam` (IAM, rol `trazacafe_app`: solo datos) |
 | Imágenes | Artifact Registry `us-east4-docker.pkg.dev/trazacafe-dev/trazacafe/backend` |
-| Variables | `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`, `FIREBASE_PROJECT_ID`, `STORAGE_BUCKET` |
+| Variables | `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`, `FIREBASE_PROJECT_ID`, `STORAGE_BUCKET`, `TAREAS_AUDIENCE`, `TAREAS_SA`, `KMS_KEY_VERSION`, `EAS_RED`, `SATELITE=gfw`; secreto `GFW_API_KEY` (`gfw-api-key`) |
 
 La URL es pública (`allUsers` como invocador) porque la app la llama directamente; la API exige el token de Firebase en cada `/v1/*`. `.gcloudignore` limita lo que se sube a Cloud Build a `package*.json`, `schemas/` y `backend/`.
 

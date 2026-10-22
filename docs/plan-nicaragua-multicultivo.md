@@ -29,7 +29,7 @@
 - **Esquemas EAS** (Finca con versión, Verificación, Entrega, Lote, Exportación), todavía sin registrar en la blockchain.
 
 ## Pendientes conocidos (se integran en las fases)
-- Key de Global Forest Watch: creada el 22/10/2026 y guardada en Secret Manager (`gfw-api-key`). El modo combinado (JRC + Hansen deciden; las alertas de GFW solo avisan en amarillo) está listo. Falta activarlo en Cloud Run (`SATELITE=gfw`); ver `infra/README.md` §4d.
+- ~~Key de Global Forest Watch~~: **hecho** el 22/10/2026. Key en Secret Manager (`gfw-api-key`) y modo combinado activo en Cloud Run (`SATELITE=gfw`): JRC + Hansen deciden y las alertas de GFW solo avisan en amarillo. Ver `infra/README.md` §4d.
 - Lotes, exportaciones, paquete EUDR, firma con Cloud KMS y attestations (era la semana 4).
 - Riesgo de celular compartido entre organizaciones.
 - Prueba de Equipo intermitente.
