@@ -12,6 +12,9 @@
 # contraseña (revisa también el correo no deseado). Después vuelve a correr
 # el script y elige "crear key".
 #
+# Al crear la key, el script anota su vencimiento en el secreto (vence=AAAA-MM-DD).
+# La opción 4 anota el de la key que ya está guardada (pide la contraseña).
+#
 # Opción 3 (a prueba): /auth/apikey solo pide un token de sesión válido. Si
 # entras a globalforestwatch.org con Google, puedes copiar el token de esa
 # sesión desde el navegador (F12) y pegarlo aquí; no se muestra en pantalla.
@@ -21,7 +24,7 @@ $proyecto = "trazacafe-dev"
 $cuentaApi = "trazacafe-api@$proyecto.iam.gserviceaccount.com"
 $api = "https://data-api.globalforestwatch.org"
 
-$opcion = Read-Host "¿Qué quieres hacer? [1] Registrar una cuenta nueva con correo  [2] Crear la key (ya tengo contraseña)  [3] Crear la key con el token de mi sesión del navegador"
+$opcion = Read-Host "¿Qué quieres hacer? [1] Registrar una cuenta nueva con correo  [2] Crear la key (ya tengo contraseña)  [3] Crear la key con el token de mi sesión del navegador  [4] Anotar el vencimiento de la key actual"
 
 if ($opcion -eq "1") {
   $nombre = Read-Host "Tu nombre"
@@ -48,6 +51,31 @@ if ($opcion -eq "3") {
     -ContentType "application/x-www-form-urlencoded" `
     -Body @{ username = $correo; password = $clave }).data.access_token
   $clave = $null
+}
+
+function Anotar-Vencimiento([string] $expira) {
+  # AAAA-MM-DD como anotación del secreto: la consola y los recordatorios la
+  # leen de los metadatos, sin tocar el valor de la key.
+  $fecha = $expira.Substring(0, 10)
+  gcloud secrets update gfw-api-key --update-annotations="vence=$fecha" --project=$proyecto | Out-Null
+  return $fecha
+}
+
+if ($opcion -eq "4") {
+  # La key que ya está en el secreto: GFW solo dice cuándo vence con un token de la cuenta dueña.
+  $actual = (gcloud secrets versions access latest --secret=gfw-api-key --project=$proyecto | Out-String).Trim()
+  try {
+    $info = Invoke-RestMethod "$api/auth/apikey/$actual" -Headers @{ Authorization = "Bearer $token" }
+  } catch {
+    Write-Host "GFW rechazó la consulta: $($_.ErrorDetails.Message)" -ForegroundColor Red
+    exit 1
+  } finally {
+    $token = $null
+    $actual = $null
+  }
+  $fecha = Anotar-Vencimiento ([string]@($info.data)[0].expires_on)
+  Write-Host "Listo: anotado vence=$fecha en el secreto gfw-api-key." -ForegroundColor Green
+  exit 0
 }
 
 $cuerpo = @{ alias = "trazacafe-api"; email = $correo; organization = "GoProduction"; domains = @() } | ConvertTo-Json
@@ -79,4 +107,6 @@ try {
 gcloud secrets add-iam-policy-binding gfw-api-key --project=$proyecto `
   --member="serviceAccount:$cuentaApi" --role=roles/secretmanager.secretAccessor | Out-Null
 
-Write-Host "Listo: la key quedó en Secret Manager (gfw-api-key). Vence el $($dato.expires_on)." -ForegroundColor Green
+$vence = Anotar-Vencimiento ([string]$dato.expires_on)
+
+Write-Host "Listo: la key quedó en Secret Manager (gfw-api-key). Vence el $vence." -ForegroundColor Green
