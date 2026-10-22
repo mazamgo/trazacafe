@@ -1200,7 +1200,7 @@ describe("chequeo satelital", () => {
     ["una alerta sin área", { alertas: 1 }, "amarillo"],
     ["pérdida de 0.05 ha", { haPerdida: 0.05 }, "amarillo"],
     ["pérdida de 0.1 ha", { haPerdida: 0.1 }, "rojo"],
-    ["alertas por 0.3 ha", { alertas: 4, haAlertas: 0.3 }, "rojo"],
+    ["alertas por 0.3 ha (las alertas solas nunca ponen rojo)", { alertas: 4, haAlertas: 0.3 }, "amarillo"],
   ])("clasifica %s como %s", (_, h, esperado) => {
     expect(clasificar({ alertas: 0, haAlertas: 0, haPerdida: 0, detalle: {}, ...h })).toBe(esperado);
   });
@@ -1213,7 +1213,7 @@ describe("chequeo satelital", () => {
   it("la tarea revisa las fincas pendientes y guarda el resultado", async () => {
     const { app, repo, satelite } = crearApp();
     repo.porRevisar.push(porRevisar);
-    satelite.hallazgos = { alertas: 2, haAlertas: 0.4, haPerdida: 0, detalle: {} };
+    satelite.hallazgos = { alertas: 2, haAlertas: 0.1, haPerdida: 0.4, detalle: {} };
     const res = await pedir(app, "POST", "/v1/tareas/chequeo-deforestacion", "oidc-scheduler", {});
     expect(res.json()).toMatchObject({ revisadas: 1, rojo: 1, errores: 0 });
     expect(repo.chequeos[0]).toMatchObject({ fincaId: finca.id, temporadaId: "t1", resultado: "rojo", areaAfectadaHa: 0.4 });

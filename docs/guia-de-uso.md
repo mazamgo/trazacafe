@@ -91,13 +91,15 @@ TrazaCafé revisa cada finca con mapas satelitales públicos. Usa dos fuentes:
 - **JRC 2020** de la Comisión Europea: dónde había bosque en 2020;
 - **Hansen/UMD:** dónde se perdió cobertura de árboles cada año.
 
+Si está activado, también consulta las **alertas recientes de Global Forest Watch**, pero solo en fincas que tenían bosque en 2020. Las alertas avisan antes que Hansen, aunque no siempre son deforestación (puede ser una poda de sombra o una renovación del cafetal). Por eso una alerta deja la finca en amarillo, nunca en rojo.
+
 Cada día revisa sola las fincas que aún no tienen revisión en la temporada. El resultado aparece en la finca:
 
 | Color | Significa | ¿Puede exportar? |
 |---|---|---|
 | 🟢 Verde | Sin deforestación detectada después de 2020 | Sí |
-| 🟡 Amarillo | Posible pérdida pequeña (menos de 0.1 ha): hay que revisar | No, hasta revisarla |
-| 🔴 Rojo | Pérdida de bosque después de 2020 (0.1 ha o más) | **No** |
+| 🟡 Amarillo | Posible pérdida pequeña (menos de 0.1 ha) o alertas recientes: hay que revisar | No, hasta revisarla |
+| 🔴 Rojo | Pérdida de bosque confirmada después de 2020 (0.1 ha o más) | **No** |
 
 El **administrador** puede pedir la revisión en el momento con **Revisar por satélite**. Necesita señal y que la finca ya esté enviada.
 
