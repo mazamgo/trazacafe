@@ -302,8 +302,9 @@ Con 5 o 10 organizaciones eso no alcanza.
   2. **Uso y facturación,** por organización y por mes:
      - productores activos;
      - fincas y hectáreas;
-     - contenedores con paquete EUDR;
+     - **contenedores cerrados**, que es lo que se cobra (ver *Cobro por contenedor*, abajo);
      - fotos y espacio en Storage;
+     - contratos, estado de cuenta, facturas y pagos;
      - exportar a Excel para facturar (base de las métricas de la Fase 5).
   3. **Salud del sistema:**
      - última ejecución y resultado de cada tarea programada (attestations, chequeo satelital, eliminaciones);
@@ -323,6 +324,83 @@ Con 5 o 10 organizaciones eso no alcanza.
      - **Cuenta de GFW de la empresa:** pasar la key a un correo de GoProduction (por ejemplo, soporte@), no a uno personal, para que la renovación no dependa de una sola persona.
 - **Fuera de alcance al inicio:** cobro automático con tarjeta, y entrar como otro usuario ("ver como"). Se evalúan con 10 o más clientes.
 
+#### Cobro por contenedor (plan Exportador)
+**Qué se cobra: el contenedor cerrado, no el "embarcado".**
+- **"Embarcado" no se puede comprobar:**
+  - la fecha de embarque la escribe la exportadora;
+  - puede quedar vacía;
+  - se cambia mientras el contenedor esté abierto.
+- **El cierre sí se puede comprobar:**
+  - solo ocurre con número de contenedor ISO y todas las fincas en verde;
+  - no se deshace;
+  - en la hora siguiente queda firmado en la blockchain.
+
+  Es el momento en que el paquete EUDR queda listo para la DDS del importador, que es lo que paga el cliente.
+- **La cuenta se puede comprobar:** cada contenedor cobrado tiene su attestation `Exportacion` pública, así que la exportadora puede revisar cada línea en el verificador.
+- **Un contenedor se cobra una sola vez,** a la organización que lo cierra, aunque tenga lotes de varias cooperativas (Fase 2b).
+- **La fecha de embarque** sale en el reporte como dato, pero no decide el cobro.
+
+**Cambio necesario antes de cobrar (GeoJSON solo con el contenedor cerrado):**
+- **El problema:**
+  - hoy el GeoJSON para TRACES y el PDF se descargan también con el contenedor abierto;
+  - el PDF dice "Abierto (borrador)", pero el GeoJSON no avisa nada;
+  - una exportadora podría mandarle el GeoJSON al importador sin cerrar nunca el contenedor, y ese contenedor no se cobraría;
+  - además, ese GeoJSON puede llevar fincas en amarillo o sin chequeo, un riesgo para la DDS del importador.
+- **El cambio:**
+  - el **GeoJSON de TRACES** se descarga solo con el contenedor **cerrado**;
+  - el PDF borrador sigue disponible, para revisarlo con el comprador antes de cerrar;
+  - actualizar `docs/guia-de-uso.md` §4.5 e `infra/README.md` §4h.
+
+**Registro de consumo (tabla `consumos`):**
+- **Qué guarda:** una fila por cada cosa que se cobra, escrita **en la misma transacción** que el cierre:
+  - organización, contenedor, fecha de cierre, cultivo, kg y número de contenedor;
+  - el precio del contrato vigente en ese momento, congelado;
+  - el UID de su attestation, que se agrega cuando se firma.
+- **Ajustes:** las filas no se cambian ni se borran. Un ajuste (contenedor de cortesía, error) es otra fila, con monto negativo y motivo.
+- **Por qué una tabla aparte:**
+  - recalcular desde `exportaciones` perdería el precio que se acordó en su momento;
+  - el reporte de un mes ya facturado no debe cambiar después.
+- **Otros cobros que se registran ahí más adelante:**
+  - productores activos por temporada (plan Básico), contados al cierre de la temporada;
+  - mapeo de campo y capacitación, anotados a mano desde la consola.
+
+**Contratos (tabla `contratos`), uno por organización y temporada:**
+- plan;
+- cuota de la temporada y contenedores incluidos;
+- precio por contenedor adicional;
+- moneda (USD) y fechas;
+- estado: prueba, activo, en mora o suspendido.
+
+**Modelo de cobro (hipótesis a validar con el piloto):** en lugar de facturar solo a mes vencido:
+- **Cuota por temporada, pagada por adelantado,** con una **bolsa de contenedores** incluida (por ejemplo, 20 o 50), según lo que la exportadora embarcó la temporada anterior.
+- **Contenedores adicionales:** se facturan a fin de mes, con el precio del contrato.
+- **Por qué así:**
+  - cada transferencia SWIFT cobra comisiones en los dos bancos, así que conviene emitir pocas facturas;
+  - el dinero llega antes de la cosecha, cuando más se gasta en mapeo y capacitación;
+  - se reduce el riesgo de cobranza mes a mes.
+- **Primeros clientes:** precio de fundador, o los primeros 2 contenedores de cortesía, registrados como ajuste.
+
+**Estado de cuenta mensual (en la consola):**
+- **Por organización:**
+  - los contenedores cerrados del mes, con código, número de contenedor, fecha de cierre, kg y enlace a su attestation;
+  - cuántos quedan en la bolsa;
+  - los adicionales y el total.
+- **Se exporta en:**
+  - PDF, para mandárselo a la exportadora;
+  - Excel, para hacer la factura.
+- **La consola no emite facturas fiscales:**
+  - la factura sale del sistema autorizado de la DGI, o del de la entidad legal cuando exista (Fase 0);
+  - en la consola se anotan el número de factura, el pago recibido y su fecha.
+- **Aviso** cuando a una organización le quedan 3 contenedores en la bolsa: a los propietarios por correo y al administrador de la organización en la app.
+
+**Si no paga:**
+- **Proceso:** aviso, 30 días de gracia y, después, suspensión. La suspensión es una **decisión manual en la consola**, nunca automática.
+- **Lo que nunca se bloquea:** lo ya cerrado sigue disponible siempre (QR, verificador y paquete EUDR), porque el importador lo necesita para su DDS y para su archivo de 5 años.
+
+**Antes de que exista la consola:**
+- La tabla `consumos`, la de `contratos` y el GeoJSON solo con el contenedor cerrado van con la **Fase 4**, para que el primer contenedor real ya quede registrado.
+- Mientras no exista la pantalla, el estado de cuenta sale con un script: `npm run estado-de-cuenta -- --organizacion <id> --mes 2027-02`.
+
 ## Fase 4 — Producción y lanzamiento en Nicaragua (~2–3 semanas, antes de que termine la prueba de Cloud SQL)
 - **Proyecto `trazacafe-prod`** separado del de pruebas: Cloud SQL pagado con respaldos y recuperación a un punto en el tiempo, alertas de monitoreo y de presupuesto, keys propias y bucket propio.
 - **Seguridad:**
@@ -339,6 +417,10 @@ Con 5 o 10 organizaciones eso no alcanza.
   - arreglar la prueba de Equipo intermitente;
   - CI en GitHub Actions con las pruebas de Node y Flutter (`app/tool/probar.ps1`).
 - **Soporte:** guía de 1 página para técnicos, video corto, grupo de WhatsApp de soporte, y procedimiento de alta de una organización (`npm run crear-organizacion`).
+- **Base del cobro**, antes del primer contenedor real (detalle en la Fase 3, *Cobro por contenedor*):
+  - tablas `consumos` y `contratos`;
+  - el GeoJSON de TRACES solo con el contenedor cerrado;
+  - el script `npm run estado-de-cuenta`.
 - **Mapas sin señal:** revisar los términos de Google y, si no permiten guardar zonas, ofrecer la descarga de mapas base de otra fuente para zonas sin cobertura.
 
 ## Fase 5 — Rentabilidad en Nicaragua (desde el primer piloto)
@@ -347,7 +429,7 @@ Con 5 o 10 organizaciones eso no alcanza.
 | Paquete | Para | Precio orientativo |
 |---|---|---|
 | Básico | Cooperativa de hasta 300 productores | US$2–4 por productor al año (mínimo ~US$50/mes) |
-| Exportador | Exportadora o beneficio | Suscripción + US$30–80 por contenedor con paquete EUDR |
+| Exportador | Exportadora o beneficio | Cuota por temporada, pagada por adelantado, con una bolsa de contenedores incluida, + US$30–80 por contenedor cerrado adicional (probar también US$100–150: es menos del 0.2 % del valor de un contenedor). Ver Fase 3, *Cobro por contenedor* |
 | Comprador | Importador o tostador de la UE | Acceso básico incluido en el plan Exportador; plan Comprador US$100–300/mes (monitoreo, archivo de 5 años, varias exportadoras, API). Ver Fase 2c |
 | Servicios | Cualquiera | Mapeo de fincas en campo (con GPS y drones de Nicarobótica), capacitación, limpieza de datos |
 
@@ -384,7 +466,7 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
 |---|---|---|
 | Nov 2026 | Fase 1 (multicultivo) + key de GFW | Fase 0: entrevistas, demo, abogado |
 | Nov–Dic 2026 | Fase 2 (lotes, contenedores, paquete EUDR, attestations) | Carta de intención del piloto |
-| Ene 2027 | Fase 4 (producción, Play Store) antes de que termine la prueba de Cloud SQL | Contratos y entidad legal |
+| Ene 2027 | Fase 4 (producción, Play Store y base del cobro: `consumos`, `contratos`, GeoJSON solo con el contenedor cerrado) antes de que termine la prueba de Cloud SQL | Contratos y entidad legal |
 | Feb–Mar 2027 | Fase 2b (red de proveedores) si el piloto es una exportadora; Fase 3 (panel web) y consola del propietario (cuando pague el primer cliente) | Piloto con un contenedor real; primera factura |
 | Abr–Jun 2027 | Ajustes con el piloto; Fase 2c (portal del importador) después del primer contenedor real | 5–10 organizaciones antes del 30/06/2027; entrevistar al comprador europeo del piloto |
 | 2º semestre 2027 | — | Decidir el primer país de expansión |
@@ -417,6 +499,10 @@ Lo que la Fase 1 ya deja preparado: cultivos configurables, organizaciones con v
   - la consola del propietario rechaza (403) a administradores y técnicos de las cooperativas;
   - crear una organización desde la consola reemplaza al script;
   - la primera factura sale del reporte de uso;
+  - cerrar un contenedor de prueba crea su fila en `consumos` con el precio del contrato, y el estado de cuenta descuenta uno de la bolsa;
+  - el GeoJSON de un contenedor abierto responde 409, y el PDF sale como borrador;
+  - un ajuste de cortesía aparece en el estado de cuenta con su motivo;
+  - suspender una organización no bloquea el verificador ni el paquete de sus contenedores ya cerrados;
   - con una key de GFW vencida a propósito, la consola se pone en rojo y llega el correo; renovarla desde la consola la deja en verde sin redesplegar.
 - **Fase 4:**
   - la app instalada desde Play (pruebas cerradas) con login y mapas funcionando con el SHA-1 de Play;
