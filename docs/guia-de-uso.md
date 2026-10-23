@@ -220,7 +220,7 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 
 **Pasos hasta la exportación:**
 
-1. **Editar datos:** completa el **número de contenedor** con formato ISO, por ejemplo `MSCU1234565`. La app revisa su dígito de control. Agrega también la **fecha de embarque**.
+1. **Editar datos:** completa el **número de contenedor** con formato ISO, por ejemplo `MSCU1234566`. La app revisa su dígito de control. Agrega también la **fecha de embarque**.
 2. **Cerrar.** Para poder cerrar, el contenedor necesita:
    - el número de contenedor;
    - **todas sus fincas en verde**.

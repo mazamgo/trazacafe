@@ -498,7 +498,7 @@ class _DialogoDatosState extends State<_DialogoDatos> {
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
                   labelText: 'Número de contenedor',
-                  hintText: 'p. ej. MSCU1234565',
+                  hintText: 'p. ej. MSCU1234566',
                 ),
               ),
             ],

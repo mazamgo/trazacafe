@@ -11,6 +11,10 @@ describe("contenedorValido (ISO 6346)", () => {
     expect(contenedorValido("csqu 305438-3")).toBe("CSQU3054383");
   });
 
+  it("el ejemplo de la app y de la guía de uso es válido", () => {
+    expect(contenedorValido("MSCU1234566")).toBe("MSCU1234566");
+  });
+
   it("rechaza errores de tipeo y formatos que no son de contenedor", () => {
     expect(contenedorValido("CSQU3054384")).toBeNull();
     expect(contenedorValido("CSQU305438")).toBeNull();

@@ -169,7 +169,7 @@ class _NuevoContenedorScreenState extends ConsumerState<NuevoContenedorScreen> {
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
                   labelText: 'Número de contenedor (opcional)',
-                  hintText: 'p. ej. MSCU1234565',
+                  hintText: 'p. ej. MSCU1234566',
                   helperText: 'Si todavía no lo tienes, lo agregas después.',
                 ),
               ),
