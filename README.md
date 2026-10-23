@@ -53,6 +53,10 @@ npm run cultivos-dart --workspace schemas
 
 Cada finca es de un cultivo (`cafe` o `cacao`). La configuración (nombre, código HS, estados de entrega y máximo de kg por entrega) está en `schemas/cultivos.json`. La API la lee directamente y la app la recibe como código generado (`app/lib/domain/cultivos_generados.dart`). Pruebas de contrato en ambos lados verifican que coincidan. Agregar un cultivo es, sobre todo, agregarlo a ese archivo y regenerar.
 
+## Seguridad
+
+Revisión del 23/10/2026 (API, Storage, rutas públicas, Hosting, keys y secretos): [`docs/revision-seguridad.md`](docs/revision-seguridad.md).
+
 ## Privacidad
 
 En la blockchain solo se guardan hashes, IDs y resultados. Los datos personales de los productores (nombres, cédulas, polígonos exactos) se quedan en la base de datos. Esto cumple la Ley 787 de Protección de Datos Personales.

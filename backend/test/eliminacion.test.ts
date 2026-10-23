@@ -227,6 +227,22 @@ describe("página pública de eliminación", () => {
     }
     expect(codigos).toEqual([201, 201, 201, 201, 201, 429]);
   });
+
+  it("el límite no se salta falsificando X-Forwarded-For: cuenta la IP que agrega Cloud Run", async () => {
+    const { app } = crearApp();
+    const codigos = [];
+    for (let i = 0; i < 6; i++) {
+      // Lo de la izquierda lo escribe el cliente; Cloud Run agrega la IP real al final.
+      const res = await app.inject({
+        method: "POST",
+        url: "/v1/publico/solicitudes-eliminacion",
+        headers: { "x-forwarded-for": `10.0.0.${i}, 203.0.113.7` },
+        payload: solicitud,
+      });
+      codigos.push(res.statusCode);
+    }
+    expect(codigos).toEqual([201, 201, 201, 201, 201, 429]);
+  });
 });
 
 describe("solicitudes en la app del administrador", () => {

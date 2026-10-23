@@ -358,6 +358,32 @@ type App = ReturnType<typeof crearApp>["app"];
 const pedir = (app: App, method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: string, token: string, payload?: unknown) =>
   app.inject({ method, url, headers: { authorization: `Bearer ${token}` }, payload: payload as object });
 
+describe("errores internos", () => {
+  it("responden un mensaje genérico, sin el detalle de la base", async () => {
+    const { app, repo } = crearApp();
+    repo.listarTemporadas = async () => {
+      throw new Error('duplicate key value violates unique constraint "temporadas_pkey" (cedula=001-010190-0001A)');
+    };
+    const res = await pedir(app, "GET", "/v1/temporadas", "tecnico");
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: "error_interno", mensaje: expect.stringContaining("soporte") });
+    expect(res.body).not.toContain("temporadas_pkey");
+    expect(res.body).not.toContain("001-010190");
+  });
+
+  it("los errores de la petición (JSON mal formado) sí dicen qué pasó", async () => {
+    const { app } = crearApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/sync",
+      headers: { authorization: "Bearer tecnico", "content-type": "application/json" },
+      payload: "{no es json",
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().mensaje).toBeTruthy();
+  });
+});
+
 describe("POST /v1/sync", () => {
   it("guarda productores y fincas para la organización y el usuario del token", async () => {
     const { app, repo } = crearApp();

@@ -412,7 +412,9 @@ Con 5 o 10 organizaciones eso no alcanza.
     - Si entra alguien de otra: si todo se envió, el celular se limpia solo; si quedan registros sin enviar, la app pide que la persona anterior entre a sincronizarlos, o permite borrarlos con confirmación.
     - La sincronización se niega si los datos son de otra organización.
     - Detalle en `app/README.md`;
-  - revisión de seguridad (permisos, reglas de Storage, endpoints).
+  - ~~revisión de seguridad (permisos, reglas de Storage, endpoints)~~: **hecha** (23/10/2026), ver [`docs/revision-seguridad.md`](revision-seguridad.md).
+    - Corregidos en el código: el límite por IP ya no se salta con `X-Forwarded-For` falso, los errores internos no muestran detalles y Hosting tiene encabezados contra clickjacking.
+    - Pendientes con tu aprobación: restringir una API key de Firebase sin restricción, desactivar el acceso con correo y contraseña, y publicar la API y Hosting.
 - **Play Store:**
   - clave de subida;
   - agregar el SHA-1 de Play App Signing a Firebase, a la key de Android y a la key de mapas (`--dart-define=ANDROID_CERT_SHA1`);

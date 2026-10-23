@@ -85,8 +85,24 @@ export function buildApp({
   /** Eliminación de productores, cuentas y organizaciones (EliminacionesPg). */
   eliminaciones?: Eliminaciones | null;
 }) {
-  // trustProxy: detrás del frontal de Cloud Run, req.ip es la IP real (límite por IP).
-  const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
+  // trustProxy: solo se confía en el primer salto (el frontal de Cloud Run),
+  // que agrega la IP real al final de X-Forwarded-For. Con `true` se tomaría la
+  // primera, que la pone quien hace la petición (se saltaría el límite por IP).
+  const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: (_ip, salto) => salto === 0 });
+
+  // Un error interno no muestra su mensaje (podría traer SQL, nombres de
+  // tablas o datos): se registra en el log y se responde uno genérico.
+  app.setErrorHandler((err: { statusCode?: number; code?: string; message: string }, req, reply) => {
+    const status = err.statusCode && err.statusCode >= 400 && err.statusCode < 500 ? err.statusCode : 500;
+    if (status === 500) {
+      req.log.error({ err }, "error interno");
+      return reply.code(500).send({
+        error: "error_interno",
+        mensaje: "Ocurrió un error en el servidor. Intenta de nuevo; si sigue, avisa a soporte.",
+      });
+    }
+    return reply.code(status).send({ error: err.code ?? "solicitud_invalida", mensaje: err.message });
+  });
 
   app.addHook("onRequest", async (req, reply) => {
     if (RUTAS_WEB.includes(req.url.split("?")[0])) {
@@ -172,6 +188,12 @@ export function buildApp({
   app.post("/v1/publico/solicitudes-eliminacion", async (req, reply) => {
     if (sinEliminaciones(reply)) return;
     const ahora = Date.now();
+    // Que la memoria no crezca sin límite con IPs que ya no envían nada.
+    if (solicitudesPorIp.size > 10_000) {
+      for (const [ip, tiempos] of solicitudesPorIp) {
+        if (tiempos.every((t) => ahora - t >= 3600_000)) solicitudesPorIp.delete(ip);
+      }
+    }
     const recientes = (solicitudesPorIp.get(req.ip) ?? []).filter((t) => ahora - t < 3600_000);
     if (recientes.length >= SOLICITUDES_POR_HORA) {
       return reply.code(429).send({ error: "demasiadas", mensaje: "Ya enviaste varias solicitudes. Intenta de nuevo en una hora." });

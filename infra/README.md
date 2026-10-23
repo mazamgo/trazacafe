@@ -373,7 +373,11 @@ Endpoints:
 | Imágenes | Artifact Registry `us-east4-docker.pkg.dev/trazacafe-dev/trazacafe/backend` |
 | Variables | `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`, `FIREBASE_PROJECT_ID`, `STORAGE_BUCKET`, `TAREAS_AUDIENCE`, `TAREAS_SA`, `KMS_KEY_VERSION`, `EAS_RED`, `SATELITE=gfw`; secreto `GFW_API_KEY` (`gfw-api-key`) |
 
-La URL es pública (`allUsers` como invocador) porque la app la llama directamente; la API exige el token de Firebase en cada `/v1/*`. `.gcloudignore` limita lo que se sube a Cloud Build a `package*.json`, `schemas/` y `backend/`.
+La URL es pública (`allUsers` como invocador) porque la app la llama directamente; la API exige el token de Firebase en cada `/v1/*`.
+
+- **IP del cliente:** la API confía solo en el primer salto (el frontal de Cloud Run) para leer `X-Forwarded-For`. Si se pone un balanceador de carga delante, hay que confiar en dos saltos (`trustProxy` en `backend/src/app.ts`).
+- **Errores internos:** responden un mensaje genérico (`error_interno`); el detalle queda en el log.
+- Revisión de seguridad completa: `docs/revision-seguridad.md`. `.gcloudignore` limita lo que se sube a Cloud Build a `package*.json`, `schemas/` y `backend/`.
 
 Para publicar una versión nueva del backend (desde la raíz del repo):
 
@@ -422,6 +426,8 @@ Es la página que abre el comprador al escanear el QR del contenedor: `https://t
 - **Red:** `--dart-define=EAS_RED=optimism` al pasar a OP Mainnet. Con Sepolia, la página avisa que son registros de prueba.
 
 La misma publicación sirve también `/eliminar-datos` y `/privacidad` (§4j). Esas páginas muestran como correo de soporte `mauricio.zambrana.g@gmail.com`; para cambiarlo, compila con `--dart-define=SOPORTE_EMAIL=<correo>`.
+
+**Encabezados de seguridad** (`firebase.json`): las páginas (`/`, `/eliminar-datos`, `/privacidad`, `/v/…`) no se pueden mostrar dentro de otro sitio (`X-Frame-Options: DENY` y `frame-ancestors 'none'`, contra clickjacking), y llevan `nosniff` y `Referrer-Policy`. Las rutas reservadas de Firebase (`/__/auth/…`, que usa el login con Google) no los llevan. Después de publicar, se revisan con `curl -I https://trazacafe-dev.web.app/eliminar-datos`.
 
 Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas las rutas a `index.html`):
 
