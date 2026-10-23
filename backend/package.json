@@ -11,6 +11,9 @@
     "crear-organizacion": "node --env-file-if-exists=.env --import tsx scripts/crear-organizacion.ts",
     "explorar-mapas": "node --import tsx scripts/explorar-mapas.ts",
     "registrar-esquemas": "node --env-file-if-exists=.env --import tsx scripts/registrar-esquemas.ts",
+    "contrato": "node --env-file-if-exists=.env --import tsx scripts/cobros.ts contrato",
+    "ajuste-cobro": "node --env-file-if-exists=.env --import tsx scripts/cobros.ts ajuste",
+    "estado-de-cuenta": "node --env-file-if-exists=.env --import tsx scripts/cobros.ts estado",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

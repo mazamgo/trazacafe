@@ -388,6 +388,13 @@ export class ColaPg implements ColaAttestations {
           default: {
             const tabla = { Verificacion: "verificaciones", Entrega: "entregas", Lote: "lotes", Exportacion: "exportaciones" }[p.esquema];
             await client.query(`UPDATE ${tabla} SET attestation_uid = $2 WHERE id = $1`, [p.entidadId, uid]);
+            // El contenedor cobrado lleva su attestation, para revisarlo en el verificador.
+            if (p.esquema === "Exportacion") {
+              await client.query(
+                "UPDATE consumos SET attestation_uid = $2 WHERE exportacion_id = $1 AND tipo = 'contenedor' AND attestation_uid IS NULL",
+                [p.entidadId, uid],
+              );
+            }
           }
         }
         if (p.colaId !== null) await client.query("DELETE FROM attestations_pendientes WHERE id = $1", [p.colaId]);

@@ -699,12 +699,25 @@ export function buildApp({
   }
   const nombreArchivo = (codigo: string) => codigo.replace(/[^A-Za-z0-9._-]+/g, "_");
 
-  /** Geolocalización de las fincas de origen para la DDS en TRACES. */
+  /**
+   * Geolocalización de las fincas de origen para la DDS en TRACES. Solo con el
+   * contenedor cerrado: así no llega al importador un GeoJSON con fincas sin
+   * verde, y el contenedor queda registrado como consumo (lo que se cobra).
+   * El PDF borrador sí se descarga abierto, para revisarlo antes de cerrar.
+   */
   app.get<{ Params: { id: string }; Querystring: { productores?: string } }>(
     "/v1/exportaciones/:id/geojson",
     async (req, reply) => {
       const r = await paquete(req, reply);
       if (!r) return;
+      if (r.p.exportacion.estado !== "cerrada") {
+        return reply.code(409).send({
+          error: "abierta",
+          mensaje:
+            "El GeoJSON para TRACES se descarga con el contenedor cerrado. Ciérralo (número de contenedor y " +
+            "todas las fincas en verde) o descarga el PDF borrador para revisarlo con el comprador.",
+        });
+      }
       return reply
         .header("content-type", "application/geo+json")
         .header("content-disposition", `attachment; filename="${nombreArchivo(r.p.exportacion.codigo)}.geojson"`)
@@ -731,7 +744,7 @@ export function buildApp({
     if (motivos.length > 0) {
       return reply.code(409).send({ error: "incompleto", mensaje: `No se puede cerrar: ${motivos.join(". ")}.`, motivos });
     }
-    const estado = await repo.cerrarExportacion(r.admin.organizacionId, req.params.id);
+    const estado = await repo.cerrarExportacion(r.admin.organizacionId, req.params.id, r.admin.uid);
     if (estado !== "cambiada") return reply.code(409).send(respuestaCerrada);
     return (await repo.listarExportaciones(r.admin.organizacionId)).find((e) => e.id === req.params.id);
   });

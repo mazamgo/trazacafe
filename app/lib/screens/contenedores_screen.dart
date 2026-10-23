@@ -367,13 +367,22 @@ class _TarjetaContenedor extends StatelessWidget {
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text('PDF'),
               ),
+              // Para TRACES solo el contenedor cerrado (todas las fincas en
+              // verde); abierto, el PDF sirve de borrador.
               TextButton.icon(
-                onPressed: onGeojson,
+                onPressed: x.abierta ? null : onGeojson,
                 icon: const Icon(Icons.map_outlined),
                 label: const Text('GeoJSON (TRACES)'),
               ),
             ],
           ),
+          if (x.abierta)
+            Text(
+              'El PDF es un borrador para revisarlo con el comprador. El '
+              'GeoJSON para TRACES se descarga al cerrar el contenedor.',
+              style: pequeno,
+              textAlign: TextAlign.end,
+            ),
           OverflowBar(
             alignment: MainAxisAlignment.end,
             children: [

@@ -232,8 +232,8 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 
 Desde la tarjeta del contenedor (`backend/src/paquete.ts`):
 
-- **GeoJSON para TRACES** (`GET /v1/exportaciones/:id/geojson`): una Feature por finca de origen con su lindero vigente (WGS84, 8 decimales; punto si mide menos de 4 ha). Propiedades: `ProducerCountry` (NI), `ProductionPlace` (finca y comunidad) y `Area` (ha oficiales). `ProducerName` solo con `?productores=1`, porque es dato personal (Ley 787). **Pendiente:** validar el archivo subiéndolo a TRACES (entorno de aceptación) antes del primer envío real.
-- **PDF para el comprador** (`GET /v1/exportaciones/:id/pdf`): envío, cumplimiento (corte 31/12/2020, chequeo satelital, visitas), lotes y fincas con su huella geoHash. No lleva nombres de productores.
+- **GeoJSON para TRACES** (`GET /v1/exportaciones/:id/geojson`): **solo con el contenedor cerrado**; abierto responde 409 `abierta` (así no llega al importador un GeoJSON con fincas sin verde, y el contenedor queda registrado como consumo, §4k). Una Feature por finca de origen con su lindero vigente (WGS84, 8 decimales; punto si mide menos de 4 ha). Propiedades: `ProducerCountry` (NI), `ProductionPlace` (finca y comunidad) y `Area` (ha oficiales). `ProducerName` solo con `?productores=1`, porque es dato personal (Ley 787). **Pendiente:** validar el archivo subiéndolo a TRACES (entorno de aceptación) antes del primer envío real.
+- **PDF para el comprador** (`GET /v1/exportaciones/:id/pdf`): se descarga también abierto, como borrador ("Abierto (borrador)"). Envío, cumplimiento (corte 31/12/2020, chequeo satelital, visitas), lotes y fincas con su huella geoHash. No lleva nombres de productores.
 - **Cerrar** (`POST /v1/exportaciones/:id/cerrar`): exige el número de contenedor y **todas las fincas en verde**; si no, responde 409 con los motivos. Al cerrar, encola la attestation `Exportacion`. Cerrado, solo se puede anotar la referencia de la DDS, mientras la attestation no esté firmada.
 - En la app, el PDF y el GeoJSON se comparten con el menú del celular (WhatsApp, correo, Drive) usando `share_plus`.
 
@@ -319,6 +319,33 @@ Google Play exige una opción dentro de la app y una página web para pedir la e
 - **CORS:** las rutas que llama la página web (`/v1/publico/organizaciones`, `/v1/publico/solicitudes-eliminacion`, `/v1/cuenta`, `/v1/organizacion` y `/v1/organizacion/eliminacion`) responden con CORS abierto. La sesión va en el encabezado `Authorization`, no en cookies.
 - **Solicitudes sin cooperativa** (el productor eligió "No sé"): quedan con `organizacion_id` vacío y las atiende GoProduction. Consultarlas en la base con `SELECT * FROM solicitudes_eliminacion WHERE organizacion_id IS NULL AND estado = 'pendiente'`.
 
+## 4k. Cobros: contratos y consumos (Fase 4)
+
+Lo que se cobra es el **contenedor cerrado** (detalle y modelo en `docs/plan-nicaragua-multicultivo.md`, Fase 3, *Cobro por contenedor*). Código: `backend/src/cobros.ts` y `backend/scripts/cobros.ts`, migración `014_cobros.sql`.
+
+- **`contratos`:** uno vigente a la vez por organización (no se traslapan).
+  - Campos: plan (`basico`, `exportador`, `comprador`), fechas, cuota del período (por adelantado), contenedores incluidos (la bolsa), precio por contenedor adicional, y estado (`prueba`, `activo`, `en_mora`, `suspendido`).
+  - Sirve para cuota fija con bolsa, solo cuota (precio 0) o solo por contenedor (cuota y bolsa en 0).
+- **`consumos`:** una fila por cosa cobrada.
+  - **Contenedor:** se anota **en la misma transacción que el cierre** (`POST /v1/exportaciones/:id/cerrar`), con el contrato vigente y su precio **congelado**. Se copian código, número de contenedor, cultivo y kg. Un contenedor se cobra una sola vez.
+  - **Ajuste:** cortesía o error, con monto (negativo = descuento) y motivo.
+  - **No se cambian ni se borran** (trigger `consumos_inmutables`). Lo único que se completa es `attestation_uid`, que pone el worker al firmar la attestation `Exportacion`; esa firma necesita la referencia de la DDS.
+- **Comandos** (desde `backend/`, con el `.env` de Cloud SQL):
+
+  ```bash
+  npm run contrato -- --organizacion <uuid> --plan exportador --inicio 2026-11-01 --fin 2027-10-31 --cuota 1500 --incluidos 20 --precio 50 --estado activo
+  npm run ajuste-cobro -- --organizacion <uuid> --monto -50 --motivo "Primer contenedor de cortesía"
+  npm run estado-de-cuenta -- --mes 2026-11 [--organizacion <uuid>] [--csv estado-2026-11.csv]
+  ```
+
+- **Estado de cuenta del mes** (meses en hora de Nicaragua), por organización:
+  - la cuota, si el contrato empieza ese mes;
+  - cada contenedor cerrado, con su enlace al verificador (`VERIFICADOR_URL`/v/{uid}), y si va en la bolsa o se cobra aparte;
+  - los ajustes, cuántos contenedores quedan en la bolsa y el total.
+
+  Un contenedor cerrado sin contrato vigente sale como **SIN CONTRATO** y no suma: hay que acordar el precio y registrar un ajuste. El CSV abre en Excel. No es una factura fiscal: esa sale del sistema autorizado de la DGI.
+- **Lo que no se bloquea:** lo ya cerrado (QR, verificador y paquete EUDR) sigue disponible aunque la organización no pague. La suspensión será una decisión manual en la consola del propietario (Fase 3).
+
 ## 5. Backend en Cloud Run (ya hecho)
 
 Endpoints:
@@ -334,6 +361,7 @@ Endpoints:
   - cualquier persona con sesión: `DELETE /v1/cuenta`.
 - Públicas (sin sesión, con CORS): `GET /v1/publico/:uid` (verificador), `GET /v1/publico/organizaciones`, `POST /v1/publico/solicitudes-eliminacion`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`, `POST /v1/tareas/attestations`, `POST /v1/tareas/eliminaciones`.
+- Cobros: no tienen rutas todavía; se manejan con `npm run contrato`, `ajuste-cobro` y `estado-de-cuenta` (§4k).
 
 **URL de la API:** https://trazacafe-api-85528878949.us-east4.run.app
 

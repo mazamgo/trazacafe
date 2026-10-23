@@ -121,9 +121,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('descarga el PDF y el GeoJSON sin nombres y los comparte', (tester) async {
-    final api = await abrir(tester, const ContenedoresScreen(), {
+  testWidgets('abierto, solo el PDF borrador: el GeoJSON para TRACES espera el cierre', (tester) async {
+    await abrir(tester, const ContenedoresScreen(), {
       'GET /v1/exportaciones': (200, {'exportaciones': [exportacionJson()]}),
+    });
+    await expandir(tester);
+    final geojson = tester.widget<TextButton>(find.widgetWithText(TextButton, 'GeoJSON (TRACES)'));
+    expect(geojson.onPressed, isNull);
+    expect(find.textContaining('se descarga al cerrar el contenedor'), findsOneWidget);
+  });
+
+  testWidgets('cerrado, descarga el PDF y el GeoJSON sin nombres y los comparte', (tester) async {
+    final api = await abrir(tester, const ContenedoresScreen(), {
+      'GET /v1/exportaciones': (200, {'exportaciones': [exportacionJson(contenedor: 'CSQU3054383', sinVerde: 0, estado: 'cerrada')]}),
       'GET /v1/exportaciones/x1/pdf': (200, '%PDF-1.3 falso'),
       'GET /v1/exportaciones/x1/geojson': (200, {'type': 'FeatureCollection', 'features': []}),
     });

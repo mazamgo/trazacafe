@@ -213,8 +213,9 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 3. Toca **Crear contenedor**.
 
 **Paquete EUDR**, en la tarjeta del contenedor:
-- **PDF:** resumen para el comprador, con fincas de origen, áreas, chequeos y visitas.
+- **PDF:** resumen para el comprador, con fincas de origen, áreas, chequeos y visitas. Con el contenedor **abierto** es un **borrador**, para revisarlo con el comprador antes de cerrar.
 - **GeoJSON (TRACES):** la ubicación de cada finca de origen. Se manda al **importador** en la Unión Europea, que lo sube a **TRACES** con su **declaración de diligencia debida (DDS)**.
+  - **Se descarga solo con el contenedor cerrado**, es decir, con todas sus fincas en verde. Mientras está abierto, el botón está apagado.
   - La app pregunta si incluir los nombres de los productores. TRACES no los exige y son datos personales; lo normal es **Sin nombres**.
 
 **Pasos hasta la exportación:**
@@ -224,7 +225,7 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
    - el número de contenedor;
    - **todas sus fincas en verde**.
 
-   Si falta algo, la app dice qué. Al cerrarlo ya no se cambian sus lotes ni sus datos.
+   Si falta algo, la app dice qué. Al cerrarlo ya no se cambian sus lotes ni sus datos, y se activa el **GeoJSON (TRACES)**. Cada contenedor cerrado cuenta para el plan de tu organización con GoProduction.
 3. **Enviar el paquete al importador:**
    - manda el **GeoJSON** y el **PDF** al comprador o importador en la Unión Europea, con los botones de la tarjeta (correo, WhatsApp);
    - con ellos, el importador presenta la **DDS** en **TRACES**, desde su propia cuenta y antes de que el café entre a la UE;

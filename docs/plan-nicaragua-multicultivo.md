@@ -423,10 +423,11 @@ Con 5 o 10 organizaciones eso no alcanza.
   - ~~arreglar la prueba de Equipo intermitente~~: **causa encontrada** (23/10/2026). No es la prueba: en Windows, `flutter_tester.exe` se cae con `0xC0000005` (violación de acceso del motor) a mitad de un archivo (cualquiera; más o menos 1 de cada 4 a 6 corridas). `app/tool/probar.ps1` repite el archivo hasta 4 veces y lo avisa. En CI corre en Linux;
   - ~~CI en GitHub Actions~~: **hecho** (`.github/workflows/ci.yml`). En cada push a `main` y en cada pull request: typecheck y pruebas de Node, `flutter analyze` y `flutter test` en Linux.
 - **Soporte:** guía de 1 página para técnicos, video corto, grupo de WhatsApp de soporte, y procedimiento de alta de una organización (`npm run crear-organizacion`).
-- **Base del cobro**, antes del primer contenedor real (detalle en la Fase 3, *Cobro por contenedor*):
-  - tablas `consumos` y `contratos`;
-  - el GeoJSON de TRACES solo con el contenedor cerrado;
-  - el script `npm run estado-de-cuenta`.
+- **Base del cobro**, antes del primer contenedor real (detalle en la Fase 3, *Cobro por contenedor*): **código hecho** (23/10/2026), ensayado en Cloud SQL con la transacción revertida.
+  - tablas `consumos` y `contratos` (migración 014; el consumo se anota al cerrar el contenedor, con el precio congelado);
+  - el GeoJSON de TRACES solo con el contenedor cerrado (la app apaga el botón mientras está abierto);
+  - `npm run contrato`, `npm run ajuste-cobro` y `npm run estado-de-cuenta` (con CSV para Excel). Detalle en `infra/README.md` §4k.
+  - **Falta:** aplicar la 014 en Cloud SQL, desplegar la API y el APK, y crear el contrato del piloto cuando se acuerde el precio.
 - **Mapas sin señal:** revisar los términos de Google y, si no permiten guardar zonas, ofrecer la descarga de mapas base de otra fuente para zonas sin cobertura.
 
 ## Fase 5 — Rentabilidad en Nicaragua (desde el primer piloto)

@@ -174,12 +174,14 @@ class RepoMemoria implements Repo {
     return exportacion ? { organizacion: "Prueba", exportacion, fincas: this.fincasPaquete } : null;
   }
   colaAttestations: string[] = [];
-  async cerrarExportacion(organizacionId: string, id: string) {
+  consumos: { exportacionId: string; organizacionId: string; uid: string }[] = [];
+  async cerrarExportacion(organizacionId: string, id: string, uid: string) {
     const x = this.exportaciones.find((e) => e.id === id && e.organizacionId === organizacionId);
     if (!x) return "no_encontrada" as const;
     if (x.estado === "cerrada") return "cerrada" as const;
     x.estado = "cerrada";
     this.colaAttestations.push(`Exportacion:${id}`);
+    this.consumos.push({ exportacionId: id, organizacionId, uid });
     return "cambiada" as const;
   }
   async eliminarExportacion(organizacionId: string, id: string) {
@@ -957,8 +959,18 @@ describe("paquete EUDR del contenedor", () => {
     return { ...c, id: res.json().id as string };
   }
 
+  it("el GeoJSON para TRACES solo se descarga con el contenedor cerrado", async () => {
+    const { app, id } = await preparar({ contenedor: "CSQU3054383" });
+    const abierta = await pedir(app, "GET", `/v1/exportaciones/${id}/geojson`, "admin");
+    expect(abierta.statusCode).toBe(409);
+    expect(abierta.json().error).toBe("abierta");
+    expect(abierta.json().mensaje).toContain("PDF borrador");
+    expect((await pedir(app, "GET", `/v1/exportaciones/${id}/pdf`, "admin")).statusCode).toBe(200);
+  });
+
   it("descarga el GeoJSON para TRACES, sin nombres de productores salvo que se pidan", async () => {
-    const { app, id } = await preparar();
+    const { app, id } = await preparar({ contenedor: "CSQU3054383" });
+    expect((await pedir(app, "POST", `/v1/exportaciones/${id}/cerrar`, "admin")).statusCode).toBe(200);
     const res = await pedir(app, "GET", `/v1/exportaciones/${id}/geojson`, "admin");
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("application/geo+json");
@@ -988,6 +1000,7 @@ describe("paquete EUDR del contenedor", () => {
       "1 finca no tiene chequeo satelital verde: XXX (sin chequeo)",
     ]);
     expect(repo.exportaciones[0].estado).toBe("abierta");
+    expect(repo.consumos, "sin cerrar no se cobra").toEqual([]);
   });
 
   it("cierra un paquete completo, encola su attestation y después solo acepta la DDS", async () => {
@@ -996,7 +1009,10 @@ describe("paquete EUDR del contenedor", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().estado).toBe("cerrada");
     expect(repo.colaAttestations).toEqual([`Exportacion:${id}`]);
+    // Cerrar es lo que se cobra: queda anotado una sola vez.
+    expect(repo.consumos).toEqual([{ exportacionId: id, organizacionId: ORG, uid: expect.any(String) }]);
     expect((await pedir(app, "POST", `/v1/exportaciones/${id}/cerrar`, "admin")).statusCode).toBe(409);
+    expect(repo.consumos).toHaveLength(1);
     expect((await pedir(app, "PATCH", `/v1/exportaciones/${id}`, "admin", { ddsRef: "26NI000123" })).statusCode).toBe(200);
     expect((await pedir(app, "PATCH", `/v1/exportaciones/${id}`, "admin", { destino: "Amberes" })).statusCode).toBe(409);
   });

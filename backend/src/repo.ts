@@ -1,6 +1,7 @@
 import { convertirKg, cultivo, estadoValido } from "@trazacafe/eudr-eas-schemas";
 import type pg from "pg";
 import type { Rol, UsuarioActivo } from "./auth.ts";
+import { registrarContenedorEnTx } from "./cobros.ts";
 import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "./exportaciones.ts";
 import { avisoSatelite, type Aviso, type EntregaCandidata, type LoteNuevo } from "./lotes.ts";
 import type { LoteSync, TemporadaNueva } from "./sync.ts";
@@ -263,7 +264,8 @@ export interface Repo {
   /** Contenedor con sus fincas de origen, para el paquete EUDR; `null` si no es de la organización. */
   paqueteExportacion(organizacionId: string, id: string): Promise<Paquete | null>;
   /** Pasa un contenedor abierto a cerrado y encola su attestation. */
-  cerrarExportacion(organizacionId: string, id: string): Promise<ResultadoCambiarExportacion>;
+  /** Cierra el contenedor y anota su consumo (lo que se cobra, ver `cobros.ts`). */
+  cerrarExportacion(organizacionId: string, id: string, uid: string): Promise<ResultadoCambiarExportacion>;
 
   /** Todo lo de la organización, para que cada celular vea lo del equipo. */
   datosOrganizacion(organizacionId: string): Promise<DatosOrganizacion>;
@@ -973,7 +975,7 @@ export class PgRepo implements Repo {
     };
   }
 
-  async cerrarExportacion(organizacionId: string, id: string): Promise<ResultadoCambiarExportacion> {
+  async cerrarExportacion(organizacionId: string, id: string, uid: string): Promise<ResultadoCambiarExportacion> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -990,6 +992,7 @@ export class PgRepo implements Repo {
         "INSERT INTO attestations_pendientes (esquema, entidad_id) VALUES ('Exportacion', $1) ON CONFLICT DO NOTHING",
         [id],
       );
+      await registrarContenedorEnTx(client, organizacionId, id, uid);
       await client.query("COMMIT");
       return "cambiada";
     } catch (e) {
