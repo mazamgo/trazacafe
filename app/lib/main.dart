@@ -7,6 +7,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'firebase_options.dart';
 import 'providers.dart';
 import 'screens/activacion_screen.dart';
+import 'screens/celular_compartido_screen.dart';
 import 'screens/eliminar_datos_screen.dart';
 import 'screens/privacidad_publica_screen.dart';
 import 'screens/login_screen.dart';
@@ -86,6 +87,10 @@ class _Inicio extends ConsumerWidget {
           data: (sesion) => switch (sesion) {
             null => const LoginScreen(),
             Sesion(activa: false) => ActivacionScreen(email: sesion.email),
+            Sesion(:final organizacionId?) => CelularListo(
+              organizacionId: organizacionId,
+              child: const ProductoresScreen(),
+            ),
             _ => const ProductoresScreen(),
           },
         );

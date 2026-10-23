@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' show Value;
 
 import '../data/database.dart';
 import 'api_client.dart';
+import 'datos_celular.dart';
 
 class ResultadoSync {
   ResultadoSync({this.enviados = 0, this.fotosSubidas = 0, this.errorFotos});
@@ -45,6 +46,12 @@ class SyncService {
     if (_enCurso) return ResultadoSync();
     _enCurso = true;
     try {
+      // Datos de otra organización en el celular: no se mezclan.
+      final org = _organizacionId();
+      final duena = await _db.leerAjuste(ClaveAjuste.organizacionDatos);
+      if (org != null && duena != null && duena != org) {
+        throw DatosDeOtraOrganizacion();
+      }
       final pendientes = await _db.pendientes();
       if (!pendientes.vacio) {
         await _api.sync(payload(pendientes));

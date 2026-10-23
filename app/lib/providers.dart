@@ -11,6 +11,7 @@ import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/compartir_service.dart';
 import 'services/correcciones_service.dart';
+import 'services/datos_celular.dart';
 import 'services/eliminacion_service.dart';
 import 'services/fincas_service.dart';
 import 'services/fotos_service.dart';
@@ -95,6 +96,17 @@ final fincasDeProductorProvider = StreamProvider.family<List<Finca>, String>(
 );
 
 final mapasServiceProvider = Provider<MapasService>((ref) => MapasService());
+
+final datosCelularProvider = Provider<DatosCelular>(
+  (ref) => DatosCelular(ref.watch(databaseProvider)),
+);
+
+/// Al entrar: registros sin enviar de otra organización que quedaron en el
+/// celular (0 = listo para trabajar). Ver [DatosCelular.prepararPara].
+final celularListoProvider = FutureProvider.autoDispose.family<int, String>(
+  (ref, organizacionId) =>
+      ref.watch(datosCelularProvider).prepararPara(organizacionId),
+);
 
 final lugaresServiceProvider = Provider<LugaresService>(
   (ref) => LugaresService(),

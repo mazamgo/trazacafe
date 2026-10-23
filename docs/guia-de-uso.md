@@ -32,6 +32,7 @@ Los productores no entran a la app; son registros que lleva el técnico.
 - **Sin señal:** todo lo que registras se guarda en el celular.
 - **Sincronizar:** arriba, en la pantalla de **Productores**, hay un botón con un número: son los registros pendientes de enviar. Cuando tengas señal, tócalo para enviarlos y recibir lo que registró el resto del equipo.
 - **Recomendación:** sincroniza al terminar cada día de campo.
+- **Celular de otra organización:** cada celular guarda los datos de una sola organización. Si entras en un celular que usó otra organización, la app borra sus datos (si ya estaban enviados) y descarga los de la tuya.
 - **Lo que necesita señal siempre:** corregir algo que ya se envió, los lotes, los contenedores y la revisión satelital.
 
 ### Tema claro u oscuro
@@ -283,6 +284,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | "Eres el único administrador" al eliminar tu cuenta | Invita a otro administrador en **Equipo** (o elimina la organización) y vuelve a intentarlo. |
 | Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |
 | Celular nuevo o reinstalación | Entra con la misma cuenta y toca **Sincronizar**: se descargan los datos de la organización. Lo que **no** se había sincronizado en el celular anterior se pierde. |
+| "Datos de otra organización" al entrar | El celular tiene registros **sin enviar** de otra organización (un celular prestado o heredado). Lo mejor: toca **Cerrar sesión** y que la persona anterior entre con su cuenta y toque **Sincronizar** con señal. Después entras tú y el celular se limpia solo. Si esos datos ya no importan, **Borrar esos datos y continuar** los borra para siempre. |
 
 ## 7. Palabras que aparecen en la app
 

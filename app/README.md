@@ -15,7 +15,7 @@ En la web solo se abren esas páginas (`lib/main.dart`). El manual para las pers
 | Carpeta | Contenido |
 |---|---|
 | `lib/screens/` | Pantallas: login, productores, fincas, visitas, entregas, temporadas, equipo, cultivos, lotes, contenedores, privacidad y solicitudes de eliminación, verificador (con sus textos en español e inglés en `verificador_textos.dart`) y las páginas web de eliminación de datos y privacidad |
-| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión), sincronización, fincas, fotos, mapas, lugares del buscador y última vista del mapa (`lugares_service.dart`), correcciones, eliminación de datos (`eliminacion_service.dart`, también las llamadas sin sesión de la página web), compartir archivos, verificador y preferencias (tema e idioma, en `SharedPreferences`) |
+| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión), sincronización, fincas, fotos, mapas, lugares del buscador y última vista del mapa (`lugares_service.dart`), datos del celular por organización (`datos_celular.dart`), correcciones, eliminación de datos (`eliminacion_service.dart`, también las llamadas sin sesión de la página web), compartir archivos, verificador y preferencias (tema e idioma, en `SharedPreferences`) |
 | `lib/data/` | Base local SQLite con drift (`database.dart`; `database.g.dart` es generado) |
 | `lib/domain/` | Reglas puras: geometría y polígonos, cédula nicaragüense, cultivos (`cultivos_generados.dart` sale de `schemas/cultivos.json`), búsqueda de lugares y lectura de coordenadas (`busqueda_lugar.dart`) |
 | `lib/widgets/` | Formulario de entrega, mapa de Google, buscador del mapa (`buscador_mapa.dart`), motivo de corrección, fotos, diálogo del QR del verificador |
@@ -46,7 +46,10 @@ flutter build apk --release --dart-define=API_URL=https://trazacafe-api-85528878
 # Verificador y páginas de eliminación de datos y privacidad (después: firebase deploy --only hosting, desde la raíz)
 flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
 
-# Pruebas: en Windows, mejor archivo por archivo (ver dart_test.yaml)
+# Pruebas: en Windows, archivo por archivo. flutter_tester.exe a veces se cae
+# (0xC0000005) y deja pruebas en "did not complete": el script repite ese
+# archivo hasta 4 veces y lo avisa (ver dart_test.yaml). CI corre `flutter test`
+# en Linux (.github/workflows/ci.yml).
 powershell -ExecutionPolicy Bypass -File tool\probar.ps1
 flutter analyze
 
@@ -76,3 +79,8 @@ El APK release se firma con el **certificado de depuración** de esta computador
 - **Sin señal:** la app guarda todo en el celular y lo envía con **Sincronizar**.
 - **Al sincronizar:** el servidor devuelve los datos de toda la organización y la app actualiza su copia, sin perder lo que todavía no se ha enviado.
 - **Eliminaciones:** los productores y fincas que ya no vienen del servidor se borran del celular con sus fotos; a los anonimizados se les borran las fotos que quedaban en el celular. **Eliminar mi cuenta** deja el celular sin datos (`borrarTodoLocal`).
+- **Un celular, una organización** (`lib/services/datos_celular.dart`): el ajuste `organizacionDatos` guarda de quién son los datos. Al entrar, `CelularListo` (`lib/screens/celular_compartido_screen.dart`) revisa:
+  - si son de la misma organización, o no tienen dueña (celular nuevo o datos de antes de esta versión), se anota y sigue;
+  - si son de otra y ya se enviaron todos (incluidos los archivos de fotos), se borran con sus fotos y se descargan los de la nueva al sincronizar;
+  - si son de otra y quedan sin enviar, no se borra nada: la pantalla pide que la persona anterior entre a sincronizar, o permite borrarlos con confirmación.
+  - `SyncService` además se niega a sincronizar si la sesión y los datos son de organizaciones distintas.

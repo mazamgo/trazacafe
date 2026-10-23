@@ -1,5 +1,8 @@
-# Pendiente: equipo_screen_test.dart a veces queda "did not complete" cuando
-# corre en la misma sesión que otros archivos de prueba (también en serie);
-# solo, pasa siempre (8/8). Es un problema de las pruebas, no de la app; la
-# causa no está identificada. En serie falla menos que en paralelo.
+# En Windows, flutter_tester.exe a veces se cae a mitad de un archivo con
+# 0xC0000005 (violación de acceso del motor de Flutter, no de las pruebas):
+# las pruebas que faltaban quedan "did not complete". Puede tocarle a
+# cualquier archivo, también corriendo solo (equipo_screen_test.dart y
+# contenedores_screen_test.dart, ~1 de cada 4 a 6 corridas).
+# tool/probar.ps1 repite el archivo en ese caso; CI corre en Linux.
+# En serie se cae menos que en paralelo.
 concurrency: 1

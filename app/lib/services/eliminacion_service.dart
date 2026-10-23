@@ -1,12 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../data/database.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
+import 'datos_celular.dart';
 import 'sync_service.dart';
 import 'verificador_service.dart' show verificadorUrl;
 
@@ -51,7 +50,7 @@ class EliminacionService {
       }
     }
     await _api.eliminarCuenta();
-    await _borrarArchivos(await _db.borrarTodoLocal());
+    await borrarArchivosLocales(await _db.borrarTodoLocal());
     await _auth.cerrarSesion();
   }
 
@@ -90,16 +89,6 @@ class EliminacionService {
     await _sync.sincronizar();
   }
 
-  static Future<void> _borrarArchivos(List<String> rutas) async {
-    if (kIsWeb) return;
-    for (final ruta in rutas) {
-      try {
-        await File(ruta).delete();
-      } on FileSystemException {
-        // Ya no estaba.
-      }
-    }
-  }
 }
 
 /// Cooperativa que el productor puede elegir en la página pública.

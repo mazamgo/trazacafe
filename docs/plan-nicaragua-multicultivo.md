@@ -26,16 +26,17 @@
 - **App Android sin señal:** productores con foto del consentimiento, fincas con polígono validado (cruces, regla de 4 ha) y mapa satelital de Google, fotos subidas con hash verificado, entregas, temporadas, visita de verificación con historial del lindero y aviso al registrar entregas.
 - **Acceso:** login con Google, acceso por invitación, roles de administrador y técnico, pantallas Equipo y Temporadas, y descarga de los datos del equipo.
 - **API en Cloud Run** con Cloud SQL (PostGIS) por IAM, Storage con reglas por organización, área oficial calculada por PostGIS, chequeo satelital (GFW) con tarea diaria en Scheduler y API keys restringidas.
-- **Esquemas EAS** (Finca con versión, Verificación, Entrega, Lote, Exportación), todavía sin registrar en la blockchain.
+- **Esquemas EAS** registrados en OP Sepolia (20/10/2026) y attestations firmándose cada hora (ver Fase 2).
+- **Lotes, contenedores, paquete EUDR, chequeo satelital propio, correcciones, verificador público y eliminación de datos** (ver Fases 2 y 4).
+- **Buscador del mapa** en Nueva finca (23/10/2026): comunidades de Nicaragua sin señal, coordenadas y ubicaciones de WhatsApp.
 
 ## Pendientes conocidos (se integran en las fases)
 - ~~Key de Global Forest Watch~~: **hecho** el 22/10/2026. Key en Secret Manager (`gfw-api-key`) y modo combinado activo en Cloud Run (`SATELITE=gfw`): JRC + Hansen deciden y las alertas de GFW solo avisan en amarillo. Ver `infra/README.md` §4d.
-- Lotes, exportaciones, paquete EUDR, firma con Cloud KMS y attestations (era la semana 4).
-- Riesgo de celular compartido entre organizaciones.
-- Prueba de Equipo intermitente.
-- Publicación en Play Store.
-- Entorno de producción.
-- Verificador web en Firebase Hosting.
+- ~~Lotes, exportaciones, paquete EUDR, firma con Cloud KMS y attestations~~: **hechos** (Fase 2).
+- ~~Verificador web en Firebase Hosting~~: **hecho** (`trazacafe-dev.web.app`).
+- ~~Riesgo de celular compartido entre organizaciones~~: **corregido** el 23/10/2026 (Fase 4).
+- ~~Prueba de Equipo intermitente~~: **causa encontrada** el 23/10/2026: `flutter_tester.exe` se cae en Windows (Fase 4).
+- Publicación en Play Store y entorno de producción (Fase 4).
 
 ---
 
@@ -123,10 +124,11 @@ Es la parte que **paga el cliente**.
 - **Contenedores: hechos** (migración 010, pantalla Contenedores). Detalle en `infra/README.md` §4g.
 - **Paquete EUDR: hecho**: GeoJSON para TRACES, PDF para el comprador y cierre del contenedor (detalle en `infra/README.md` §4h).
   - Falta validar el GeoJSON en el entorno de aceptación de TRACES.
-  - Ningún contenedor se puede cerrar mientras no haya chequeos satelitales en verde (key de GFW).
-- **Attestations: código hecho**: firma con Cloud KMS, worker en cuatro olas, migración 011 y esquema `Chequeo` separado de `Finca`. Detalle en `infra/README.md` §3.
-  - La clave HSM ya está creada (dirección `0xBFC2333a01536EdFDB3e6aB987c544CDeAC8CB99`).
-  - Faltan: ETH de prueba, registrar los esquemas en OP Sepolia, aplicar la 011, desplegar y programar el worker.
+  - Un contenedor solo se cierra con todas sus fincas en verde. Los chequeos ya no esperan la key de GFW: los hace el chequeo satelital propio (abajo).
+- **Attestations: hechas y activas en OP Sepolia** (20/10/2026): firma con Cloud KMS (clave HSM `0xBFC2333a01536EdFDB3e6aB987c544CDeAC8CB99`), worker en cuatro olas, migración 011 y esquema `Chequeo` separado de `Finca`.
+  - Los 6 esquemas están registrados y el job de Cloud Scheduler `attestations` corre cada hora.
+  - Para OP Mainnet faltan: registrar los esquemas allí, fondear la dirección con ETH real y la revocación de lo ya firmado.
+  - Detalle en `infra/README.md` §3.
 - **Chequeo satelital propio: hecho.** Mapas públicos JRC GFC2020 V4 (bosque 2020, la referencia de la UE) y Hansen/UMD v1.12 (pérdida 2021-2024), leídos por partes. Ya no se depende de la key de GFW, que queda como complemento opcional para alertas recientes. Detalle en `infra/README.md` §4d.
 - **Correcciones de datos: hechas** (migración 012). Se pueden corregir o anular entregas, lotes, productores, fincas, fotos, visitas y temporadas mientras no estén sellados, con historial y motivo. Detalle en `infra/README.md` §4i.
 - **Período de gracia: hecho.** Entregas y visitas se firman a los 7 días de enviarlas, o antes si entran a un lote, para poder corregirlas sin revocar. La revocación de lo ya firmado sigue pendiente, para antes de OP Mainnet.
@@ -405,7 +407,11 @@ Con 5 o 10 organizaciones eso no alcanza.
 - **Proyecto `trazacafe-prod`** separado del de pruebas: Cloud SQL pagado con respaldos y recuperación a un punto en el tiempo, alertas de monitoreo y de presupuesto, keys propias y bucket propio.
 - **Seguridad:**
   - Firebase App Check con Play Integrity en la API;
-  - corregir el riesgo del celular compartido entre organizaciones;
+  - ~~corregir el riesgo del celular compartido entre organizaciones~~: **hecho** (23/10/2026).
+    - El celular anota de qué organización son sus datos.
+    - Si entra alguien de otra: si todo se envió, el celular se limpia solo; si quedan registros sin enviar, la app pide que la persona anterior entre a sincronizarlos, o permite borrarlos con confirmación.
+    - La sincronización se niega si los datos son de otra organización.
+    - Detalle en `app/README.md`;
   - revisión de seguridad (permisos, reglas de Storage, endpoints).
 - **Play Store:**
   - clave de subida;
@@ -414,8 +420,8 @@ Con 5 o 10 organizaciones eso no alcanza.
   - **eliminación de datos (requisito de Play): hecha en la app, la API y la página web** ([`docs/plan-eliminacion-datos.md`](plan-eliminacion-datos.md)). Falta revisar la política con el abogado, poner la URL definitiva en Play Console al pasar a producción y llenar Seguridad de los datos ([`docs/seguridad-de-datos-play.md`](seguridad-de-datos-play.md));
   - pruebas cerradas con el piloto.
 - **Calidad:**
-  - arreglar la prueba de Equipo intermitente;
-  - CI en GitHub Actions con las pruebas de Node y Flutter (`app/tool/probar.ps1`).
+  - ~~arreglar la prueba de Equipo intermitente~~: **causa encontrada** (23/10/2026). No es la prueba: en Windows, `flutter_tester.exe` se cae con `0xC0000005` (violación de acceso del motor) a mitad de un archivo (cualquiera; más o menos 1 de cada 4 a 6 corridas). `app/tool/probar.ps1` repite el archivo hasta 4 veces y lo avisa. En CI corre en Linux;
+  - ~~CI en GitHub Actions~~: **hecho** (`.github/workflows/ci.yml`). En cada push a `main` y en cada pull request: typecheck y pruebas de Node, `flutter analyze` y `flutter test` en Linux.
 - **Soporte:** guía de 1 página para técnicos, video corto, grupo de WhatsApp de soporte, y procedimiento de alta de una organización (`npm run crear-organizacion`).
 - **Base del cobro**, antes del primer contenedor real (detalle en la Fase 3, *Cobro por contenedor*):
   - tablas `consumos` y `contratos`;

@@ -47,6 +47,8 @@ cd schemas && npm install && npm run register -- --dry-run
 npm run cultivos-dart --workspace schemas
 ```
 
+**CI:** GitHub Actions (`.github/workflows/ci.yml`) corre en cada push a `main` y en cada pull request: typecheck y pruebas de Node, `flutter analyze` y `flutter test`.
+
 ## Cultivos
 
 Cada finca es de un cultivo (`cafe` o `cacao`). La configuración (nombre, código HS, estados de entrega y máximo de kg por entrega) está en `schemas/cultivos.json`. La API la lee directamente y la app la recibe como código generado (`app/lib/domain/cultivos_generados.dart`). Pruebas de contrato en ambos lados verifican que coincidan. Agregar un cultivo es, sobre todo, agregarlo a ese archivo y regenerar.

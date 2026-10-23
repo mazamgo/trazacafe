@@ -109,6 +109,10 @@ abstract final class ClaveAjuste {
 
   /// Solicitudes de eliminación de productores sin responder (solo administradores).
   static const solicitudesPendientes = 'solicitudesPendientes';
+
+  /// Organización dueña de los datos del celular (la anota la app al entrar;
+  /// ver `DatosCelular`).
+  static const organizacionDatos = 'organizacionDatos';
 }
 
 /// Lindero nuevo de una finca ya enviada, pendiente de enviar. Al enviarse
@@ -585,6 +589,16 @@ class AppDatabase extends _$AppDatabase {
     }
     return rutas;
   });
+
+  Future<String?> leerAjuste(String clave) async =>
+      (await (select(
+        ajustes,
+      )..where((a) => a.clave.equals(clave))).getSingleOrNull())?.valor;
+
+  Future<void> guardarAjuste(String clave, String? valor) => into(ajustes)
+      .insertOnConflictUpdate(
+        AjustesCompanion.insert(clave: clave, valor: Value(valor)),
+      );
 
   Stream<String?> observarAjuste(String clave) =>
       (select(ajustes)..where((a) => a.clave.equals(clave)))
