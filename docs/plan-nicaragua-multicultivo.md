@@ -414,7 +414,8 @@ Con 5 o 10 organizaciones eso no alcanza.
     - Detalle en `app/README.md`;
   - ~~revisión de seguridad (permisos, reglas de Storage, endpoints)~~: **hecha** (23/10/2026), ver [`docs/revision-seguridad.md`](revision-seguridad.md).
     - Corregidos en el código: el límite por IP ya no se salta con `X-Forwarded-For` falso, los errores internos no muestran detalles y Hosting tiene encabezados contra clickjacking.
-    - Pendientes con tu aprobación: restringir una API key de Firebase sin restricción, desactivar el acceso con correo y contraseña, y publicar la API y Hosting.
+    - Publicado el mismo día (API `trazacafe-api-00021-l6b` y Hosting), y restringida la API key de Firebase que no tenía restricción.
+    - Pendiente: desactivar el acceso con correo y contraseña en Firebase Auth.
 - **Play Store:**
   - clave de subida;
   - agregar el SHA-1 de Play App Signing a Firebase, a la key de Android y a la key de mapas (`--dart-define=ANDROID_CERT_SHA1`);
