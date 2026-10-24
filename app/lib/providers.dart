@@ -16,6 +16,7 @@ import 'services/eliminacion_service.dart';
 import 'services/fincas_service.dart';
 import 'services/fotos_service.dart';
 import 'services/lugares_service.dart';
+import 'services/mapas_sin_senal.dart';
 import 'services/mapas_service.dart';
 import 'services/sync_service.dart';
 
@@ -96,6 +97,13 @@ final fincasDeProductorProvider = StreamProvider.family<List<Finca>, String>(
 );
 
 final mapasServiceProvider = Provider<MapasService>((ref) => MapasService());
+
+final mapasSinSenalProvider = Provider<MapasSinSenal>((ref) => MapasSinSenal());
+
+/// Mapas satelitales (Sentinel-2) ya descargados: se ven sin señal.
+final mapasDescargadosProvider = FutureProvider<List<MapaDescargado>>(
+  (ref) => ref.watch(mapasSinSenalProvider).descargados(),
+);
 
 final datosCelularProvider = Provider<DatosCelular>(
   (ref) => DatosCelular(ref.watch(databaseProvider)),

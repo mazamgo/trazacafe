@@ -22,3 +22,7 @@ Thumbs.db
 
 # Configuración local de Claude Code
 .claude/settings.local.json
+
+# Paquetes de mapa sin señal (decenas de MB; se generan con
+# `npm run mapa-sentinel` y se publican con Hosting)
+app/web/mapas/

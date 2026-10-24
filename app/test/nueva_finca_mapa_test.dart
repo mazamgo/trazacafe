@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart' show DatabaseConnection, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -7,12 +9,15 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart' show sqlite3;
 import 'package:trazacafe/data/database.dart';
 import 'package:trazacafe/domain/busqueda_lugar.dart';
 import 'package:trazacafe/providers.dart';
 import 'package:trazacafe/screens/nueva_finca_screen.dart';
 import 'package:trazacafe/services/auth_service.dart';
 import 'package:trazacafe/services/mapas_service.dart';
+import 'package:trazacafe/services/mapas_sin_senal.dart';
+import 'package:trazacafe/widgets/capa_sin_senal.dart';
 
 /// Nueva finca con el mapa, el buscador y el inicio cerca del terreno.
 /// drift trabaja con tiempo real: los datos se cargan antes de abrir la
@@ -206,6 +211,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Abrir el enlace de Google Maps'), findsOneWidget);
     expect(find.textContaining('No se encontró'), findsNothing);
+  });
+
+  testWidgets('sin señal, con el mapa de la zona descargado, se ve la capa Sentinel-2 con su crédito', (tester) async {
+    final ruta = '${Directory.systemTemp.createTempSync('trazacafe_capa').path}/zona.mbtiles';
+    sqlite3.open(ruta)
+      ..execute('CREATE TABLE tiles (zoom_level integer, tile_column integer, tile_row integer, tile_data blob)')
+      ..close();
+    final mapa = MapaDescargado(
+      PaqueteMapa.desdeJson({
+        'id': 'zona',
+        'nombre': 'Zona',
+        'archivo': 'zona.mbtiles',
+        'bytes': 1,
+        'bounds': [-86.3, 12.95, -85.3, 13.85],
+        'maxzoom': 14,
+        'atribucion': 'Contains modified Copernicus Sentinel data 2026',
+      }),
+      ruta,
+    );
+    await abrir(tester, overrides: [mapasDescargadosProvider.overrideWith((ref) async => [mapa])]);
+    expect(find.byType(CapaSinSenal), findsOneWidget);
+    expect(find.text('Contains modified Copernicus Sentinel data 2026'), findsOneWidget);
+    expect(find.textContaining('se ve el mapa descargado'), findsOneWidget);
   });
 
   testWidgets('las fincas registradas se ven en el mapa con su nombre', (tester) async {

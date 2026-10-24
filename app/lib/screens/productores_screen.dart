@@ -7,6 +7,7 @@ import 'contenedores_screen.dart';
 import 'cultivos_screen.dart';
 import 'equipo_screen.dart';
 import 'lotes_screen.dart';
+import 'mapas_sin_senal_screen.dart';
 import 'finca_screen.dart' show fecha;
 import 'nuevo_productor_screen.dart';
 import 'privacidad_screen.dart';
@@ -74,6 +75,12 @@ class ProductoresScreen extends ConsumerWidget {
                   ),
                   child: const Text('Contenedores'),
                 ),
+              PopupMenuItem(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MapasSinSenalScreen()),
+                ),
+                child: const Text('Mapas sin señal'),
+              ),
               PopupMenuItem(
                 onTap: () => elegirTema(context),
                 child: const Text('Tema'),

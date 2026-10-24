@@ -14,6 +14,7 @@ import '../providers.dart';
 import '../services/fotos_service.dart';
 import '../services/lugares_service.dart';
 import '../widgets/buscador_mapa.dart';
+import '../widgets/capa_sin_senal.dart';
 import '../widgets/mapa_google.dart';
 
 /// Lindero dibujado en modo "nuevo lindero" (se devuelve, no se guarda aquí).
@@ -348,6 +349,7 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
     final vecinas = _fincasVecinas(
       ref.watch(fincasReferenciaProvider).value ?? const [],
     );
+    final descargados = ref.watch(mapasDescargadosProvider).value ?? const [];
 
     final anterior = widget.linderoAnterior;
     // En modo lindero, el mapa arranca sobre la finca.
@@ -445,6 +447,9 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                 },
               ),
               children: [
+                // Debajo de Google: se ve cuando Google no carga (sin señal).
+                for (final m in descargados)
+                  CapaSinSenal(m, key: ValueKey(m.ruta)),
                 if (sesionMapa != null) capaGoogle(sesionMapa),
                 // Fincas ya registradas, en gris: para ubicarse y no
                 // registrar dos veces el mismo terreno.
@@ -559,19 +564,25 @@ class _NuevaFincaScreenState extends ConsumerState<NuevaFincaScreen> {
                     servicio: ref.read(mapasServiceProvider),
                   )
                 else
-                  const Align(
+                  Align(
                     alignment: Alignment.topCenter,
                     child: Card(
-                      margin: EdgeInsets.all(8),
+                      margin: const EdgeInsets.all(8),
                       child: Padding(
-                        padding: EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(8),
                         child: Text(
-                          'Sin señal: el mapa no carga, pero puedes marcar\nlos linderos con "Agregar mi ubicación".',
+                          descargados.isEmpty
+                              ? 'Sin señal: el mapa no carga, pero puedes marcar\n'
+                                    'los linderos con "Agregar mi ubicación".\n'
+                                    'Descarga el mapa de tu zona en ⋮ → Mapas sin señal.'
+                              : 'Sin señal: se ve el mapa descargado (10 m).\n'
+                                    'Marca los linderos con "Agregar mi ubicación".',
                           textAlign: TextAlign.center,
                         ),
                       ),
                     ),
                   ),
+                if (descargados.isNotEmpty) AtribucionSinSenal(descargados),
               ],
             ),
           ),

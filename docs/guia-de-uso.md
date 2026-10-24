@@ -84,7 +84,10 @@ En **⋮ → Privacidad y datos → Eliminar mi cuenta**. La app primero envía 
 6. Toca **Guardar finca**.
 
 **Consejos:**
-- **Sin señal** el mapa no carga, pero los puntos se marcan igual con el GPS. La lupa y **Ir a mi ubicación** también funcionan.
+- **Sin señal** el mapa de Google no carga, pero los puntos se marcan igual con el GPS. La lupa y **Ir a mi ubicación** también funcionan.
+- **Mapa sin señal:** antes de salir, con Wi-Fi, descarga el mapa satelital de tu zona en **⋮ → Mapas sin señal**. En la montaña, sin señal, "Nueva finca" lo muestra en lugar del de Google.
+  - Es de menor detalle (10 m por píxel, imágenes Sentinel-2 de la época seca): se ven bosque, claros, caminos y ríos, no cada mata. Sirve para ubicarte; el lindero se sigue marcando caminando con el GPS.
+  - Si miraste la zona en el mapa de Google con señal ese mismo día, también se sigue viendo sin señal hasta el día siguiente.
 - **Con señal, desde la oficina**, puedes buscar la comunidad y revisar el terreno en el satélite antes de ir. Los puntos se marcan en campo.
 - **El polígono no puede cruzarse** sobre sí mismo. Camina el borde en orden, sin saltar de un lado al otro.
 
@@ -281,6 +284,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | Una entrega "no puede ir en un lote" | Revisa el motivo: falta la visita de la temporada, la finca está en rojo, o es de otra temporada o cultivo. |
 | El contenedor "todavía no se puede cerrar" | Falta el número de contenedor o hay fincas sin chequeo verde. La app las nombra. |
 | El mapa no carga | Sin señal no hay mapa, pero el GPS sigue marcando puntos con **Agregar mi ubicación**. |
+| Sin señal el mapa se ve gris | Descarga el mapa de tu zona con Wi-Fi en **⋮ → Mapas sin señal**. Si tu zona no está en la lista, pídeselo al administrador. |
 | El mapa abre lejos de la finca | Toca **Ir a mi ubicación**, o busca la comunidad con la **lupa**. Si la comunidad no aparece, prueba con una cercana o con el municipio. |
 | "Eres el único administrador" al eliminar tu cuenta | Invita a otro administrador en **Equipo** (o elimina la organización) y vuelve a intentarlo. |
 | Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |

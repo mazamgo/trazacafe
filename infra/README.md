@@ -429,6 +429,16 @@ La misma publicación sirve también `/eliminar-datos` y `/privacidad` (§4j). E
 
 **Encabezados de seguridad** (`firebase.json`): las páginas (`/`, `/eliminar-datos`, `/privacidad`, `/v/…`) no se pueden mostrar dentro de otro sitio (`X-Frame-Options: DENY` y `frame-ancestors 'none'`, contra clickjacking), y llevan `nosniff` y `Referrer-Policy`. Las rutas reservadas de Firebase (`/__/auth/…`, que usa el login con Google) no los llevan. Después de publicar, se revisan con `curl -I https://trazacafe-dev.web.app/eliminar-datos`.
 
+**Mapas sin señal** (`/mapas/indice.json` y `/mapas/<zona>.mbtiles`): la app los descarga desde esta misma publicación (⋮ → Mapas sin señal). Son imágenes Sentinel-2 de Copernicus (gratis, también para uso comercial, con el crédito "Contains modified Copernicus Sentinel data"), porque Google no permite guardar su mapa para usarlo sin conexión: sus mosaicos se guardan como máximo 24 horas (`max-age=86400, must-revalidate`).
+- **Generar una zona** (desde `backend/`; lee del catálogo público de AWS, sin cuentas; Jinotega tarda cerca de una hora):
+
+  ```bash
+  npm run mapa-sentinel -- --id jinotega --nombre "Jinotega (zona cafetalera)" --bbox=-86.30,12.95,-85.30,13.85 --desde 2025-12-01 --hasta 2026-05-15
+  ```
+
+  Escribe `app/web/mapas/<id>.mbtiles` (zooms 8–14, JPEG) y actualiza `indice.json`. La carpeta no va al repositorio: hay que generarla, o copiarla, en la computadora que publica Hosting.
+- Firebase Hosting acepta archivos de hasta 2 GB. Si hay muchas zonas, pasarlas a un bucket de Cloud Storage.
+
 Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas las rutas a `index.html`):
 
 ```powershell
