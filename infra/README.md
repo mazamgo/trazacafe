@@ -436,7 +436,20 @@ La misma publicación sirve también `/eliminar-datos` y `/privacidad` (§4j). E
   npm run mapa-sentinel -- --id jinotega --nombre "Jinotega (zona cafetalera)" --bbox=-86.30,12.95,-85.30,13.85 --desde 2025-12-01 --hasta 2026-05-15
   ```
 
-  Escribe `app/web/mapas/<id>.mbtiles` (zooms 8–14, JPEG) y actualiza `indice.json`. La carpeta no va al repositorio: hay que generarla, o copiarla, en la computadora que publica Hosting.
+  Escribe `app/web/mapas/<id>.mbtiles` (zooms 8–14, JPEG) y actualiza `indice.json`. Si se corta la red, repetir con `--continuar`: no rehace los bloques listos.
+- **Zonas** (imágenes de la época seca, `--desde 2025-12-01 --hasta 2026-05-15`; el `--bbox` es oeste,sur,este,norte):
+
+  | `--id` | `--nombre` | `--bbox=` |
+  |---|---|---|
+  | `jinotega` | Jinotega (zona cafetalera) | `-86.30,12.95,-85.30,13.85` |
+  | `matagalpa` | Matagalpa | `-86.15,12.50,-85.20,12.95` |
+  | `nueva-segovia` | Nueva Segovia | `-86.75,13.40,-85.75,14.00` |
+  | `madriz` | Madriz | `-86.75,13.20,-86.15,13.75` |
+  | `esteli` | Estelí | `-86.65,12.85,-86.10,13.40` |
+  | `waslala-siuna` | Waslala y Siuna | `-85.30,13.10,-84.85,13.70` |
+  | `rio-san-juan` | Río San Juan | `-85.00,10.90,-84.10,11.60` |
+
+  Algunas zonas se traslapan en los bordes; la app dibuja las dos capas y se ve igual. La carpeta no va al repositorio: hay que generarla, o copiarla, en la computadora que publica Hosting.
 - Firebase Hosting acepta archivos de hasta 2 GB. Si hay muchas zonas, pasarlas a un bucket de Cloud Storage.
 
 Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas las rutas a `index.html`):

@@ -435,7 +435,8 @@ Con 5 o 10 organizaciones eso no alcanza.
   - Google no permite guardar su mapa para usarlo sin conexión (solo 24 horas de caché).
   - Se probó una capa propia con imágenes **Sentinel-2** de Copernicus (gratis, también para uso comercial, 10 m por píxel), que se descarga por zona en ⋮ → Mapas sin señal y se ve debajo de Google.
   - Primera zona: Jinotega, la zona cafetalera (50 MB, publicada en Hosting el 24/10/2026; `infra/README.md` §6).
-  - **Falta:** que Mauricio la vea en el Samsung y decida si 10 m alcanzan, o si conviene una licencia comercial de EOX (mosaico más parejo) o Mapbox (más detalle, con costo por mosaico y cambio de SDK). Si sirve, agregar Matagalpa, Nueva Segovia, Madriz, Estelí, Waslala y Río San Juan.
+  - **28/10/2026:** se publican en Hosting Matagalpa, Nueva Segovia, Madriz, Estelí, Waslala y Siuna, y Río San Juan: 7 zonas en total, de 21 a 50 MB cada una (lista y comandos en `infra/README.md` §6).
+  - **Queda por evaluar:** con el piloto, si 10 m alcanzan o si conviene una licencia comercial de EOX (mosaico más parejo) o Mapbox (más detalle, con costo por mosaico y cambio de SDK).
 
 ## Fase 5 — Rentabilidad en Nicaragua (desde el primer piloto)
 **Paquetes (hipótesis a validar en la Fase 0):**

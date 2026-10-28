@@ -86,6 +86,7 @@ En **⋮ → Privacidad y datos → Eliminar mi cuenta**. La app primero envía 
 **Consejos:**
 - **Sin señal** el mapa de Google no carga, pero los puntos se marcan igual con el GPS. La lupa y **Ir a mi ubicación** también funcionan.
 - **Mapa sin señal:** antes de salir, con Wi-Fi, descarga el mapa satelital de tu zona en **⋮ → Mapas sin señal**. En la montaña, sin señal, "Nueva finca" lo muestra en lugar del de Google.
+  - Zonas disponibles: Jinotega, Matagalpa, Nueva Segovia, Madriz, Estelí, Waslala y Siuna, y Río San Juan (de 20 a 50 MB cada una). Descarga solo las de tu zona.
   - Es de menor detalle (10 m por píxel, imágenes Sentinel-2 de la época seca): se ven bosque, claros, caminos y ríos, no cada mata. Sirve para ubicarte; el lindero se sigue marcando caminando con el GPS.
   - Si miraste la zona en el mapa de Google con señal ese mismo día, también se sigue viendo sin señal hasta el día siguiente.
 - **Con señal, desde la oficina**, puedes buscar la comunidad y revisar el terreno en el satélite antes de ir. Los puntos se marcan en campo.
