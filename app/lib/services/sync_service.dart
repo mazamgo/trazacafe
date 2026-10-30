@@ -202,6 +202,8 @@ class SyncService {
                   organizacion['eliminacionProgramada'] as String?,
               ClaveAjuste.solicitudesPendientes:
                   '${(d['solicitudesPendientes'] as int?) ?? 0}',
+              ClaveAjuste.organizacionNombre: organizacion['nombre'] as String?,
+              ClaveAjuste.organizacionTipo: organizacion['tipo'] as String?,
             },
       temporadas: [
         for (final t in lista('temporadas'))

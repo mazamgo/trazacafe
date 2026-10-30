@@ -2,6 +2,10 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'red_proveedores.dart';
+
+export 'red_proveedores.dart';
+
 /// URL de la API. En el emulador de Android, 10.0.2.2 es el localhost de la
 /// computadora. Para Cloud Run: `flutter run --dart-define=API_URL=https://...`
 const apiUrl = String.fromEnvironment(
@@ -138,11 +142,53 @@ class EntregaDeLote {
     required this.estado,
     required this.fecha,
   });
+
+  /// Alias ("Finca 3F2A") en un lote comprado si la proveedora no comparte nombres.
   final String fincaNombre;
-  final String productorNombre;
+
+  /// `null` en un lote comprado si la proveedora no comparte nombres.
+  final String? productorNombre;
   final double kg;
   final String estado;
   final DateTime fecha;
+}
+
+/// Venta de un lote a una exportadora (o compra, en un lote recibido).
+class VentaLote {
+  VentaLote({
+    required this.vinculoId,
+    required this.cliente,
+    required this.recibido,
+    required this.kgEnviados,
+    required this.fechaEnvio,
+    required this.kgRecibidos,
+    required this.fechaRecibido,
+    required this.enContenedor,
+  });
+
+  factory VentaLote.desdeJson(Map<String, dynamic> j) => VentaLote(
+    vinculoId: j['vinculoId'] as String,
+    cliente: j['cliente'] as String,
+    recibido: j['estado'] == 'recibido',
+    kgEnviados: (j['kgEnviados'] as num).toDouble(),
+    fechaEnvio: DateTime.parse(j['fechaEnvio'] as String),
+    kgRecibidos: (j['kgRecibidos'] as num?)?.toDouble(),
+    fechaRecibido: j['fechaRecibido'] == null
+        ? null
+        : DateTime.parse(j['fechaRecibido'] as String),
+    enContenedor: j['enContenedor'] as bool? ?? false,
+  );
+
+  final String vinculoId;
+  final String cliente;
+  final bool recibido;
+  final double kgEnviados;
+  final DateTime fechaEnvio;
+  final double? kgRecibidos;
+  final DateTime? fechaRecibido;
+
+  /// Ya va en un contenedor de la exportadora: la venta no se deshace.
+  final bool enContenedor;
 }
 
 class Lote {
@@ -161,6 +207,8 @@ class Lote {
     required this.creadoEn,
     required this.entregas,
     this.exportacionCodigo,
+    this.proveedor,
+    this.venta,
   });
 
   factory Lote.desdeJson(Map<String, dynamic> j) => Lote(
@@ -179,12 +227,16 @@ class Lote {
     ],
     attestationUid: j['attestationUid'] as String?,
     exportacionCodigo: j['exportacionCodigo'] as String?,
+    proveedor: j['proveedor'] as String?,
+    venta: j['venta'] == null
+        ? null
+        : VentaLote.desdeJson(j['venta'] as Map<String, dynamic>),
     creadoEn: DateTime.parse(j['creadoEn'] as String).toLocal(),
     entregas: [
       for (final e in (j['entregas'] as List? ?? const []).cast<Map>())
         EntregaDeLote(
           fincaNombre: e['fincaNombre'] as String,
-          productorNombre: e['productorNombre'] as String,
+          productorNombre: e['productorNombre'] as String?,
           kg: (e['kg'] as num).toDouble(),
           estado: e['estado'] as String,
           fecha: DateTime.parse(e['fecha'] as String).toLocal(),
@@ -211,8 +263,22 @@ class Lote {
   /// Ya está en la blockchain: no se puede deshacer.
   bool get atestado => attestationUid != null;
 
-  /// Contenedor en que va, o `null` si está libre.
+  /// Contenedor (de esta organización) en que va, o `null` si está libre.
   final String? exportacionCodigo;
+
+  /// Lote comprado: la organización que lo vendió; `null` si es propio.
+  final String? proveedor;
+
+  /// Venta a una exportadora (en un lote propio) o compra (en uno comprado).
+  final VentaLote? venta;
+
+  /// Propio y vendido a otra organización: ya no se corrige ni se pone en
+  /// un contenedor propio.
+  bool get vendido => proveedor == null && venta != null;
+
+  /// Kg con que cuenta en un contenedor: los recibidos si se compró.
+  double get kgEnContenedor =>
+      proveedor != null ? venta?.kgRecibidos ?? kg : kg;
   final DateTime creadoEn;
   final List<EntregaDeLote> entregas;
 }
@@ -261,6 +327,7 @@ class Exportacion {
             kg: (l['kg'] as num).toDouble(),
             estado: l['estado'] as String,
             temporada: l['temporadaNombre'] as String,
+            proveedor: l['proveedor'] as String?,
           ),
       ],
       entregas: r['entregas'] as int,
@@ -292,7 +359,17 @@ class Exportacion {
   /// Ya está en la blockchain: ni la DDS se puede cambiar.
   bool get atestada => attestationUid != null;
   final double kg;
-  final List<({String codigo, double kg, String estado, String temporada})>
+
+  /// `proveedor`: el lote se compró a otra organización.
+  final List<
+    ({
+      String codigo,
+      double kg,
+      String estado,
+      String temporada,
+      String? proveedor,
+    })
+  >
   lotes;
   final int entregas;
   final int fincas;
@@ -582,6 +659,135 @@ class ApiClient {
   Future<void> quitarAcceso(String email) =>
       _pedir('DELETE', '/v1/invitaciones/${Uri.encodeComponent(email)}');
 
+  // Red de proveedores (Fase 2b).
+
+  /// Exportadora: sus proveedoras y los lotes que le enviaron sin recibir.
+  Future<({List<Vinculo> proveedores, List<LotePorRecibir> porRecibir})>
+  proveedores() async {
+    final r = await _pedir('GET', '/v1/proveedores');
+    return (
+      proveedores: [
+        for (final v in (r['proveedores'] as List).cast<Map<String, dynamic>>())
+          Vinculo.desdeJson(v),
+      ],
+      porRecibir: [
+        for (final l in (r['porRecibir'] as List).cast<Map<String, dynamic>>())
+          LotePorRecibir.desdeJson(l),
+      ],
+    );
+  }
+
+  /// Invita a la organización del administrador con ese correo.
+  Future<void> invitarProveedor(String email) =>
+      _pedir('POST', '/v1/proveedores', {'email': email});
+
+  /// Termina el vínculo con una proveedora (o cancela la invitación).
+  Future<void> terminarProveedor(String id) =>
+      _pedir('DELETE', '/v1/proveedores/${Uri.encodeComponent(id)}');
+
+  /// Confirma los kg recibidos; devuelve el aviso si no coinciden.
+  Future<AvisoLote?> recibirLote(
+    String loteId, {
+    required double kg,
+    required DateTime fecha,
+  }) async {
+    final r = await _pedirJson(
+      'POST',
+      '/v1/proveedores/lotes/${Uri.encodeComponent(loteId)}/recibir',
+      {'kgRecibidos': kg, 'fecha': _dia(fecha)},
+      reintentable: true,
+    );
+    final a = r['aviso'] as Map?;
+    return a == null
+        ? null
+        : AvisoLote(a['codigo'] as String, a['mensaje'] as String);
+  }
+
+  Future<RevisionProveedor> revisionProveedor(String id) async =>
+      RevisionProveedor.desdeJson(
+        await _pedir(
+          'GET',
+          '/v1/proveedores/${Uri.encodeComponent(id)}/revision',
+        ),
+      );
+
+  /// Cooperativa: sus clientes, con las invitaciones por responder.
+  Future<List<Vinculo>> clientes() async {
+    final r = await _pedir('GET', '/v1/clientes');
+    return [
+      for (final v in (r['clientes'] as List).cast<Map<String, dynamic>>())
+        Vinculo.desdeJson(v),
+    ];
+  }
+
+  Future<void> responderCliente(
+    String id, {
+    required bool aceptar,
+    bool comparteNombres = false,
+  }) => _pedir(
+    'POST',
+    '/v1/clientes/${Uri.encodeComponent(id)}/${aceptar ? 'aceptar' : 'rechazar'}',
+    {if (aceptar) 'comparteNombres': comparteNombres},
+  );
+
+  Future<void> compartirNombres(String id, bool comparte) => _pedir(
+    'PATCH',
+    '/v1/clientes/${Uri.encodeComponent(id)}',
+    {'comparteNombres': comparte},
+  );
+
+  Future<void> terminarCliente(String id) =>
+      _pedir('DELETE', '/v1/clientes/${Uri.encodeComponent(id)}');
+
+  /// Vende el lote a un cliente activo; devuelve el lote actualizado.
+  Future<Lote> venderLote(
+    String loteId, {
+    required String vinculoId,
+    required double kg,
+    required DateTime fecha,
+  }) async => Lote.desdeJson(
+    await _pedir('POST', '/v1/lotes/${Uri.encodeComponent(loteId)}/venta', {
+      'vinculoId': vinculoId,
+      'kg': kg,
+      'fecha': _dia(fecha),
+    }),
+  );
+
+  Future<void> deshacerVenta(String loteId) =>
+      _pedir('DELETE', '/v1/lotes/${Uri.encodeComponent(loteId)}/venta');
+
+  Future<List<Observacion>> observaciones() async {
+    final r = await _pedir('GET', '/v1/observaciones');
+    return [
+      for (final o in (r['observaciones'] as List).cast<Map<String, dynamic>>())
+        Observacion.desdeJson(o),
+    ];
+  }
+
+  /// La exportadora observa una finca o un lote de su proveedora.
+  Future<void> observar({
+    String? fincaId,
+    String? loteId,
+    required String texto,
+  }) => _pedir('POST', '/v1/observaciones', {
+    'fincaId': ?fincaId,
+    'loteId': ?loteId,
+    'texto': texto,
+  });
+
+  Future<void> responderObservacion(String id, String texto) => _pedir(
+    'POST',
+    '/v1/observaciones/${Uri.encodeComponent(id)}/respuesta',
+    {'texto': texto},
+  );
+
+  Future<AvisosRed> avisosRed() async =>
+      AvisosRed.desdeJson(await _pedir('GET', '/v1/red/avisos'));
+
+  /// Día local como AAAA-MM-DD.
+  static String _dia(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   /// Solicitudes de productores que pidieron borrar sus datos (administradores).
   Future<List<SolicitudEliminacion>> solicitudesEliminacion() async {
     final r = await _pedir('GET', '/v1/solicitudes-eliminacion');
@@ -732,7 +938,7 @@ class ApiClient {
     return switch (status) {
       401 => 'La sesión venció. Vuelve a iniciar sesión.',
       403 || 409 => propio ?? cuerpo['error'] as String? ?? 'Sin permiso.',
-      404 => 'No encontrado.',
+      404 => propio ?? 'No encontrado.',
       422 => propio ?? 'Datos rechazados: ${detalles ?? cuerpo['error']}',
       _ => 'Error del servidor ($status).',
     };

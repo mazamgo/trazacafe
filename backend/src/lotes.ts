@@ -49,7 +49,8 @@ export interface EntregaCandidata {
 }
 
 export interface Aviso {
-  codigo: "volumen" | "rendimiento" | "satelite";
+  /** `diferencia`: la exportadora recibió otros kg que los enviados (Fase 2b). */
+  codigo: "volumen" | "rendimiento" | "satelite" | "diferencia";
   mensaje: string;
 }
 

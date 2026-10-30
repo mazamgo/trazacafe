@@ -59,7 +59,7 @@ export async function registrarContenedorEnTx(
     `INSERT INTO consumos (id, organizacion_id, tipo, contrato_id, exportacion_id, codigo, numero_contenedor,
                            cultivo, kg, precio_usd, creado_por)
      SELECT $1, x.organizacion_id, 'contenedor', ct.id, x.id, x.codigo, x.contenedor, x.cultivo,
-            coalesce((SELECT sum(l.kg) FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
+            coalesce((SELECT sum(kg_en_contenedor(el.lote_id)) FROM exportacion_lotes el
                       WHERE el.exportacion_id = x.id), 0),
             ct.precio_contenedor_usd, $4
      FROM exportaciones x

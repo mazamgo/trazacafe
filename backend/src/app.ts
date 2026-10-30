@@ -25,6 +25,15 @@ import {
 import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
 import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
 import { geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
+import {
+  invitarProveedorSchema,
+  observacionSchema,
+  recepcionSchema,
+  respuestaObservacionSchema,
+  respuestaVinculoSchema,
+  ventaSchema,
+  type Proveedores,
+} from "./proveedores.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
 import { UID_VALIDO, type Verificador } from "./verificador.ts";
@@ -68,6 +77,7 @@ export function buildApp({
   correcciones = null,
   verificador = null,
   eliminaciones = null,
+  proveedores = null,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
@@ -84,6 +94,8 @@ export function buildApp({
   verificador?: Verificador | null;
   /** Eliminación de productores, cuentas y organizaciones (EliminacionesPg). */
   eliminaciones?: Eliminaciones | null;
+  /** Red de proveedores: vínculos, venta de lotes y observaciones (ProveedoresPg). */
+  proveedores?: Proveedores | null;
 }) {
   // trustProxy: solo se confía en el primer salto (el frontal de Cloud Run),
   // que agrega la IP real al final de X-Forwarded-For. Con `true` se tomaría la
@@ -648,7 +660,172 @@ export function buildApp({
         mensaje: "El lote ya está en la blockchain o en un contenedor; no se puede deshacer.",
       });
     }
+    if (r === "vendido") {
+      return reply.code(409).send({ error: "vendido", mensaje: "El lote está vendido; para deshacerlo, primero deshaz la venta." });
+    }
     return reply.code(204).send();
+  });
+
+  // Red de proveedores (Fase 2b): la exportadora invita y recibe; la
+  // cooperativa acepta y vende. Todo es de administradores.
+
+  /**
+   * Administrador con la red disponible; con [id], además un uuid válido.
+   * `null` si ya se respondió.
+   */
+  async function red(req: FastifyRequest, reply: FastifyReply, id?: string) {
+    const admin = await activo(req, reply, true);
+    if (!admin) return null;
+    if (!proveedores) {
+      reply.code(503).send({ error: "sin_proveedores" });
+      return null;
+    }
+    if (id !== undefined && !z.uuid().safeParse(id).success) {
+      reply.code(404).send({ error: "no_encontrado" });
+      return null;
+    }
+    return { admin, proveedores };
+  }
+
+  /** Cuerpo validado, o `null` si ya se respondió 422. */
+  function cuerpo<S extends z.ZodType>(schema: S, req: FastifyRequest, reply: FastifyReply): z.infer<S> | null {
+    const r = schema.safeParse(req.body);
+    if (r.success) return r.data;
+    reply.code(422).send({ error: "Datos inválidos", mensaje: r.error.issues[0]?.message, detalles: r.error.issues });
+    return null;
+  }
+
+  /** Traduce un Resultado de error a su respuesta; `true` si salió bien. */
+  function resuelto<T>(r: Resultado<T>, reply: FastifyReply): r is { ok: true; valor: T } {
+    if (!r.ok) reply.code(r.status).send({ error: "no_permitido", mensaje: r.mensaje });
+    return r.ok;
+  }
+
+  /** Exportadora: sus proveedoras y los lotes que le enviaron y no ha recibido. */
+  app.get("/v1/proveedores", async (req, reply) => {
+    const x = await red(req, reply);
+    if (!x) return;
+    const vinculos = await x.proveedores.vinculos(x.admin.organizacionId);
+    return {
+      proveedores: vinculos.filter((v) => v.soy === "cliente"),
+      porRecibir: await x.proveedores.porRecibir(x.admin.organizacionId),
+    };
+  });
+
+  app.post("/v1/proveedores", async (req, reply) => {
+    const x = await red(req, reply);
+    if (!x) return;
+    const d = cuerpo(invitarProveedorSchema, req, reply);
+    if (!d) return;
+    const r = await x.proveedores.invitar(x.admin, d.email);
+    if (resuelto(r, reply)) return reply.code(201).send(r.valor);
+  });
+
+  /** Cualquiera de las dos termina el vínculo (o cancela la invitación). */
+  app.delete<{ Params: { id: string } }>("/v1/proveedores/:id", async (req, reply) => {
+    const x = await red(req, reply, req.params.id);
+    if (!x) return;
+    if (resuelto(await x.proveedores.terminar(x.admin, req.params.id), reply)) return reply.code(204).send();
+  });
+
+  app.post<{ Params: { loteId: string } }>("/v1/proveedores/lotes/:loteId/recibir", async (req, reply) => {
+    const x = await red(req, reply, req.params.loteId);
+    if (!x) return;
+    const d = cuerpo(recepcionSchema, req, reply);
+    if (!d) return;
+    const r = await x.proveedores.recibir(x.admin, req.params.loteId, d);
+    if (resuelto(r, reply)) return r.valor;
+  });
+
+  /** Revisión de solo lectura de lo que vendió una proveedora (vínculo activo). */
+  app.get<{ Params: { id: string } }>("/v1/proveedores/:id/revision", async (req, reply) => {
+    const x = await red(req, reply, req.params.id);
+    if (!x) return;
+    const r = await x.proveedores.revision(x.admin.organizacionId, req.params.id);
+    if (resuelto(r, reply)) return r.valor;
+  });
+
+  /** Cooperativa: sus clientes, con las invitaciones por responder. */
+  app.get("/v1/clientes", async (req, reply) => {
+    const x = await red(req, reply);
+    if (!x) return;
+    const vinculos = await x.proveedores.vinculos(x.admin.organizacionId);
+    return { clientes: vinculos.filter((v) => v.soy === "proveedora") };
+  });
+
+  for (const accion of ["aceptar", "rechazar"] as const) {
+    app.post<{ Params: { id: string } }>(`/v1/clientes/:id/${accion}`, async (req, reply) => {
+      const x = await red(req, reply, req.params.id);
+      if (!x) return;
+      const d = accion === "aceptar" ? cuerpo(respuestaVinculoSchema, req, reply) : { comparteNombres: false };
+      if (!d) return;
+      const r = await x.proveedores.responder(x.admin, req.params.id, accion === "aceptar", d.comparteNombres);
+      if (resuelto(r, reply)) return r.valor;
+    });
+  }
+
+  app.patch<{ Params: { id: string } }>("/v1/clientes/:id", async (req, reply) => {
+    const x = await red(req, reply, req.params.id);
+    if (!x) return;
+    const d = cuerpo(respuestaVinculoSchema, req, reply);
+    if (!d) return;
+    const r = await x.proveedores.cambiarNombres(x.admin, req.params.id, d.comparteNombres);
+    if (resuelto(r, reply)) return r.valor;
+  });
+
+  app.delete<{ Params: { id: string } }>("/v1/clientes/:id", async (req, reply) => {
+    const x = await red(req, reply, req.params.id);
+    if (!x) return;
+    if (resuelto(await x.proveedores.terminar(x.admin, req.params.id), reply)) return reply.code(204).send();
+  });
+
+  /** La cooperativa vende un lote a un cliente activo; responde el lote actualizado. */
+  app.post<{ Params: { id: string } }>("/v1/lotes/:id/venta", async (req, reply) => {
+    const x = await red(req, reply, req.params.id);
+    if (!x) return;
+    const d = cuerpo(ventaSchema, req, reply);
+    if (!d) return;
+    if (!resuelto(await x.proveedores.vender(x.admin, req.params.id, d), reply)) return;
+    return (await repo.listarLotes(x.admin.organizacionId)).find((l) => l.id === req.params.id);
+  });
+
+  app.delete<{ Params: { id: string } }>("/v1/lotes/:id/venta", async (req, reply) => {
+    const x = await red(req, reply, req.params.id);
+    if (!x) return;
+    if (resuelto(await x.proveedores.deshacerVenta(x.admin, req.params.id), reply)) return reply.code(204).send();
+  });
+
+  /** Las hechas (exportadora) y las recibidas (cooperativa). */
+  app.get("/v1/observaciones", async (req, reply) => {
+    const x = await red(req, reply);
+    if (!x) return;
+    return { observaciones: await x.proveedores.observaciones(x.admin.organizacionId) };
+  });
+
+  app.post("/v1/observaciones", async (req, reply) => {
+    const x = await red(req, reply);
+    if (!x) return;
+    const d = cuerpo(observacionSchema, req, reply);
+    if (!d) return;
+    const r = await x.proveedores.observar(x.admin, d);
+    if (resuelto(r, reply)) return reply.code(201).send(r.valor);
+  });
+
+  app.post<{ Params: { id: string } }>("/v1/observaciones/:id/respuesta", async (req, reply) => {
+    const x = await red(req, reply, req.params.id);
+    if (!x) return;
+    const d = cuerpo(respuestaObservacionSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.proveedores.responderObservacion(x.admin, req.params.id, d.texto), reply)) {
+      return reply.code(204).send();
+    }
+  });
+
+  /** Lo pendiente en la red, para los avisos de la pantalla de inicio. */
+  app.get("/v1/red/avisos", async (req, reply) => {
+    const x = await red(req, reply);
+    if (!x) return;
+    return x.proveedores.avisos(x.admin.organizacionId);
   });
 
   /** Contenedores de exportación (solo administradores). */

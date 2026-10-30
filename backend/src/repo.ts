@@ -4,6 +4,7 @@ import type { Rol, UsuarioActivo } from "./auth.ts";
 import { registrarContenedorEnTx } from "./cobros.ts";
 import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "./exportaciones.ts";
 import { avisoSatelite, type Aviso, type EntregaCandidata, type LoteNuevo } from "./lotes.ts";
+import { avisoDiferencia, type VentaLote } from "./proveedores.ts";
 import type { LoteSync, TemporadaNueva } from "./sync.ts";
 
 export class AccesoDenegado extends Error {}
@@ -47,13 +48,18 @@ export interface Lote {
   avisos: Aviso[];
   attestationUid: string | null;
   creadoEn: string;
-  /** Código del contenedor en que va, o `null`. */
+  /** Código del contenedor (de esta organización) en que va, o `null`. */
   exportacionCodigo: string | null;
+  /** Lote comprado a otra organización: su nombre; `null` si es propio. */
+  proveedor: string | null;
+  /** Venta a una exportadora (o compra, si `proveedor`), o `null`. */
+  venta: VentaLote | null;
   entregas: {
     id: string;
     fincaId: string;
+    /** Alias ("Finca 3F2A") en lotes comprados si la proveedora no comparte nombres. */
     fincaNombre: string;
-    productorNombre: string;
+    productorNombre: string | null;
     kg: number;
     estado: string;
     fecha: string;
@@ -63,7 +69,7 @@ export interface Lote {
 export type DatosLote = LoteNuevo & { id: string; beneficio: string; kgEsperados: number; avisos: Aviso[] };
 
 export type ResultadoGuardarLote = "creado" | "codigo_repetido" | "entrega_ocupada";
-export type ResultadoEliminarLote = "eliminado" | "no_encontrado" | "atestado";
+export type ResultadoEliminarLote = "eliminado" | "no_encontrado" | "atestado" | "vendido";
 
 /** Contenedor de exportación con sus lotes y el resumen para el paquete EUDR. */
 export interface Exportacion {
@@ -79,7 +85,8 @@ export interface Exportacion {
   attestationUid: string | null;
   creadoEn: string;
   kg: number;
-  lotes: { id: string; codigo: string; kg: number; estado: string; temporadaNombre: string }[];
+  /** Kg con que cuenta cada lote (los recibidos, si se compró); `proveedor` si es de otra organización. */
+  lotes: { id: string; codigo: string; kg: number; estado: string; temporadaNombre: string; proveedor: string | null }[];
   /** Fincas de origen de todas sus entregas. */
   resumen: { entregas: number; fincas: number; areaOficialHa: number; fincasSinVerde: number };
 }
@@ -89,8 +96,12 @@ export type ResultadoGuardarExportacion = "creada" | "codigo_repetido" | "lote_o
 /** Finca de origen de un contenedor, con lo que piden TRACES y el comprador. */
 export interface FincaDePaquete {
   id: string;
+  /** Alias ("Finca 3F2A") si es de una proveedora que no comparte nombres. */
   nombre: string;
-  productorNombre: string;
+  /** `null` si es de una proveedora que no comparte nombres. */
+  productorNombre: string | null;
+  /** Organización proveedora; `null` si la finca es de quien exporta. */
+  proveedor: string | null;
   comunidad: string | null;
   /** GeoJSON del lindero vigente (punto si mide menos de 4 ha). */
   geometria: { type: string; coordinates: unknown };
@@ -107,6 +118,8 @@ export interface FincaDePaquete {
 
 export interface Paquete {
   organizacion: string;
+  /** Organizaciones que vendieron lotes del contenedor (Fase 2b). */
+  proveedores: string[];
   exportacion: Exportacion;
   fincas: FincaDePaquete[];
 }
@@ -311,6 +324,19 @@ const COLUMNAS_INVITACION = `email, organizacion_id AS "organizacionId", rol, in
  */
 export const AREA_OFICIAL = (t: string) =>
   `(CASE WHEN GeometryType(${t}.geom) = 'POINT' THEN ${t}.area_ha ELSE ${t}.area_oficial_ha END)`;
+
+/**
+ * ¿Ve [cliente] los nombres de fincas y productores de [orgProductor]? Los
+ * suyos siempre; los de una proveedora, solo si en un vínculo activo aceptó
+ * compartirlos (Ley 787). Si no, la finca se muestra con su alias.
+ */
+export const NOMBRES_VISIBLES = (orgProductor: string, cliente: string) =>
+  `(${orgProductor} = ${cliente} OR EXISTS (
+     SELECT 1 FROM vinculos vi WHERE vi.proveedora_id = ${orgProductor} AND vi.cliente_id = ${cliente}
+       AND vi.estado = 'activo' AND vi.comparte_nombres))`;
+
+/** "Finca 3F2A": alias estable de una finca (las 4 primeras letras de su id). */
+export const ALIAS_FINCA = (f: string) => `('Finca ' || upper(left(${f}.id::text, 4)))`;
 
 export const TEMPORADA_DE = (org: string, fecha: string, finca: string) =>
   `(SELECT t.id FROM temporadas t, fincas fx
@@ -749,38 +775,61 @@ export class PgRepo implements Repo {
     }
   }
 
+  /** Los lotes propios y los comprados a proveedoras (ya recibidos). */
   async listarLotes(organizacionId: string): Promise<Lote[]> {
     const { rows } = await this.pool.query(
       `SELECT l.id, l.codigo, l.cultivo, l.temporada_id AS "temporadaId", t.nombre AS "temporadaNombre", l.estado,
               l.kg::float8 AS kg, l.kg_esperados::float8 AS "kgEsperados", l.beneficio, l.proceso, l.avisos,
               l.attestation_uid AS "attestationUid", l.creado_en AS "creadoEn",
               (SELECT x.codigo FROM exportacion_lotes el JOIN exportaciones x ON x.id = el.exportacion_id
-                WHERE el.lote_id = l.id) AS "exportacionCodigo",
+                WHERE el.lote_id = l.id AND x.organizacion_id = $1) AS "exportacionCodigo",
+              CASE WHEN l.organizacion_id <> $1 THEN po.nombre END AS proveedor,
+              (SELECT json_build_object(
+                        'vinculoId', v.vinculo_id, 'cliente', co.nombre, 'estado', v.estado,
+                        'kgEnviados', v.kg_enviados::float8, 'fechaEnvio', to_char(v.fecha_envio, 'YYYY-MM-DD'),
+                        'kgRecibidos', v.kg_recibidos::float8, 'fechaRecibido', to_char(v.fecha_recibido, 'YYYY-MM-DD'),
+                        'enContenedor', EXISTS (SELECT 1 FROM exportacion_lotes el WHERE el.lote_id = l.id))
+               FROM ventas_lotes v JOIN organizaciones co ON co.id = v.cliente_id WHERE v.lote_id = l.id) AS venta,
+              ${NOMBRES_VISIBLES("l.organizacion_id", "$1")} AS visibles,
               count(DISTINCT f.id)::int AS "fincasTotal",
               (count(DISTINCT f.id) FILTER (WHERE f.deforestacion <> 'verde'))::int AS "fincasSinVerde",
               coalesce(json_agg(json_build_object(
-                'id', e.id, 'fincaId', f.id, 'fincaNombre', f.nombre, 'productorNombre', p.nombre,
-                'kg', e.kg::float8, 'estado', e.estado, 'fecha', e.fecha
+                'id', e.id, 'fincaId', f.id, 'fincaNombre', f.nombre, 'alias', ${ALIAS_FINCA("f")},
+                'productorNombre', p.nombre, 'kg', e.kg::float8, 'estado', e.estado, 'fecha', e.fecha
               ) ORDER BY e.fecha) FILTER (WHERE e.id IS NOT NULL), '[]') AS entregas
        FROM lotes l JOIN temporadas t ON t.id = l.temporada_id
+       JOIN organizaciones po ON po.id = l.organizacion_id
        LEFT JOIN lote_entregas le ON le.lote_id = l.id
        LEFT JOIN entregas e ON e.id = le.entrega_id
        LEFT JOIN fincas f ON f.id = e.finca_id
        LEFT JOIN productores p ON p.id = f.productor_id
        WHERE l.organizacion_id = $1
-       GROUP BY l.id, t.nombre
+          OR EXISTS (SELECT 1 FROM ventas_lotes v WHERE v.lote_id = l.id AND v.cliente_id = $1 AND v.estado = 'recibido')
+       GROUP BY l.id, t.nombre, po.nombre
        ORDER BY l.creado_en DESC`,
       [organizacionId],
     );
-    return rows.map(({ fincasTotal, fincasSinVerde, ...r }) => {
+    type FilaEntrega = { fecha: string; fincaNombre: string; alias: string; productorNombre: string };
+    return rows.map(({ fincasTotal, fincasSinVerde, visibles, ...r }) => {
       // El aviso satelital guardado al crear el lote se reemplaza por el actual.
       const satelite = avisoSatelite(fincasSinVerde, fincasTotal);
-      const avisos = [...(r.avisos as Aviso[]).filter((a) => a.codigo !== "satelite"), ...(satelite ? [satelite] : [])];
+      const diferencia = r.venta ? avisoDiferencia(r.venta.kgEnviados, r.venta.kgRecibidos) : null;
+      const avisos = [
+        ...(r.avisos as Aviso[]).filter((a) => a.codigo !== "satelite"),
+        ...(satelite ? [satelite] : []),
+        ...(diferencia ? [diferencia] : []),
+      ];
       return {
         ...r,
         avisos,
         creadoEn: new Date(r.creadoEn).toISOString(),
-        entregas: r.entregas.map((e: { fecha: string }) => ({ ...e, fecha: new Date(e.fecha).toISOString() })),
+        // Lote comprado a una proveedora que no comparte nombres: alias y sin productor.
+        entregas: r.entregas.map(({ alias, ...e }: FilaEntrega) => ({
+          ...e,
+          fincaNombre: visibles ? e.fincaNombre : alias,
+          productorNombre: visibles ? e.productorNombre : null,
+          fecha: new Date(e.fecha).toISOString(),
+        })),
       };
     });
   }
@@ -789,15 +838,16 @@ export class PgRepo implements Repo {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const { rows } = await client.query<{ atestado: boolean }>(
+      const { rows } = await client.query<{ atestado: boolean; vendido: boolean }>(
         `SELECT attestation_uid IS NOT NULL
-                OR EXISTS (SELECT 1 FROM exportacion_lotes x WHERE x.lote_id = l.id) AS atestado
+                OR EXISTS (SELECT 1 FROM exportacion_lotes x WHERE x.lote_id = l.id) AS atestado,
+                EXISTS (SELECT 1 FROM ventas_lotes v WHERE v.lote_id = l.id) AS vendido
          FROM lotes l WHERE l.id = $1 AND l.organizacion_id = $2 FOR UPDATE`,
         [loteId, organizacionId],
       );
-      if (rows.length === 0 || rows[0].atestado) {
+      if (rows.length === 0 || rows[0].atestado || rows[0].vendido) {
         await client.query("ROLLBACK");
-        return rows.length === 0 ? "no_encontrado" : "atestado";
+        return rows.length === 0 ? "no_encontrado" : rows[0].atestado ? "atestado" : "vendido";
       }
       await client.query("DELETE FROM attestations_pendientes WHERE esquema = 'Lote' AND entidad_id = $1", [loteId]);
       await client.query("DELETE FROM lote_entregas WHERE lote_id = $1", [loteId]);
@@ -814,11 +864,15 @@ export class PgRepo implements Repo {
 
   async lotesCandidatos(organizacionId: string, ids: string[]): Promise<LoteCandidato[]> {
     const { rows } = await this.pool.query<LoteCandidato>(
+      // Propios sin vender, o comprados a una proveedora y ya recibidos.
       `SELECT l.id, l.codigo, l.cultivo, x.codigo AS "exportacionCodigo"
        FROM lotes l
        LEFT JOIN exportacion_lotes el ON el.lote_id = l.id
        LEFT JOIN exportaciones x ON x.id = el.exportacion_id
-       WHERE l.organizacion_id = $1 AND l.id = ANY($2::uuid[])`,
+       WHERE l.id = ANY($2::uuid[])
+         AND ((l.organizacion_id = $1 AND NOT EXISTS (SELECT 1 FROM ventas_lotes v WHERE v.lote_id = l.id))
+              OR EXISTS (SELECT 1 FROM ventas_lotes v
+                         WHERE v.lote_id = l.id AND v.cliente_id = $1 AND v.estado = 'recibido'))`,
       [organizacionId, ids],
     );
     return rows;
@@ -861,13 +915,14 @@ export class PgRepo implements Repo {
       `SELECT x.id, x.codigo, x.cultivo, x.comprador, x.destino, x.contenedor,
               to_char(x.fecha_embarque, 'YYYY-MM-DD') AS "fechaEmbarque", x.dds_ref AS "ddsRef", x.estado,
               x.attestation_uid AS "attestationUid", x.creado_en AS "creadoEn",
-              coalesce((SELECT sum(l.kg)::float8 FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
+              coalesce((SELECT sum(kg_en_contenedor(el.lote_id))::float8 FROM exportacion_lotes el
                         WHERE el.exportacion_id = x.id), 0) AS kg,
               coalesce((SELECT json_agg(json_build_object(
-                          'id', l.id, 'codigo', l.codigo, 'kg', l.kg::float8, 'estado', l.estado,
-                          'temporadaNombre', t.nombre) ORDER BY l.codigo)
+                          'id', l.id, 'codigo', l.codigo, 'kg', kg_en_contenedor(l.id)::float8, 'estado', l.estado,
+                          'temporadaNombre', t.nombre, 'proveedor', CASE WHEN l.organizacion_id <> x.organizacion_id THEN o.nombre END)
+                          ORDER BY l.codigo)
                         FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
-                        JOIN temporadas t ON t.id = l.temporada_id
+                        JOIN temporadas t ON t.id = l.temporada_id JOIN organizaciones o ON o.id = l.organizacion_id
                         WHERE el.exportacion_id = x.id), '[]') AS lotes,
               (SELECT json_build_object(
                         'entregas', count(DISTINCT e.id),
@@ -957,19 +1012,24 @@ export class PgRepo implements Repo {
          JOIN entregas e ON e.id = le.entrega_id
          WHERE el.exportacion_id = $1
          GROUP BY e.finca_id)
-       SELECT f.id, f.nombre, p.nombre AS "productorNombre", p.comunidad,
+       SELECT f.id,
+              CASE WHEN ${NOMBRES_VISIBLES("p.organizacion_id", "$2")} THEN f.nombre ELSE ${ALIAS_FINCA("f")} END AS nombre,
+              CASE WHEN ${NOMBRES_VISIBLES("p.organizacion_id", "$2")} THEN p.nombre END AS "productorNombre",
+              CASE WHEN p.organizacion_id <> $2 THEN o.nombre END AS proveedor, p.comunidad,
               ST_AsGeoJSON(f.geom, 8)::json AS geometria, ${AREA_OFICIAL("f")}::float8 AS "areaOficialHa",
               f.version_actual AS version, f.geo_hash AS "geoHash", f.deforestacion,
               (SELECT max(c.fecha) FROM chequeos_deforestacion c WHERE c.finca_id = f.id) AS "ultimoChequeo",
               (SELECT max(v.fecha) FROM verificaciones v WHERE v.finca_id = f.id) AS "ultimaVisita",
               f.attestation_uid AS "attestationUid", x.kg AS "kgEntregados"
        FROM entregas_x x JOIN fincas f ON f.id = x.finca_id JOIN productores p ON p.id = f.productor_id
-       ORDER BY f.nombre`,
-      [id],
+       JOIN organizaciones o ON o.id = p.organizacion_id
+       ORDER BY 2`,
+      [id, organizacionId],
     );
     const iso = (d: Date | null) => (d ? new Date(d).toISOString() : null);
     return {
       organizacion,
+      proveedores: [...new Set(rows.flatMap((f) => (f.proveedor ? [f.proveedor as string] : [])))].sort(),
       exportacion,
       fincas: rows.map((f) => ({ ...f, ultimoChequeo: iso(f.ultimoChequeo), ultimaVisita: iso(f.ultimaVisita) })),
     };

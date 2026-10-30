@@ -10,6 +10,7 @@ import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../services/correcciones_service.dart';
 import '../services/fincas_service.dart';
+import '../widgets/estado_satelital.dart';
 import '../widgets/formulario_entrega.dart';
 import '../widgets/motivo.dart';
 import '../widgets/seccion_fotos.dart';
@@ -486,24 +487,6 @@ class _Resumen extends ConsumerWidget {
   /// organización trabaja un solo cultivo.
   final VoidCallback? onCambiarCultivo;
 
-  static const _satelite = {
-    'verde': (
-      Colors.green,
-      Icons.check_circle,
-      'Sin deforestación detectada después de 2020',
-    ),
-    'amarillo': (
-      Colors.orange,
-      Icons.error,
-      'Posible pérdida de bosque pequeña: requiere revisión',
-    ),
-    'rojo': (
-      Colors.red,
-      Icons.dangerous,
-      'Pérdida de bosque después de 2020: no apta para exportar',
-    ),
-  };
-
   Future<void> _revisarAhora(BuildContext context, WidgetRef ref) async {
     final mensajero = ScaffoldMessenger.of(context);
     try {
@@ -520,7 +503,7 @@ class _Resumen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final oficial = finca.areaOficialHa;
-    final sat = _satelite[finca.deforestacion];
+    final sat = estadosSatelitales[finca.deforestacion];
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Padding(

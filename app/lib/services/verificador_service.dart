@@ -94,6 +94,7 @@ class CadenaPublica {
     required this.tipo,
     required this.uid,
     required this.organizacion,
+    this.proveedores = const [],
     required this.cultivo,
     required this.exportacion,
     required this.lotes,
@@ -106,6 +107,7 @@ class CadenaPublica {
       tipo: j['tipo'] as String,
       uid: j['uid'] as String,
       organizacion: j['organizacion'] as String,
+      proveedores: (j['proveedores'] as List? ?? const []).cast<String>(),
       cultivo: j['cultivo'] as String,
       exportacion: x == null
           ? null
@@ -121,6 +123,7 @@ class CadenaPublica {
         for (final l in (j['lotes'] as List).cast<Map<String, dynamic>>())
           LotePublico(
             firma: Firma.desdeJson(l),
+            organizacion: l['organizacion'] as String?,
             codigo: l['codigo'] as String,
             temporada: l['temporada'] as String,
             kg: _num(l['kg']),
@@ -172,7 +175,12 @@ class CadenaPublica {
   /// `Exportacion` (QR del contenedor) o `Lote` (QR del saco).
   final String tipo;
   final String uid;
+
+  /// Quien exporta el contenedor (o la dueña del lote escaneado).
   final String organizacion;
+
+  /// Otras organizaciones que vendieron lotes del contenedor.
+  final List<String> proveedores;
   final String cultivo;
   final ExportacionPublica? exportacion;
   final List<LotePublico> lotes;
@@ -200,6 +208,7 @@ class ExportacionPublica {
 class LotePublico {
   LotePublico({
     required this.firma,
+    this.organizacion,
     required this.codigo,
     required this.temporada,
     required this.kg,
@@ -209,6 +218,9 @@ class LotePublico {
   });
 
   final Firma? firma;
+
+  /// Organización dueña del lote (solo su nombre).
+  final String? organizacion;
   final String codigo;
   final String temporada;
   final double kg;

@@ -121,6 +121,8 @@ class RepoMemoria implements Repo {
         attestationUid: null,
         creadoEn: "2026-10-16T20:00:00.000Z",
         exportacionCodigo: null,
+        proveedor: null,
+        venta: null,
         entregas: [],
       }));
   }
@@ -171,7 +173,7 @@ class RepoMemoria implements Repo {
   fincasPaquete = paqueteDePrueba().fincas;
   async paqueteExportacion(organizacionId: string, id: string): Promise<Paquete | null> {
     const exportacion = (await this.listarExportaciones(organizacionId)).find((x) => x.id === id);
-    return exportacion ? { organizacion: "Prueba", exportacion, fincas: this.fincasPaquete } : null;
+    return exportacion ? { organizacion: "Prueba", proveedores: [], exportacion, fincas: this.fincasPaquete } : null;
   }
   colaAttestations: string[] = [];
   consumos: { exportacionId: string; organizacionId: string; uid: string }[] = [];

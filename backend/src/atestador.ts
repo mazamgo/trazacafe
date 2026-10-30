@@ -345,7 +345,7 @@ export class ColaPg implements ColaAttestations {
   private async exportaciones(limite: number): Promise<Pendiente[]> {
     const { rows } = await this.pool.query(
       `SELECT ap.id AS "colaId", x.id, x.cultivo, x.contenedor, x.destino, x.dds_ref AS "ddsRef",
-              (SELECT sum(l.kg)::float8 FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
+              (SELECT sum(kg_en_contenedor(el.lote_id))::float8 FROM exportacion_lotes el
                WHERE el.exportacion_id = x.id) AS kg,
               (SELECT array_agg(l.attestation_uid ORDER BY l.codigo) FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
                WHERE el.exportacion_id = x.id) AS uids

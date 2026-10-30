@@ -223,6 +223,42 @@ final compartidorProvider = Provider<Compartidor>(
   (ref) => CompartidorSistema(),
 );
 
+/// Tipo de la organización según la última sincronización (`null` antes de
+/// la primera): decide si el menú muestra Proveedores o Clientes.
+final tipoOrganizacionProvider = StreamProvider<String?>(
+  (ref) =>
+      ref.watch(databaseProvider).observarAjuste(ClaveAjuste.organizacionTipo),
+);
+
+/// Exportadora: proveedoras y lotes por recibir (requiere señal).
+final proveedoresProvider = FutureProvider.autoDispose(
+  (ref) => ref.watch(apiProvider).proveedores(),
+);
+
+/// Cooperativa: clientes e invitaciones (requiere señal).
+final clientesProvider = FutureProvider.autoDispose<List<Vinculo>>(
+  (ref) => ref.watch(apiProvider).clientes(),
+);
+
+final revisionProveedorProvider = FutureProvider.autoDispose
+    .family<RevisionProveedor, String>(
+      (ref, id) => ref.watch(apiProvider).revisionProveedor(id),
+    );
+
+final observacionesProvider = FutureProvider.autoDispose<List<Observacion>>(
+  (ref) => ref.watch(apiProvider).observaciones(),
+);
+
+/// Pendientes de la red para el aviso de inicio; sin señal, `null` (no se
+/// muestra nada).
+final avisosRedProvider = FutureProvider.autoDispose<AvisosRed?>((ref) async {
+  try {
+    return await ref.watch(apiProvider).avisosRed();
+  } catch (_) {
+    return null;
+  }
+});
+
 /// Equipo de la organización (solo administradores; requiere señal).
 final invitacionesProvider = FutureProvider.autoDispose<List<Invitacion>>(
   (ref) => ref.watch(apiProvider).invitaciones(),

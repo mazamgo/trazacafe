@@ -89,7 +89,8 @@ class _NuevoContenedorScreenState extends ConsumerState<NuevoContenedorScreen> {
           });
           final libres = [
             for (final l in todos)
-              if (l.exportacionCodigo == null) l,
+              // Propios sin vender, y comprados a proveedoras (ya recibidos).
+              if (l.exportacionCodigo == null && !l.vendido) l,
           ];
           final elegidos = [
             for (final l in libres)
@@ -97,7 +98,7 @@ class _NuevoContenedorScreenState extends ConsumerState<NuevoContenedorScreen> {
           ];
           // El cultivo lo fija el primer lote elegido.
           final cultivo = elegidos.firstOrNull?.cultivo;
-          final kg = elegidos.fold(0.0, (s, l) => s + l.kg);
+          final kg = elegidos.fold(0.0, (s, l) => s + l.kgEnContenedor);
           return ListView(
             padding: EdgeInsets.fromLTRB(
               16,
@@ -114,7 +115,8 @@ class _NuevoContenedorScreenState extends ConsumerState<NuevoContenedorScreen> {
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    'No hay lotes libres. Arma primero los lotes en ⋮ → Lotes.',
+                    'No hay lotes libres. Arma primero los lotes en ⋮ → Lotes, '
+                    'o recibe los de tus proveedores en ⋮ → Proveedores.',
                   ),
                 ),
               for (final l in libres)
@@ -133,11 +135,14 @@ class _NuevoContenedorScreenState extends ConsumerState<NuevoContenedorScreen> {
                                   : _elegidos.remove(l.id),
                             ),
                       secondary: Icon(c.icono, color: c.colorUi),
-                      title: Text('${l.codigo} · ${kgTexto(l.kg)} kg'),
+                      title: Text(
+                        '${l.codigo} · ${kgTexto(l.kgEnContenedor)} kg',
+                      ),
                       subtitle: Text(
                         otroCultivo
                             ? 'Es de ${c.nombre.toLowerCase()}: un contenedor lleva un solo cultivo'
-                            : '${c.nombre} ${c.nombreEstado(l.estado).toLowerCase()} · ${l.temporadaNombre}',
+                            : '${c.nombre} ${c.nombreEstado(l.estado).toLowerCase()} · ${l.temporadaNombre}'
+                                  '${l.proveedor != null ? ' · de ${l.proveedor}' : ''}',
                       ),
                     );
                   },

@@ -13,6 +13,7 @@ import { CorreccionesPg } from "./correcciones.ts";
 import { EliminacionesPg } from "./eliminacion.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
+import { ProveedoresPg } from "./proveedores.ts";
 import { PgRepo } from "./repo.ts";
 import { VerificadorPg } from "./verificador.ts";
 
@@ -121,6 +122,7 @@ const app = buildApp({
   atestador,
   correcciones: new CorreccionesPg(pool),
   eliminaciones: new EliminacionesPg(pool),
+  proveedores: new ProveedoresPg(pool),
   verificador: new VerificadorPg(pool),
 });
 

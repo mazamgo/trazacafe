@@ -50,6 +50,9 @@ class Textos {
   String embarque(String fecha) => _t('Embarque: $fecha', 'Shipment: $fecha');
   String exportador(String o) => _t('Exportador: $o', 'Exporter: $o');
 
+  String proveedores(List<String> o) =>
+      _t('Proveedores: ${o.join(', ')}', 'Suppliers: ${o.join(', ')}');
+
   String get sinBlockchain => _t(
     'No se pudo consultar la blockchain ahora',
     'The blockchain could not be checked right now',

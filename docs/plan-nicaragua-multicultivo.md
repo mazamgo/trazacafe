@@ -156,6 +156,17 @@ Es la parte que **paga el cliente**.
 - **Verificador público** (Flutter Web en Firebase Hosting): QR del contenedor o del saco → cadena completa sin datos personales.
 
 ## Fase 2b — Red de proveedores: cooperativa → exportadora (~3–4 semanas)
+**Avance (30/10/2026):** el piloto se presenta primero a una **exportadora**, que conoce a las cooperativas y a los importadores europeos, así que esta fase va antes que el panel de la Fase 3.
+- **Hecho en código** (migración 015, `backend/src/proveedores.ts`, pantallas Proveedores, Clientes y Observaciones; detalle en `infra/README.md` §4l y en la guía §4.7 y §4.8): pasos 1 a 4.
+- **Decisiones:**
+  - la exportadora invita con el **correo del administrador** de la cooperativa, que ya debe estar en TrazaCafé (no se muestra una lista de organizaciones);
+  - el contenedor cuenta los **kg recibidos** por la exportadora; el lote conserva sus kg firmados y la diferencia queda como aviso;
+  - todo va en la app de administradores mientras no exista el panel web.
+- **Falta:**
+  - aplicar la 015 en Cloud SQL, desplegar la API y Hosting, y generar el APK;
+  - crear una exportadora de prueba (`npm run crear-organizacion -- --tipo exportadora`) y probar el recorrido en el Samsung con dos cuentas.
+- **Para después:** el paso 5 (visitas de control de la exportadora), cuando el piloto lo pida.
+
 **Por qué:**
 - Hoy cada organización vive aislada: una exportadora no ve nada de las cooperativas que le venden.
 - En la práctica, la exportadora compra lotes a varias cooperativas, arma contenedores con ellos y necesita la geolocalización de todas las fincas de origen (EUDR).
@@ -190,7 +201,7 @@ Es la parte que **paga el cliente**.
 
 **Datos y API:**
 - Tablas nuevas:
-  - `vinculos_organizaciones`: proveedora, cliente, estado y qué comparte;
+  - `vinculos`: proveedora, cliente, estado y qué comparte;
   - `ventas_lotes`: lote, exportadora, kg enviados y recibidos, fechas;
   - `observaciones`: sobre una finca o un lote, de quién, respuesta.
 - **Rutas:**
@@ -247,7 +258,7 @@ Es el argumento de venta del plan Exportador: "tu comprador recibe la prueba lis
 
 **Datos, permisos y privacidad:**
 - **Tablas:**
-  - `vinculos_organizaciones` (de la Fase 2b) admite también exportadora → importador;
+  - `vinculos` (de la Fase 2b) admite también exportadora → importador;
   - `ventas_contenedores`: contenedor, importador, fecha y referencia de la DDS;
   - `alertas_comprador`: finca, contenedor, resultado y fecha de aviso;
   - `tokens_api`: importador, permisos, último uso.
@@ -430,7 +441,7 @@ Con 5 o 10 organizaciones eso no alcanza.
   - tablas `consumos` y `contratos` (migración 014; el consumo se anota al cerrar el contenedor, con el precio congelado);
   - el GeoJSON de TRACES solo con el contenedor cerrado (la app apaga el botón mientras está abierto);
   - `npm run contrato`, `npm run ajuste-cobro` y `npm run estado-de-cuenta` (con CSV para Excel). Detalle en `infra/README.md` §4k.
-  - **Falta:** aplicar la 014 en Cloud SQL, desplegar la API y el APK, y crear el contrato del piloto cuando se acuerde el precio.
+  - **Publicado el 23/10/2026:** la 014 aplicada en Cloud SQL, la API desplegada y el APK generado. **Falta:** crear el contrato del piloto cuando se acuerde el precio.
 - **Mapas sin señal:** **en prueba** (23/10/2026).
   - Google no permite guardar su mapa para usarlo sin conexión (solo 24 horas de caché).
   - Se probó una capa propia con imágenes **Sentinel-2** de Copernicus (gratis, también para uso comercial, 10 m por píxel), que se descarga por zona en ⋮ → Mapas sin señal y se ve debajo de Google.

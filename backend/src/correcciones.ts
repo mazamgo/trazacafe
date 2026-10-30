@@ -274,6 +274,7 @@ export class CorreccionesPg implements Correcciones {
         `SELECT l.id, l.codigo, l.cultivo, l.temporada_id AS "temporadaId", l.estado, l.kg::float8 AS kg, l.beneficio, l.proceso,
                 l.attestation_uid IS NOT NULL AS atestado,
                 (SELECT x.codigo FROM exportacion_lotes el JOIN exportaciones x ON x.id = el.exportacion_id WHERE el.lote_id = l.id) AS contenedor,
+                (SELECT o.nombre FROM ventas_lotes v JOIN organizaciones o ON o.id = v.cliente_id WHERE v.lote_id = l.id) AS "vendidoA",
                 (SELECT array_agg(le.entrega_id) FROM lote_entregas le WHERE le.lote_id = l.id) AS entregas
          FROM lotes l WHERE l.id = $1 AND l.organizacion_id = $2 FOR UPDATE`,
         [id, u.organizacionId],
@@ -281,6 +282,7 @@ export class CorreccionesPg implements Correcciones {
       const l = rows[0];
       if (!l) return no(404, "No encontrado.");
       if (u.rol !== "admin") return no(403, "Solo un administrador puede corregir lotes.");
+      if (l.vendidoA) return no(409, `El lote se vendió a ${l.vendidoA}; para corregirlo, primero deshaz la venta.`);
       if (l.contenedor) return no(409, `El lote va en el contenedor ${l.contenedor}; para corregirlo, primero deshaz el contenedor.`);
       if (l.atestado) return no(409, "El lote ya está firmado en la blockchain; no se puede corregir.");
       const d = diferencias(

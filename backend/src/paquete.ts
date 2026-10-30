@@ -10,7 +10,8 @@ export const PAIS_PRODUCCION = "NI";
  * debida (DDS) en TRACES: WGS84, al menos 6 decimales, un punto si la finca
  * mide menos de 4 ha y polígono si no. Propiedades según la descripción de
  * GeoJSON de TRACES (ProducerName, ProducerCountry, ProductionPlace, Area).
- * El nombre del productor es dato personal (Ley 787): solo va si se pide.
+ * El nombre del productor es dato personal (Ley 787): solo va si se pide, y
+ * nunca el de una proveedora que no aceptó compartir nombres.
  */
 export function geojsonTraces(fincas: FincaDePaquete[], { incluirProductor = false } = {}) {
   return {
@@ -19,7 +20,7 @@ export function geojsonTraces(fincas: FincaDePaquete[], { incluirProductor = fal
       type: "Feature" as const,
       geometry: f.geometria,
       properties: {
-        ...(incluirProductor ? { ProducerName: f.productorNombre } : {}),
+        ...(incluirProductor && f.productorNombre ? { ProducerName: f.productorNombre } : {}),
         ProducerCountry: PAIS_PRODUCCION,
         ProductionPlace: f.comunidad ? `${f.nombre}, ${f.comunidad}` : f.nombre,
         Area: Math.round(f.areaOficialHa * 10000) / 10000,
@@ -125,6 +126,7 @@ export function pdfPaquete(p: Paquete, generado = new Date()): Promise<Buffer> {
   fila("Cantidad", `${kg(x.kg)} kg en ${x.lotes.length} ${x.lotes.length === 1 ? "lote" : "lotes"}`);
   fila("País de producción", "Nicaragua (NI)");
   fila("Exportador", p.organizacion);
+  if (p.proveedores.length > 0) fila("Proveedores", p.proveedores.join(", "));
   fila("Comprador", x.comprador);
   fila("Destino", x.destino);
   fila("Contenedor", x.contenedor ?? "pendiente");
@@ -155,7 +157,12 @@ export function pdfPaquete(p: Paquete, generado = new Date()): Promise<Buffer> {
   titulo("Lotes");
   tabla(
     [{ t: "Lote", w: 3 }, { t: "Temporada", w: 2 }, { t: "Estado", w: 2 }, { t: "Kg", w: 1.4 }],
-    x.lotes.map((l) => [l.codigo, l.temporadaNombre, c?.estados.find((e) => e.id === l.estado)?.nombre ?? l.estado, kg(l.kg)]),
+    x.lotes.map((l) => [
+      l.proveedor ? `${l.codigo} (${l.proveedor})` : l.codigo,
+      l.temporadaNombre,
+      c?.estados.find((e) => e.id === l.estado)?.nombre ?? l.estado,
+      kg(l.kg),
+    ]),
   );
 
   titulo("Fincas de origen");
@@ -170,7 +177,7 @@ export function pdfPaquete(p: Paquete, generado = new Date()): Promise<Buffer> {
       { t: "Huella (geoHash)", w: 2.4 },
     ],
     p.fincas.map((f) => [
-      f.comunidad ? `${f.nombre} (${f.comunidad})` : f.nombre,
+      (f.comunidad ? `${f.nombre} (${f.comunidad})` : f.nombre) + (f.proveedor ? ` · ${f.proveedor}` : ""),
       f.areaOficialHa.toFixed(2),
       `${f.geometria.type === "Point" ? "Punto" : "Polígono"} v${f.version}`,
       `${NOMBRE_SATELITE[f.deforestacion]}${f.ultimoChequeo ? ` · ${fechaCorta(f.ultimoChequeo)}` : ""}`,

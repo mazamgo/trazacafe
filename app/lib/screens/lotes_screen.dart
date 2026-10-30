@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../services/api_client.dart';
+import '../widgets/dialogo_envio.dart';
+import '../widgets/en_linea.dart';
 import '../widgets/qr_verificador.dart';
 import 'finca_screen.dart' show fecha;
 import 'nuevo_lote_screen.dart';
@@ -110,9 +112,84 @@ class LotesScreen extends ConsumerWidget {
     }
   }
 
+  /// Vende el lote a una exportadora vinculada (⋮ → Clientes).
+  Future<void> _vender(BuildContext context, WidgetRef ref, Lote l) async {
+    final mensajero = ScaffoldMessenger.of(context);
+    final List<Vinculo> activos;
+    try {
+      activos = (await ref.read(apiProvider).clientes())
+          .where((v) => v.activo)
+          .toList();
+    } catch (e) {
+      mensajero.showSnackBar(
+        SnackBar(content: Text('No se pudieron cargar los clientes: $e')),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    if (activos.isEmpty) {
+      mensajero.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No tienes clientes. La exportadora te invita y tú aceptas en ⋮ → Clientes.',
+          ),
+        ),
+      );
+      return;
+    }
+    final r = await pedirEnvio(
+      context,
+      titulo: 'Vender ${l.codigo}',
+      explicacion:
+          'La exportadora lo recibe y confirma los kg. Mientras no lo ponga en un '
+          'contenedor, puedes deshacer la venta.',
+      destinos: {for (final v in activos) v.id: v.organizacion},
+      etiquetaKg: 'Kg enviados',
+      etiquetaFecha: 'Fecha de envío',
+      accion: 'Vender',
+      kgInicial: l.kg,
+    );
+    if (r == null || !context.mounted) return;
+    final cliente = activos.firstWhere((v) => v.id == r.destino).organizacion;
+    if (await ejecutarEnLinea(
+      context,
+      () => ref
+          .read(apiProvider)
+          .venderLote(l.id, vinculoId: r.destino!, kg: r.kg, fecha: r.fecha),
+      'Lote ${l.codigo} vendido a $cliente.',
+    )) {
+      ref.invalidate(lotesProvider);
+    }
+  }
+
+  Future<void> _deshacerVenta(
+    BuildContext context,
+    WidgetRef ref,
+    Lote l,
+  ) async {
+    if (await ejecutarEnLinea(
+      context,
+      () => ref.read(apiProvider).deshacerVenta(l.id),
+      'Venta del lote ${l.codigo} deshecha.',
+    )) {
+      ref.invalidate(lotesProvider);
+    }
+  }
+
+  /// Propio, sin firmar, sin contenedor y sin vender: se corrige, se
+  /// deshace o se vende.
+  static bool _libre(Lote l) =>
+      l.proveedor == null &&
+      !l.atestado &&
+      l.exportacionCodigo == null &&
+      l.venta == null;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lotes = ref.watch(lotesProvider);
+    final vende = tiposProveedora.contains(
+      ref.watch(tipoOrganizacionProvider).value ?? 'cooperativa',
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('Lotes')),
       body: lotes.when(
@@ -160,12 +237,19 @@ class LotesScreen extends ConsumerWidget {
                     for (final l in lista)
                       _TarjetaLote(
                         lote: l,
-                        onCorregir: l.atestado || l.exportacionCodigo != null
-                            ? null
-                            : () => _corregir(context, ref, l),
-                        onDeshacer: l.atestado || l.exportacionCodigo != null
-                            ? null
-                            : () => _deshacer(context, ref, l),
+                        onCorregir: _libre(l)
+                            ? () => _corregir(context, ref, l)
+                            : null,
+                        onDeshacer: _libre(l)
+                            ? () => _deshacer(context, ref, l)
+                            : null,
+                        onVender: vende && _libre(l)
+                            ? () => _vender(context, ref, l)
+                            : null,
+                        onDeshacerVenta:
+                            l.vendido && !(l.venta?.enContenedor ?? false)
+                            ? () => _deshacerVenta(context, ref, l)
+                            : null,
                       ),
                   ],
                 ),
@@ -185,10 +269,14 @@ class _TarjetaLote extends StatelessWidget {
     required this.lote,
     required this.onDeshacer,
     required this.onCorregir,
+    required this.onVender,
+    required this.onDeshacerVenta,
   });
 
   final Lote lote;
   final VoidCallback? onDeshacer;
+  final VoidCallback? onVender;
+  final VoidCallback? onDeshacerVenta;
 
   /// Peso, código, beneficio o proceso; `null` si ya no se puede.
   final VoidCallback? onCorregir;
@@ -219,6 +307,9 @@ class _TarjetaLote extends StatelessWidget {
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (lote.proveedor != null) Text('Comprado a ${lote.proveedor}'),
+          if (lote.venta case final v?)
+            _Venta(venta: v, comprado: lote.proveedor != null),
           Text(
             'Beneficio: ${lote.beneficio}'
             '${lote.proceso != null ? ' · Proceso: ${lote.proceso}' : ''}',
@@ -249,7 +340,8 @@ class _TarjetaLote extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                '${e.fincaNombre} (${e.productorNombre}) · ${kgTexto(e.kg)} kg '
+                '${e.fincaNombre}${e.productorNombre != null ? ' (${e.productorNombre})' : ''} · '
+                '${kgTexto(e.kg)} kg '
                 '${c.nombreEstado(e.estado).toLowerCase()} · ${fecha(e.fecha)}',
               ),
             ),
@@ -275,7 +367,16 @@ class _TarjetaLote extends StatelessWidget {
             ),
           ] else if (lote.exportacionCodigo != null)
             Text('Va en el contenedor ${lote.exportacionCodigo}.')
-          else
+          else if (onDeshacerVenta != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onDeshacerVenta,
+                icon: const Icon(Icons.undo),
+                label: const Text('Deshacer venta'),
+              ),
+            )
+          else if (onCorregir != null)
             OverflowBar(
               alignment: MainAxisAlignment.end,
               children: [
@@ -289,8 +390,55 @@ class _TarjetaLote extends StatelessWidget {
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Corregir'),
                 ),
+                if (onVender != null)
+                  FilledButton.tonalIcon(
+                    onPressed: onVender,
+                    icon: const Icon(Icons.local_shipping_outlined),
+                    label: const Text('Vender'),
+                  ),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Estado de la venta: a quién, enviado o recibido, y los kg.
+class _Venta extends StatelessWidget {
+  const _Venta({required this.venta, required this.comprado});
+
+  final VentaLote venta;
+
+  /// Lote comprado (lo ve la exportadora); si no, vendido (la cooperativa).
+  final bool comprado;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = venta;
+    final recibidos = v.kgRecibidos;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            v.recibido
+                ? Icons.inventory_2_outlined
+                : Icons.local_shipping_outlined,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              v.recibido && recibidos != null
+                  ? '${comprado ? 'Recibido' : 'Vendido a ${v.cliente}: recibido'} el '
+                        '${fecha(v.fechaRecibido!)} · ${kgTexto(recibidos)} kg '
+                        '(enviados ${kgTexto(v.kgEnviados)})'
+                  : 'Vendido a ${v.cliente}: enviado el ${fecha(v.fechaEnvio)} · '
+                        '${kgTexto(v.kgEnviados)} kg, falta que lo reciba',
+            ),
+          ),
         ],
       ),
     );

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
+import '../services/api_client.dart';
 import '../services/preferencias.dart';
+import 'clientes_screen.dart';
 import 'contenedores_screen.dart';
 import 'cultivos_screen.dart';
 import 'equipo_screen.dart';
@@ -10,7 +12,9 @@ import 'lotes_screen.dart';
 import 'mapas_sin_senal_screen.dart';
 import 'finca_screen.dart' show fecha;
 import 'nuevo_productor_screen.dart';
+import 'observaciones_screen.dart';
 import 'privacidad_screen.dart';
+import 'proveedores_screen.dart';
 import 'solicitudes_eliminacion_screen.dart';
 import 'productor_screen.dart';
 import 'temporadas_screen.dart';
@@ -24,6 +28,10 @@ class ProductoresScreen extends ConsumerWidget {
     ref.watch(autoSyncProvider);
     final productores = ref.watch(productoresProvider);
     final sesion = ref.watch(sesionProvider).value;
+    final esAdmin = sesion?.esAdmin ?? false;
+    // Antes de la primera sincronización, el tipo por defecto de la API.
+    final tipo = ref.watch(tipoOrganizacionProvider).value ?? 'cooperativa';
+    final red = esAdmin ? ref.watch(avisosRedProvider).value : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,9 +83,27 @@ class ProductoresScreen extends ConsumerWidget {
                   ),
                   child: const Text('Contenedores'),
                 ),
+              if (esAdmin && tiposCliente.contains(tipo))
+                PopupMenuItem(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ProveedoresScreen(),
+                    ),
+                  ),
+                  child: const Text('Proveedores'),
+                ),
+              if (esAdmin && tiposProveedora.contains(tipo))
+                PopupMenuItem(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ClientesScreen()),
+                  ),
+                  child: const Text('Clientes'),
+                ),
               PopupMenuItem(
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const MapasSinSenalScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const MapasSinSenalScreen(),
+                  ),
                 ),
                 child: const Text('Mapas sin señal'),
               ),
@@ -141,6 +167,50 @@ class ProductoresScreen extends ConsumerWidget {
                   ),
                   child: const Text('Responder'),
                 ),
+              ],
+            ),
+          if (red != null && !red.vacio)
+            MaterialBanner(
+              leading: const Icon(Icons.handshake_outlined),
+              content: Text(
+                [
+                  for (final o in red.invitaciones)
+                    '$o te invitó como proveedora.',
+                  if (red.lotesPorRecibir > 0)
+                    '${red.lotesPorRecibir} ${red.lotesPorRecibir == 1 ? 'lote' : 'lotes'} '
+                        'de proveedores por recibir.',
+                  if (red.observacionesSinResponder > 0)
+                    '${red.observacionesSinResponder} '
+                        '${red.observacionesSinResponder == 1 ? 'observación' : 'observaciones'} '
+                        'de tus clientes sin responder.',
+                ].join('\n'),
+              ),
+              actions: [
+                if (red.invitaciones.isNotEmpty)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ClientesScreen()),
+                    ),
+                    child: const Text('Clientes'),
+                  ),
+                if (red.lotesPorRecibir > 0)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProveedoresScreen(),
+                      ),
+                    ),
+                    child: const Text('Recibir'),
+                  ),
+                if (red.observacionesSinResponder > 0)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ObservacionesScreen(),
+                      ),
+                    ),
+                    child: const Text('Responder'),
+                  ),
               ],
             ),
           if (ref.watch(temporadasProvider).hasValue &&

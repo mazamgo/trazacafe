@@ -207,6 +207,15 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
 - **Deshacer lote:** sus entregas quedan libres.
 - **Límite:** las dos cosas solo mientras el lote no esté en un contenedor ni firmado en la blockchain.
 
+**Vender el lote a una exportadora** (cooperativas con un cliente, ver 4.7):
+1. Abre el lote y toca **Vender**.
+2. Elige el **cliente**, los **kg enviados** (la app propone el peso del lote) y la **fecha de envío**.
+3. La exportadora lo **recibe** y confirma los kg. La tarjeta dice **Vendido a…**, si ya lo recibieron y con cuántos kg.
+
+- **Deshacer venta:** mientras la exportadora no lo ponga en un contenedor.
+- Un lote vendido **ya no se corrige ni se deshace** (primero se deshace la venta) y no va en tus contenedores.
+- Si la exportadora recibe otros kg, el lote muestra un **aviso de diferencia**, por ejemplo "Se recibieron 980 kg de 1,000 enviados".
+
 **QR del lote (saco):** cuando el lote ya está firmado en la blockchain (**Registrado en la blockchain ✓**), su tarjeta tiene el botón **QR del verificador**, igual que los contenedores (sección 4.5). Sirve para etiquetar los sacos: quien lo escanea ve ese lote, sus entregas y sus fincas de origen.
 
 ### 4.5 Contenedores y paquete EUDR
@@ -215,6 +224,8 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 1. **⋮ → Contenedores → Contenedor**.
 2. Elige los **lotes libres** y escribe el **código interno**, el **comprador**, el **destino** y, si ya lo tienes, el **número de contenedor**.
 3. Toca **Crear contenedor**.
+
+**Exportadoras:** en los lotes libres también salen los **lotes recibidos** de tus proveedores, con "de Cooperativa X". En el contenedor cuentan los **kg recibidos**. El paquete EUDR junta las fincas de todas las cooperativas: el PDF dice **Exportador** y **Proveedores**, y el QR del contenedor muestra la cadena completa hasta cada finca. Las fincas de una cooperativa que no comparte nombres salen con un código (por ejemplo **Finca 3F2A**) y sin el nombre del productor.
 
 **Paquete EUDR**, en la tarjeta del contenedor:
 - **PDF:** resumen para el comprador, con fincas de origen, áreas, chequeos y visitas. Con el contenedor **abierto** es un **borrador**, para revisarlo con el comprador antes de cerrar.
@@ -257,6 +268,30 @@ Un productor puede pedir que se borren sus datos (Ley 787). Lo pide en la págin
   - no se puede deshacer.
 - **Eliminar la organización:** **⋮ → Privacidad y datos → Eliminar la organización**. Se ejecuta a los **30 días**; hasta entonces todos ven un aviso con la fecha y el administrador puede **Cancelar**. Descarga antes lo que necesites (paquetes EUDR, PDF). Ese día se borran el equipo, los productores, las fincas y las fotos, salvo lo que el EUDR obliga a guardar, que queda anónimo 5 años.
 
+### 4.7 Clientes (cooperativa que vende a una exportadora)
+La exportadora que te compra te invita desde su app con el **correo de Google del administrador**. Aparece un aviso en **Productores** y la invitación en **⋮ → Clientes**.
+
+- **Aceptar:** la app explica qué ve la exportadora. De los lotes que le vendas ve lo que pide el EUDR: ubicación y área de cada finca de origen, estado satelital, visitas y registros en la blockchain. **No** ve el resto de tus fincas ni corrige tus datos.
+- **Compartir nombres:** al aceptar eliges si comparte los **nombres de productores y fincas**. Son datos personales (Ley 787): compártelos solo si los productores lo autorizaron. Si no, cada finca sale con un código. Se cambia después con el interruptor **Compartir nombres**.
+- **Rechazar:** la exportadora ve que la rechazaste.
+- **Terminar el vínculo:** ya no le puedes vender lotes y deja de ver lo nuevo. Los lotes que ya recibió se quedan con ella, porque el EUDR obliga a guardarlos; los enviados sin recibir vuelven a tu lista.
+- **Vender lotes:** desde **⋮ → Lotes → Vender** (sección 4.4).
+- **Observaciones:** la exportadora puede dejarte observaciones sobre una finca o un lote, por ejemplo "revisar el lindero norte". Salen en el aviso de **Productores** y en **⋮ → Clientes →** ícono de observaciones. Tócala y **Responder**.
+
+### 4.8 Proveedores (exportadora o beneficio)
+En **⋮ → Proveedores** están las cooperativas que te venden.
+
+1. **Invitar proveedor:** escribe el **correo de Google con que entra a TrazaCafé el administrador** de la cooperativa. La cooperativa ya debe usar TrazaCafé; si no, escríbenos para darla de alta. Queda **pendiente** hasta que la acepte.
+2. **Recibir lotes:** arriba salen los **Lotes por recibir**. Toca **Recibir**, escribe los **kg que pesó al llegar** y la fecha. Esos kg son los que cuentan en el contenedor; si no coinciden con los enviados, queda un aviso de diferencia para las dos.
+3. **Revisar al proveedor:** toca la cooperativa (con vínculo activo). Ves, de solo lectura:
+   - el resumen: fincas de origen, hectáreas, cuántas están en verde y cuántas tienen visita en la temporada;
+   - un mapa con las fincas, coloreadas por su estado satelital;
+   - cada lote con sus avisos, y cada finca con su estado satelital, su visita y en qué lotes va.
+4. **Observación:** si algo no cuadra, toca el ícono de observación en la finca o el lote y escribe qué revisar. La cooperativa la responde en su app; las respuestas salen en el ícono de observaciones de **Proveedores**.
+5. **Armar el contenedor:** los lotes recibidos aparecen en **⋮ → Contenedores → Contenedor** (sección 4.5).
+
+- **Terminar el vínculo** (ícono de la cadena rota): los lotes ya recibidos se quedan contigo; los enviados sin recibir vuelven a la cooperativa.
+
 ## 5. Qué ve el comprador
 
 Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Puede ser el QR de un **contenedor** o de un **lote** (saco).
@@ -269,6 +304,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 - el contenedor, el destino, los kg y la DDS;
 - un sello **Verificado en la blockchain**. La página lo comprueba por su cuenta, leyendo la blockchain directamente: quién lo firmó, que no está revocado y que los datos coinciden;
 - un mapa con la **ubicación aproximada** (~1 km) de las fincas;
+- el **exportador** y, si el contenedor lleva lotes comprados a cooperativas, los **proveedores**, con la cooperativa de cada lote (solo el nombre de la organización);
 - los lotes, y cada finca como "Finca 1", "Finca 2"…, con su área, revisión satelital, visita y entregas;
 - enlaces a cada registro en la blockchain.
 
@@ -290,6 +326,9 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | "Eres el único administrador" al eliminar tu cuenta | Invita a otro administrador en **Equipo** (o elimina la organización) y vuelve a intentarlo. |
 | Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |
 | Celular nuevo o reinstalación | Entra con la misma cuenta y toca **Sincronizar**: se descargan los datos de la organización. Lo que **no** se había sincronizado en el celular anterior se pierde. |
+| "Ese correo no es de un administrador activo" al invitar un proveedor | Pide a la cooperativa el correo con que **su administrador** entra a la app (debe haber entrado al menos una vez). Si la cooperativa no usa TrazaCafé, escríbenos para darla de alta. |
+| No sale **Vender** en un lote | Necesitas un cliente activo (**⋮ → Clientes**), y el lote no debe estar firmado, en un contenedor ni vendido. |
+| No se puede deshacer la venta | La exportadora ya puso el lote en un contenedor. Habla con ella. |
 | "Datos de otra organización" al entrar | El celular tiene registros **sin enviar** de otra organización (un celular prestado o heredado). Lo mejor: toca **Cerrar sesión** y que la persona anterior entre con su cuenta y toque **Sincronizar** con señal. Después entras tú y el celular se limpia solo. Si esos datos ya no importan, **Borrar esos datos y continuar** los borra para siempre. |
 
 ## 7. Palabras que aparecen en la app
@@ -306,3 +345,6 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | **Anonimizar** | Quitar los datos personales (nombre, cédula, fotos) y dejar solo lo que el EUDR obliga a guardar, sin que se sepa de quién es. |
 | **Blockchain / attestation** | Registro público que nadie puede alterar. TrazaCafé firma ahí cada finca, visita, entrega, lote y contenedor, para que el comprador pueda comprobarlo. Hoy en red de pruebas (OP Sepolia). |
 | **QR del verificador** | Código que lleva a la página pública del contenedor. |
+| **Proveedora / cliente** | La cooperativa que vende lotes (proveedora) y la exportadora que se los compra (cliente). |
+| **Vínculo** | El acuerdo en la app entre una proveedora y su cliente: la exportadora invita, la cooperativa acepta y elige si comparte nombres. |
+| **Observación** | Nota de la exportadora sobre una finca o un lote de su proveedora, para que la cooperativa lo revise y responda. La exportadora no corrige datos de la cooperativa. |

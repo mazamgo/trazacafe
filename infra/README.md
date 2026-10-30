@@ -139,6 +139,8 @@ npm run crear-organizacion -- --nombre "Cooperativa Ejemplo R.L." --admin gerent
 
 `--cultivos` es opcional (por defecto, solo `cafe`). El administrador puede cambiarlos después desde la app (menú ⋮ → **Cultivos**), pero no puede quitar un cultivo que ya tiene fincas.
 
+`--tipo` es `cooperativa` (por defecto), `exportadora`, `beneficio` u `otra`. Una exportadora o un beneficio tiene **Proveedores** en el menú de la app (§4l); los demás tipos, **Clientes**. Por ejemplo: `npm run crear-organizacion -- --nombre "Exportadora Ejemplo S.A." --tipo exportadora --admin compras@gmail.com`.
+
 El administrador entra con "Entrar con Google" usando ese correo y desde **Equipo** invita a sus técnicos. Quitar a alguien le borra los permisos y cierra sus sesiones al instante (la API verifica tokens revocados). Necesita la base de datos (paso 2).
 
 ## 4b. Fotos en Firebase Storage (ya hecho)
@@ -213,7 +215,7 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - **Factores de rendimiento** en `schemas/cultivos.json` (`factorExportable` por estado: kg de café oro o cacao seco por kg). Son aproximaciones que hay que ajustar con datos del piloto:
   - café: uva 0.16, pergamino 0.8;
   - cacao: baba 0.38, fermentado 0.45.
-- **Deshacer:** un lote que no está en la blockchain ni en un contenedor se puede deshacer, y sus entregas quedan libres. Una finca con entregas en un lote no se puede borrar.
+- **Deshacer:** un lote que no está en la blockchain, en un contenedor ni vendido (§4l) se puede deshacer, y sus entregas quedan libres. Una finca con entregas en un lote no se puede borrar.
 - Cada lote encola su attestation (`Lote`). El esquema EAS ahora incluye cultivo, temporada y estado.
 
 ## 4g. Contenedores (Fase 2)
@@ -250,7 +252,7 @@ Para errores de campo: un cero de más, la fecha o el estado equivocado, un nomb
   | Dato | Se corrige mientras… |
   |---|---|
   | Entrega (kg, estado, fecha) o anularla | no esté en un lote ni firmada (se firma a los 7 días de enviarla) |
-  | Lote (peso, código, beneficio, proceso) | no esté en un contenedor ni firmado; se recalculan sus avisos |
+  | Lote (peso, código, beneficio, proceso) | no esté vendido (§4l), en un contenedor ni firmado; se recalculan sus avisos |
   | Productor (nombre, cédula, comunidad) | siempre |
   | Finca: nombre | siempre |
   | Finca de un punto: área declarada | su lindero no esté firmado |
@@ -345,6 +347,39 @@ Lo que se cobra es el **contenedor cerrado** (detalle y modelo en `docs/plan-nic
 
   Un contenedor cerrado sin contrato vigente sale como **SIN CONTRATO** y no suma: hay que acordar el precio y registrar un ajuste. El CSV abre en Excel. No es una factura fiscal: esa sale del sistema autorizado de la DGI.
 - **Lo que no se bloquea:** lo ya cerrado (QR, verificador y paquete EUDR) sigue disponible aunque la organización no pague. La suspensión será una decisión manual en la consola del propietario (Fase 3).
+
+## 4l. Red de proveedores (Fase 2b)
+
+La exportadora compra lotes a sus cooperativas y arma contenedores con ellos; el paquete EUDR junta las fincas de todas. Código: `backend/src/proveedores.ts`, migración `015_proveedores.sql`. Detalle del plan en `docs/plan-nicaragua-multicultivo.md`, Fase 2b.
+
+- **Tablas:**
+  - `vinculos`: proveedora, cliente, estado (`pendiente`, `activo`, `rechazado`, `terminado`) y `comparte_nombres`. Solo uno vigente por pareja.
+  - `ventas_lotes`: un lote se vende una vez (`lote_id` es la llave). Guarda kg y fecha de envío, y al recibir, kg y fecha de recepción.
+  - `observaciones`: de la exportadora sobre una finca o un lote, con la respuesta de la cooperativa.
+  - Función `kg_en_contenedor(lote)`: los kg recibidos si el lote se compró, o los del lote. La usan igual la attestation `Exportacion`, el verificador, la lista de contenedores y el cobro (§4k), para que lo firmado y lo mostrado coincidan.
+- **Rutas** (todas de administradores; la exportadora es el cliente y la cooperativa la proveedora):
+
+  | Ruta | Quién | Qué hace |
+  |---|---|---|
+  | `GET /v1/proveedores` | exportadora | vínculos y lotes por recibir |
+  | `POST /v1/proveedores` `{email}` | exportadora o beneficio | invita a la organización del administrador activo con ese correo; 404 si no hay |
+  | `DELETE /v1/proveedores/:id` | exportadora | cancela la invitación o termina el vínculo |
+  | `POST /v1/proveedores/lotes/:loteId/recibir` `{kgRecibidos, fecha}` | exportadora | confirma la recepción (se puede repetir mientras no esté en un contenedor) y devuelve el aviso de diferencia |
+  | `GET /v1/proveedores/:id/revision` | exportadora | solo lectura, vínculo activo: lotes vendidos, fincas de origen (nombre o alias, geometría, área oficial, satélite, visita en la temporada, attestation) y resumen |
+  | `GET /v1/clientes` | cooperativa | vínculos, con las invitaciones por responder |
+  | `POST /v1/clientes/:id/aceptar` `{comparteNombres}`, `POST /v1/clientes/:id/rechazar` | cooperativa | responde la invitación |
+  | `PATCH /v1/clientes/:id` `{comparteNombres}`, `DELETE /v1/clientes/:id` | cooperativa | cambia lo que comparte o termina el vínculo |
+  | `POST /v1/lotes/:id/venta` `{vinculoId, kg, fecha}`, `DELETE /v1/lotes/:id/venta` | cooperativa | vende el lote, o deshace la venta mientras no esté en un contenedor |
+  | `GET /v1/observaciones`, `POST /v1/observaciones` `{fincaId \| loteId, texto}`, `POST /v1/observaciones/:id/respuesta` | las dos | observaciones hechas y recibidas; la exportadora observa, la cooperativa responde una vez |
+  | `GET /v1/red/avisos` | las dos | invitaciones, lotes por recibir y observaciones sin responder, para el aviso de la app |
+
+- **Reglas:**
+  - **Vender:** el lote es propio, no está en un contenedor ni vendido, el vínculo está activo y el cliente trabaja ese cultivo. Vendido, la cooperativa ya no lo corrige ni lo deshace.
+  - **Contenedor:** acepta lotes propios **sin vender** y lotes **comprados y recibidos** (`lotesCandidatos`).
+  - **Qué ve la exportadora:** solo los lotes que le vendieron y las fincas de esos lotes, nunca el resto de la cooperativa. Los nombres de fincas y productores solo si el vínculo activo tiene `comparte_nombres`; si no, la finca sale como `Finca 3F2A` (las 4 primeras letras de su id) y sin productor, también en el GeoJSON (`ProducerName` se omite) y en el PDF. Lo recibido se sigue viendo al terminar el vínculo, por el EUDR.
+  - **Terminar un vínculo:** las ventas `enviado` se borran (el lote vuelve a la cooperativa); las recibidas se quedan con la exportadora.
+  - **Paquete y verificador:** el PDF dice "Exportador" y "Proveedores", y cada finca su cooperativa. La cadena pública (`/v1/publico/:uid`) agrega `proveedores` y la `organizacion` de cada lote (solo el nombre). La attestation `Exportacion` ya enlazaba los `lotesUIDs` de cualquier organización: los esquemas no cambian.
+  - **Eliminar una organización** (§4j): sus vínculos terminan, se borran sus observaciones y sus ventas sin recibir. Los lotes que ya están en el contenedor de otra organización se conservan.
 
 ## 5. Backend en Cloud Run (ya hecho)
 

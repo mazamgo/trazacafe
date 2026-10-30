@@ -60,6 +60,7 @@ void main() {
         authServiceProvider.overrideWithValue(auth),
         apiProvider.overrideWithValue(api.cliente(auth)),
         cultivosOrganizacionProvider.overrideWith((ref) => Stream.value(['cafe'])),
+        tipoOrganizacionProvider.overrideWith((ref) => Stream.value('cooperativa')),
         temporadasProvider.overrideWith((ref) => Stream.value([
               Temporada(id: t, nombre: '2026/27', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 9, 30)),
             ])),

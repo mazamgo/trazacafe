@@ -21,7 +21,10 @@ export interface CadenaPublica {
   /** Qué se escaneó. */
   tipo: "Exportacion" | "Lote";
   uid: string;
+  /** Quien exporta el contenedor (o la dueña del lote escaneado). */
   organizacion: string;
+  /** Otras organizaciones que vendieron lotes del contenedor (Fase 2b). */
+  proveedores: string[];
   cultivo: string;
   exportacion: (Firma & {
     contenedor: string | null;
@@ -31,6 +34,8 @@ export interface CadenaPublica {
     fechaEmbarque: string | null;
   }) | null;
   lotes: (Firma & {
+    /** Organización dueña del lote (solo su nombre). */
+    organizacion: string;
     codigo: string;
     temporada: string;
     kg: number;
@@ -136,7 +141,7 @@ export class VerificadorPg implements Verificador {
         `SELECT x.contenedor, x.destino, x.dds_ref AS "ddsRef", to_char(x.fecha_embarque, 'YYYY-MM-DD') AS "fechaEmbarque",
                 x.cultivo, x.attestation_uid AS uid, o.nombre AS organizacion,
                 (SELECT array_agg(el.lote_id) FROM exportacion_lotes el WHERE el.exportacion_id = x.id) AS lotes,
-                (SELECT coalesce(sum(l.kg), 0)::float8 FROM exportacion_lotes el JOIN lotes l ON l.id = el.lote_id
+                (SELECT coalesce(sum(kg_en_contenedor(el.lote_id)), 0)::float8 FROM exportacion_lotes el
                  WHERE el.exportacion_id = x.id) AS kg
          FROM exportaciones x JOIN organizaciones o ON o.id = x.organizacion_id
          WHERE x.id = $1`,
@@ -170,9 +175,9 @@ export class VerificadorPg implements Verificador {
     }
 
     const { rows: lotes } = await this.pool.query(
-      `SELECT l.attestation_uid AS uid, at.tx_hash AS "txHash", at.creado_en AS "firmadaEn", l.codigo,
-              t.nombre AS temporada, l.kg::float8 AS kg, l.estado, l.beneficio, l.proceso
-       FROM lotes l JOIN temporadas t ON t.id = l.temporada_id
+      `SELECT l.attestation_uid AS uid, at.tx_hash AS "txHash", at.creado_en AS "firmadaEn", o.nombre AS organizacion,
+              l.codigo, t.nombre AS temporada, l.kg::float8 AS kg, l.estado, l.beneficio, l.proceso
+       FROM lotes l JOIN temporadas t ON t.id = l.temporada_id JOIN organizaciones o ON o.id = l.organizacion_id
        LEFT JOIN attestaciones at ON at.uid = l.attestation_uid
        WHERE l.id = ANY($1::uuid[]) ORDER BY l.codigo`,
       [loteIds],
@@ -214,6 +219,7 @@ export class VerificadorPg implements Verificador {
       tipo: a.esquema,
       uid,
       organizacion,
+      proveedores: [...new Set(lotes.map((l) => l.organizacion as string))].filter((o) => o !== organizacion).sort(),
       cultivo,
       exportacion,
       lotes: lotes.map((l) => ({ ...l, firmadaEn: iso(l.firmadaEn) })),

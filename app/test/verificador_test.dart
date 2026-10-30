@@ -130,6 +130,18 @@ void main() {
     expect(find.textContaining('La Leonesa'), findsNothing);
   });
 
+  testWidgets('un contenedor con lotes de una proveedora nombra a la cooperativa', (tester) async {
+    final j = jsonDecode(cadenaContenedor) as Map<String, dynamic>;
+    j['proveedores'] = ['Cooperativa Sur R.L.'];
+    (j['lotes'] as List).first['organizacion'] = 'Cooperativa Sur R.L.';
+    await abrir(tester, servicio(cuerpoApi: j));
+    expect(find.textContaining('Exportador: GoProduction (pruebas)'), findsOneWidget);
+    expect(find.textContaining('Proveedores: Cooperativa Sur R.L.'), findsOneWidget);
+    expect(find.textContaining('GoProduction (pruebas) · Cooperativa Sur R.L.'), findsOneWidget);
+    // Sigue verificada: la attestation lleva los UID de los lotes, no de quién son.
+    expect(find.text('Verificado en la blockchain'), findsOneWidget);
+  });
+
   testWidgets('en inglés para el comprador, y recuerda el idioma elegido', (tester) async {
     await abrir(tester, servicio(), idioma: 'en');
     expect(find.text('Container CSQU3054383'), findsOneWidget);

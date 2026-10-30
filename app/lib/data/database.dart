@@ -113,6 +113,12 @@ abstract final class ClaveAjuste {
   /// Organización dueña de los datos del celular (la anota la app al entrar;
   /// ver `DatosCelular`).
   static const organizacionDatos = 'organizacionDatos';
+
+  /// Nombre y tipo (`cooperativa`, `exportadora`, `beneficio` u `otra`) de la
+  /// organización, de la última sincronización. El tipo decide si el menú
+  /// muestra Proveedores o Clientes.
+  static const organizacionNombre = 'organizacionNombre';
+  static const organizacionTipo = 'organizacionTipo';
 }
 
 /// Lindero nuevo de una finca ya enviada, pendiente de enviar. Al enviarse

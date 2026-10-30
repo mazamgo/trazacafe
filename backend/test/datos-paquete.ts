@@ -6,6 +6,7 @@ export function fincaDePaquete(p: Partial<FincaDePaquete> = {}): FincaDePaquete 
     id: "f1",
     nombre: "La Leonesa",
     productorNombre: "Ana Pérez",
+    proveedor: null,
     comunidad: "San Rafael del Norte",
     geometria: { type: "Polygon", coordinates: [[[-86.1, 13.1], [-86.09, 13.1], [-86.09, 13.11], [-86.1, 13.1]]] },
     areaOficialHa: 4.19234,
@@ -20,9 +21,12 @@ export function fincaDePaquete(p: Partial<FincaDePaquete> = {}): FincaDePaquete 
   };
 }
 
-export function paqueteDePrueba(p: { contenedor?: string | null; fincas?: FincaDePaquete[]; estado?: "abierta" | "cerrada" } = {}): Paquete {
+export function paqueteDePrueba(
+  p: { contenedor?: string | null; fincas?: FincaDePaquete[]; estado?: "abierta" | "cerrada"; proveedores?: string[] } = {},
+): Paquete {
   return {
     organizacion: "Cooperativa de Prueba R.L.",
+    proveedores: p.proveedores ?? [],
     exportacion: {
       id: "x1",
       codigo: "EXP-2026-001",
@@ -36,7 +40,7 @@ export function paqueteDePrueba(p: { contenedor?: string | null; fincas?: FincaD
       attestationUid: null,
       creadoEn: "2026-10-16T20:00:00.000Z",
       kg: 160,
-      lotes: [{ id: "l1", codigo: "CAFE-2026/27-001", kg: 160, estado: "pergamino", temporadaNombre: "2026/27" }],
+      lotes: [{ id: "l1", codigo: "CAFE-2026/27-001", kg: 160, estado: "pergamino", temporadaNombre: "2026/27", proveedor: null }],
       resumen: { entregas: 2, fincas: 2, areaOficialHa: 5.6, fincasSinVerde: 0 },
     },
     fincas: p.fincas ?? [

@@ -240,6 +240,7 @@ class _Cadena extends StatelessWidget {
                     if (x?.fechaEmbarque != null)
                       t.embarque(_fecha(x!.fechaEmbarque!)),
                     t.exportador(c.organizacion),
+                    if (c.proveedores.isNotEmpty) t.proveedores(c.proveedores),
                   ].join('\n'),
                 ),
                 isThreeLine: true,
@@ -264,7 +265,9 @@ class _Cadena extends StatelessWidget {
                 ),
                 subtitle: Text(
                   '${t.temporada(l.temporada)} · ${l.beneficio}'
-                  '${l.proceso == null ? '' : ' · ${l.proceso}'}',
+                  '${l.proceso == null ? '' : ' · ${l.proceso}'}'
+                  // Lote de una proveedora (contenedor de varias organizaciones).
+                  '${l.organizacion != null && l.organizacion != c.organizacion ? ' · ${l.organizacion}' : ''}',
                 ),
                 trailing: l.firma == null
                     ? null

@@ -551,6 +551,7 @@ async function limpiarVacios(c: pg.PoolClient, org: string) {
                  AND NOT EXISTS (SELECT 1 FROM lote_entregas le WHERE le.lote_id = l.id)`;
   await c.query(`DELETE FROM attestations_pendientes WHERE esquema = 'Lote' AND entidad_id IN (${lotes})`, [org]);
   await c.query(`DELETE FROM exportacion_lotes WHERE lote_id IN (${lotes})`, [org]);
+  await c.query(`DELETE FROM ventas_lotes WHERE lote_id IN (${lotes})`, [org]);
   await c.query(`DELETE FROM lotes WHERE id IN (${lotes})`, [org]);
   const exportaciones = `SELECT x.id FROM exportaciones x WHERE x.organizacion_id = $1
                          AND NOT EXISTS (SELECT 1 FROM exportacion_lotes el WHERE el.exportacion_id = x.id)`;
@@ -564,6 +565,26 @@ async function limpiarVacios(c: pg.PoolClient, org: string) {
        AND NOT EXISTS (SELECT 1 FROM lotes l WHERE l.temporada_id = t.id)`,
     [org],
   );
+}
+
+/**
+ * Red de proveedores de una organización eliminada: sus vínculos terminan,
+ * las ventas que no se habían recibido se cancelan y se borran las
+ * observaciones. Los lotes ya recibidos (o en un contenedor de otra
+ * organización) se conservan: el EUDR obliga a guardarlos.
+ */
+async function terminarRedEnTx(c: pg.PoolClient, org: string) {
+  await c.query(
+    `UPDATE vinculos SET estado = 'terminado', terminado_en = now(), terminado_por = 'sistema'
+     WHERE (proveedora_id = $1 OR cliente_id = $1) AND estado IN ('pendiente', 'activo')`,
+    [org],
+  );
+  await c.query(
+    `DELETE FROM ventas_lotes v WHERE v.estado = 'enviado'
+       AND (v.cliente_id = $1 OR EXISTS (SELECT 1 FROM lotes l WHERE l.id = v.lote_id AND l.organizacion_id = $1))`,
+    [org],
+  );
+  await c.query("DELETE FROM observaciones WHERE cliente_id = $1 OR proveedora_id = $1", [org]);
 }
 
 /**
@@ -581,6 +602,7 @@ async function eliminarOrganizacionEnTx(c: pg.PoolClient, org: string): Promise<
     `UPDATE organizaciones SET nombre = $2, eliminada_en = now(), eliminacion_programada = NULL WHERE id = $1`,
     [org, NOMBRE_ORGANIZACION_ELIMINADA],
   );
+  await terminarRedEnTx(c, org);
   const { rows: productores } = await c.query<{ id: string }>(
     "SELECT id FROM productores WHERE organizacion_id = $1 AND anonimizado_en IS NULL",
     [org],
