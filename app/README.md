@@ -44,9 +44,10 @@ En la web solo se abren esas páginas (`lib/main.dart`).
 ```powershell
 flutter pub get
 
-# APK para los celulares del equipo
-flutter build apk --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
-# → build\app\outputs\flutter-apk\app-release.apk
+# APK para los celulares del equipo, apuntando a Cloud Run. Antes, subir la
+# versión en pubspec.yaml (version: X.Y.Z+N; Android usa N para instalar encima).
+powershell -ExecutionPolicy Bypass -File tool\apk.ps1
+# → build\app\outputs\flutter-apk\TrazaCafe-<versión>-<AAAA-MM-DD>.apk
 
 # Verificador, panel y páginas de eliminación de datos y privacidad (después: firebase deploy --only hosting, desde la raíz)
 flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app --dart-define=GOOGLE_MAPS_WEB_KEY=<key web>
