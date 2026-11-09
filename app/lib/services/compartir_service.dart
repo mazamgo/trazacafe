@@ -4,6 +4,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'descarga.dart';
+
 /// Comparte un archivo generado por la API (PDF, GeoJSON) con las apps del
 /// celular: WhatsApp, correo, Drive... En pruebas se usa uno falso.
 abstract class Compartidor {
@@ -35,4 +37,15 @@ class CompartidorSistema implements Compartidor {
       ),
     );
   }
+}
+
+/// En el panel web: descarga el archivo en el navegador.
+class CompartidorWeb implements Compartidor {
+  @override
+  Future<void> compartir({
+    required String nombre,
+    required List<int> bytes,
+    required String tipo,
+    required String asunto,
+  }) async => descargarArchivo(nombre, bytes, tipo);
 }

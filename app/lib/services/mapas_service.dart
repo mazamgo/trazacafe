@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,7 +16,7 @@ class SesionMapa {
   final DateTime vence;
 
   String get urlMosaicos =>
-      'https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=$token&key=$googleMapsKey';
+      'https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=$token&key=$claveMapas';
 }
 
 class MapasService {
@@ -25,15 +26,19 @@ class MapasService {
   static const _kToken = 'mapa.sesion';
   static const _kVence = 'mapa.vence';
 
-  /// Encabezados que exige la key restringida a la app Android.
-  static const encabezados = {
-    'X-Android-Package': androidPackage,
-    'X-Android-Cert': androidCertSha1,
-  };
+  /// Encabezados que exige la key restringida a la app Android. En la web la
+  /// key se restringe por sitio y el navegador manda el referer solo.
+  static const encabezados = kIsWeb
+      ? <String, String>{}
+      : {
+          'X-Android-Package': androidPackage,
+          'X-Android-Cert': androidCertSha1,
+        };
 
   /// Sesión guardada si le queda más de un día; si no, pide una nueva. Sin
   /// señal devuelve la guardada aunque esté por vencer, o `null`.
   Future<SesionMapa?> sesion() async {
+    if (claveMapas.isEmpty) return null;
     final prefs = await SharedPreferences.getInstance();
     final guardada = _leer(prefs);
     if (guardada != null &&
@@ -43,7 +48,7 @@ class MapasService {
     try {
       final res = await _cliente.post(
         Uri.parse(
-          'https://tile.googleapis.com/v1/createSession?key=$googleMapsKey',
+          'https://tile.googleapis.com/v1/createSession?key=$claveMapas',
         ),
         headers: {...encabezados, 'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -81,7 +86,7 @@ class MapasService {
         Uri.parse('https://tile.googleapis.com/tile/v1/viewport').replace(
           queryParameters: {
             'session': s.token,
-            'key': googleMapsKey,
+            'key': claveMapas,
             'zoom': '$zoom',
             'north': '$norte',
             'south': '$sur',

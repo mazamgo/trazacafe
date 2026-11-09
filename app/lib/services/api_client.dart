@@ -433,6 +433,17 @@ class ApiClient {
   /// Productores, fincas y entregas de toda la organización.
   Future<Map<String, dynamic>> datos() => _pedir('GET', '/v1/datos');
 
+  /// Nombre, tipo y cultivos de la organización. Lo usa el panel web, que no
+  /// tiene base local; el celular los guarda al sincronizar.
+  Future<Map<String, dynamic>> organizacion() =>
+      _pedir('GET', '/v1/organizacion');
+
+  /// Temporadas de la organización, como las da `GET /v1/temporadas` (fechas
+  /// `AAAA-MM-DD`). Lo usa el panel web.
+  Future<List<Map<String, dynamic>>> temporadas() async =>
+      ((await _pedir('GET', '/v1/temporadas'))['temporadas'] as List)
+          .cast<Map<String, dynamic>>();
+
   /// Pide a la API que compruebe el archivo de la foto ya subido a Storage.
   Future<void> confirmarFoto(String fotoId) => _pedirJson(
     'POST',

@@ -162,9 +162,8 @@ Es la parte que **paga el cliente**.
   - la exportadora invita con el **correo del administrador** de la cooperativa, que ya debe estar en TrazaCafé (no se muestra una lista de organizaciones);
   - el contenedor cuenta los **kg recibidos** por la exportadora; el lote conserva sus kg firmados y la diferencia queda como aviso;
   - todo va en la app de administradores mientras no exista el panel web.
-- **Falta:**
-  - aplicar la 015 en Cloud SQL, desplegar la API y Hosting, y generar el APK;
-  - crear una exportadora de prueba (`npm run crear-organizacion -- --tipo exportadora`) y probar el recorrido en el Samsung con dos cuentas.
+- **Publicado el 30/10/2026:** la 015 aplicada en Cloud SQL, la API y Hosting desplegados, el APK generado y una exportadora de prueba creada.
+- **Falta:** probar el recorrido en el Samsung con dos cuentas (cooperativa y exportadora).
 - **Para después:** el paso 5 (visitas de control de la exportadora), cuando el piloto lo pida.
 
 **Por qué:**
@@ -285,6 +284,10 @@ Es el argumento de venta del plan Exportador: "tu comprador recibe la prueba lis
 - **Antes de construir,** preguntarle al comprador del piloto qué usa hoy para el EUDR y cuánto le cuesta. Si ya tiene plataforma, priorizar la API sobre el portal.
 
 ## Fase 3 — Panel web para administradores (~3 semanas)
+**Avance (9/11/2026), primera parte publicada:** `trazacafe-dev.web.app/panel`, solo para administradores, con Lotes, Contenedores (PDF y GeoJSON se descargan), Proveedores, Clientes, Observaciones y Equipo. Reutiliza las pantallas de la app; lo que el celular lee de la base local se pide a la API. La API abre CORS a los sitios del panel (`ORIGENES_PANEL`) y el mapa usa una key web aparte. Detalle en `infra/README.md` §6b y en la guía §4.9.
+- **Falta:** probar en el panel la descarga del PDF y el GeoJSON, y la cuenta de la cooperativa (Clientes y Vender).
+- **Segunda parte:** reportes (% de fincas verificadas, kg por cultivo y temporada, fincas en amarillo o rojo), alertas satelitales, avance de visitas, y Temporadas y Cultivos en la web.
+
 - **Mismo código Flutter compilado para web,** con login de Google (la key de navegador ya está restringida por dominio).
 - **Pantallas:** lotes, contenedores, paquete EUDR, alertas satelitales, avance de visitas por temporada, equipo y temporadas.
 - **Reportes:** % de fincas verificadas, kg por cultivo y temporada, fincas en amarillo o rojo.

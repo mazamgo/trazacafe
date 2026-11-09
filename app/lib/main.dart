@@ -11,6 +11,7 @@ import 'screens/celular_compartido_screen.dart';
 import 'screens/eliminar_datos_screen.dart';
 import 'screens/privacidad_publica_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/panel_screen.dart';
 import 'screens/productores_screen.dart';
 import 'screens/verificador_screen.dart';
 import 'services/auth_service.dart';
@@ -35,8 +36,9 @@ class TrazaCafeApp extends ConsumerWidget {
       theme: temaClaro,
       darkTheme: temaOscuro,
       themeMode: ref.watch(temaProvider),
-      // En la web se publican el verificador (/v/{uid}) y las páginas de
-      // eliminación de datos y privacidad; la app de campo es para Android.
+      // En la web se publican el verificador (/v/{uid}), el panel de
+      // administradores (/panel) y las páginas de eliminación de datos y
+      // privacidad; la app de campo es para Android.
       // Una sola ruta inicial: sin "atrás" hacia `/` y `/v`.
       onGenerateInitialRoutes: (ruta) => [_ruta(RouteSettings(name: ruta))],
       onGenerateRoute: _ruta,
@@ -56,6 +58,13 @@ class TrazaCafeApp extends ConsumerWidget {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => const PrivacidadPublicaScreen(),
+      );
+    }
+    // Panel web de administradores: /panel y /panel/{sección}.
+    if (kIsWeb && ruta.pathSegments.firstOrNull == 'panel') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => PanelWeb(seccion: ruta.pathSegments.elementAtOrNull(1)),
       );
     }
     if (ruta.pathSegments.length == 2 && ruta.pathSegments.first == 'v') {

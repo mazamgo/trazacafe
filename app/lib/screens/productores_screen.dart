@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers.dart';
 import '../services/api_client.dart';
 import '../services/preferencias.dart';
+import '../widgets/avisos_red.dart';
 import 'clientes_screen.dart';
 import 'contenedores_screen.dart';
 import 'cultivos_screen.dart';
@@ -170,48 +171,17 @@ class ProductoresScreen extends ConsumerWidget {
               ],
             ),
           if (red != null && !red.vacio)
-            MaterialBanner(
-              leading: const Icon(Icons.handshake_outlined),
-              content: Text(
-                [
-                  for (final o in red.invitaciones)
-                    '$o te invitó como proveedora.',
-                  if (red.lotesPorRecibir > 0)
-                    '${red.lotesPorRecibir} ${red.lotesPorRecibir == 1 ? 'lote' : 'lotes'} '
-                        'de proveedores por recibir.',
-                  if (red.observacionesSinResponder > 0)
-                    '${red.observacionesSinResponder} '
-                        '${red.observacionesSinResponder == 1 ? 'observación' : 'observaciones'} '
-                        'de tus clientes sin responder.',
-                ].join('\n'),
+            BannerRed(
+              avisos: red,
+              abrir: (seccion) => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => switch (seccion) {
+                    'clientes' => const ClientesScreen(),
+                    'proveedores' => const ProveedoresScreen(),
+                    _ => const ObservacionesScreen(),
+                  },
+                ),
               ),
-              actions: [
-                if (red.invitaciones.isNotEmpty)
-                  TextButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ClientesScreen()),
-                    ),
-                    child: const Text('Clientes'),
-                  ),
-                if (red.lotesPorRecibir > 0)
-                  TextButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ProveedoresScreen(),
-                      ),
-                    ),
-                    child: const Text('Recibir'),
-                  ),
-                if (red.observacionesSinResponder > 0)
-                  TextButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ObservacionesScreen(),
-                      ),
-                    ),
-                    child: const Text('Responder'),
-                  ),
-              ],
             ),
           if (ref.watch(temporadasProvider).hasValue &&
               ref.watch(temporadaActualProvider) == null)

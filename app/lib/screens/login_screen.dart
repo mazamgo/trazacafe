@@ -39,50 +39,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(Icons.coffee, size: 56),
-                const SizedBox(height: 8),
-                Text(
-                  'TrazaCafé',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Acceso para técnicos y administradores',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                FilledButton.icon(
-                  onPressed: _cargando ? null : _entrar,
-                  icon: _cargando
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.account_circle),
-                  label: const Text('Entrar con Google'),
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 16),
+            // En la computadora (panel web) no se estira a todo lo ancho.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.coffee, size: 56),
+                  const SizedBox(height: 8),
                   Text(
-                    error,
+                    'TrazaCafé',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Acceso para técnicos y administradores',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  FilledButton.icon(
+                    onPressed: _cargando ? null : _entrar,
+                    icon: _cargando
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.account_circle),
+                    label: const Text('Entrar con Google'),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      error,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
+                  ],
+                  const SizedBox(height: 24),
+                  Text(
+                    'Usa la cuenta de Google con la que te invitó tu organización.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
-                const SizedBox(height: 24),
-                Text(
-                  'Usa la cuenta de Google con la que te invitó tu organización.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+              ),
             ),
           ),
         ),

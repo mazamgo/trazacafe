@@ -163,6 +163,14 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - La sesión dura ~2 semanas y se guarda en el celular; Google solo permite la caché temporal del teléfono, no descargar zonas completas.
 - **Al publicar en Play Store** agrega el SHA-1 de Play App Signing a esta key (como en la sección 4) y compila con `--dart-define=ANDROID_CERT_SHA1=<SHA1>`.
 - La app muestra "Google" y el copyright de las imágenes visibles (`/tile/v1/viewport`), como exigen las políticas de Google. Para producción conviene usar el logo oficial de Google en vez del texto.
+- **Panel web** (§6b): usa otra key, "TrazaCafe mapas (web)" (`837854e7-…`), restringida por sitio web (referer) a `trazacafe-dev.web.app`, `trazacafe-dev.firebaseapp.com` y `localhost:5000`, y solo a `tile.googleapis.com`. No va en el repositorio por defecto: se pasa al compilar la web con `--dart-define=GOOGLE_MAPS_WEB_KEY=<key>`. Sin ella, el panel muestra las fincas sin el fondo satelital. Comparte la cuota gratis con la del celular. Ya está creada; el segundo comando da su valor para compilar. Para crearla en otro proyecto:
+
+  ```powershell
+  gcloud services api-keys create --project=trazacafe-dev --display-name="TrazaCafe mapas (web)" `
+    --api-target=service=tile.googleapis.com `
+    --allowed-referrers="https://trazacafe-dev.web.app/*,https://trazacafe-dev.firebaseapp.com/*,http://localhost:5000/*"
+  gcloud services api-keys get-key-string 837854e7-a197-43dc-9f40-cdf5e44f164b --project=trazacafe-dev
+  ```
 
 ## 4d. Temporadas, visitas y chequeo satelital
 
@@ -318,7 +326,7 @@ Google Play exige una opción dentro de la app y una página web para pedir la e
     --oidc-service-account-email="trazacafe-tareas@trazacafe-dev.iam.gserviceaccount.com" `
     --oidc-token-audience="https://trazacafe-api-85528878949.us-east4.run.app"
   ```
-- **CORS:** las rutas que llama la página web (`/v1/publico/organizaciones`, `/v1/publico/solicitudes-eliminacion`, `/v1/cuenta`, `/v1/organizacion` y `/v1/organizacion/eliminacion`) responden con CORS abierto. La sesión va en el encabezado `Authorization`, no en cookies.
+- **CORS:** las rutas que llama la página web (`/v1/publico/organizaciones`, `/v1/publico/solicitudes-eliminacion`, `/v1/cuenta`, `/v1/organizacion` y `/v1/organizacion/eliminacion`) responden con CORS abierto a cualquier sitio. El resto de `/v1/` solo a los sitios del panel web (§6b). La sesión va en el encabezado `Authorization`, no en cookies.
 - **Solicitudes sin cooperativa** (el productor eligió "No sé"): quedan con `organizacion_id` vacío y las atiende GoProduction. Consultarlas en la base con `SELECT * FROM solicitudes_eliminacion WHERE organizacion_id IS NULL AND estado = 'pendiente'`.
 
 ## 4k. Cobros: contratos y consumos (Fase 4)
@@ -395,6 +403,7 @@ Endpoints:
   - administradores: `GET /v1/solicitudes-eliminacion`, `POST /v1/solicitudes-eliminacion/:id/aprobar|rechazar`, `DELETE /v1/productores/:id`, `POST|DELETE /v1/organizacion/eliminacion`;
   - cualquier persona con sesión: `DELETE /v1/cuenta`.
 - Públicas (sin sesión, con CORS): `GET /v1/publico/:uid` (verificador), `GET /v1/publico/organizaciones`, `POST /v1/publico/solicitudes-eliminacion`.
+- **CORS del panel web** (§6b): todas las rutas `/v1/` responden a los sitios de `ORIGENES_PANEL` (por defecto `https://trazacafe-dev.web.app`, `https://trazacafe-dev.firebaseapp.com` y `http://localhost:5000`), con su preflight `OPTIONS`. En producción, definir `ORIGENES_PANEL` con los sitios de `trazacafe-prod`.
 - Tareas programadas: `POST /v1/tareas/chequeo-deforestacion`, `POST /v1/tareas/attestations`, `POST /v1/tareas/eliminaciones`.
 - Cobros: no tienen rutas todavía; se manejan con `npm run contrato`, `ajuste-cobro` y `estado-de-cuenta` (§4k).
 
@@ -462,7 +471,7 @@ Es la página que abre el comprador al escanear el QR del contenedor: `https://t
 
 La misma publicación sirve también `/eliminar-datos` y `/privacidad` (§4j). Esas páginas muestran como correo de soporte `mauricio.zambrana.g@gmail.com`; para cambiarlo, compila con `--dart-define=SOPORTE_EMAIL=<correo>`.
 
-**Encabezados de seguridad** (`firebase.json`): las páginas (`/`, `/eliminar-datos`, `/privacidad`, `/v/…`) no se pueden mostrar dentro de otro sitio (`X-Frame-Options: DENY` y `frame-ancestors 'none'`, contra clickjacking), y llevan `nosniff` y `Referrer-Policy`. Las rutas reservadas de Firebase (`/__/auth/…`, que usa el login con Google) no los llevan. Después de publicar, se revisan con `curl -I https://trazacafe-dev.web.app/eliminar-datos`.
+**Encabezados de seguridad** (`firebase.json`): las páginas (`/`, `/eliminar-datos`, `/privacidad`, `/v/…`, `/panel` y `/panel/…`) no se pueden mostrar dentro de otro sitio (`X-Frame-Options: DENY` y `frame-ancestors 'none'`, contra clickjacking), y llevan `nosniff` y `Referrer-Policy`. Las rutas reservadas de Firebase (`/__/auth/…`, que usa el login con Google) no los llevan. Después de publicar, se revisan con `curl -I https://trazacafe-dev.web.app/eliminar-datos`.
 
 **Mapas sin señal** (`/mapas/indice.json` y `/mapas/<zona>.mbtiles`): la app los descarga desde esta misma publicación (⋮ → Mapas sin señal). Son imágenes Sentinel-2 de Copernicus (gratis, también para uso comercial, con el crédito "Contains modified Copernicus Sentinel data"), porque Google no permite guardar su mapa para usarlo sin conexión: sus mosaicos se guardan como máximo 24 horas (`max-age=86400, must-revalidate`).
 - **Generar una zona** (desde `backend/`; lee del catálogo público de AWS, sin cuentas; Jinotega tarda cerca de una hora):
@@ -491,7 +500,24 @@ Publicar (desde la raíz; `firebase.json` ya apunta a `app/build/web`, con todas
 
 ```powershell
 cd app
-flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
+flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app --dart-define=GOOGLE_MAPS_WEB_KEY=<key web (§4c)>
 cd ..
 firebase deploy --only hosting --project trazacafe-dev
 ```
+
+## 6b. Panel web para administradores (Fase 3)
+
+La misma publicación de Hosting sirve el panel en `https://trazacafe-dev.web.app/panel` (y `/panel/lotes`, `/panel/contenedores`, `/panel/proveedores`, `/panel/clientes`, `/panel/observaciones`, `/panel/equipo`).
+
+- **Quién entra:** administradores, con su cuenta de Google (el mismo login con ventana de Google que la página de eliminación de datos). Un técnico ve un aviso para usar la app.
+- **Qué usa:** las rutas de administrador de la API, sin base local. El tipo, los cultivos y las temporadas salen de `GET /v1/organizacion` y `GET /v1/temporadas` (`app/README.md`).
+- **CORS:** la API responde a los sitios de `ORIGENES_PANEL` (§5). Si el panel se abre desde otro dominio, agregarlo ahí y en las restricciones de la key de navegador de Firebase (§4) y de la key web de mapas (§4c).
+- **Mapa:** key web de Map Tiles (§4c), pasada al compilar con `GOOGLE_MAPS_WEB_KEY`.
+- **Revisar después de publicar:**
+
+  ```bash
+  curl -I https://trazacafe-dev.web.app/panel
+  curl -i -X OPTIONS https://trazacafe-api-85528878949.us-east4.run.app/v1/lotes -H "Origin: https://trazacafe-dev.web.app" -H "Access-Control-Request-Method: GET"
+  ```
+
+  El primero debe traer `X-Frame-Options: DENY`; el segundo, `204` con `access-control-allow-origin: https://trazacafe-dev.web.app`.

@@ -1306,6 +1306,49 @@ describe("aGeometria", () => {
   });
 });
 
+describe("CORS del panel web", () => {
+  const PANEL = "https://trazacafe-dev.web.app";
+
+  it("el preflight de cualquier ruta /v1/ desde el panel responde 204 con los encabezados", async () => {
+    const { app } = crearApp();
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/lotes/abc/venta",
+      headers: { origin: PANEL, "access-control-request-method": "DELETE" },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(res.headers["access-control-allow-origin"]).toBe(PANEL);
+    expect(res.headers["access-control-allow-methods"]).toContain("PATCH");
+    expect(res.headers["access-control-allow-headers"]).toContain("authorization");
+    expect(res.headers.vary).toContain("origin");
+  });
+
+  it("las respuestas al panel llevan su origen, también los errores", async () => {
+    const { app } = crearApp();
+    const ok = await app.inject({ method: "GET", url: "/v1/lotes", headers: { origin: PANEL, authorization: "Bearer admin" } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.headers["access-control-allow-origin"]).toBe(PANEL);
+    const sinSesion = await app.inject({ method: "GET", url: "/v1/lotes", headers: { origin: PANEL } });
+    expect(sinSesion.statusCode).toBe(401);
+    expect(sinSesion.headers["access-control-allow-origin"]).toBe(PANEL);
+  });
+
+  it("otro sitio no recibe los encabezados", async () => {
+    const { app } = crearApp();
+    const res = await app.inject({ method: "GET", url: "/v1/lotes", headers: { origin: "https://otro.example", authorization: "Bearer admin" } });
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    const previa = await app.inject({ method: "OPTIONS", url: "/v1/lotes", headers: { origin: "https://otro.example" } });
+    expect(previa.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("las rutas de las páginas públicas siguen abiertas a cualquier sitio", async () => {
+    const { app } = crearApp();
+    const res = await app.inject({ method: "OPTIONS", url: "/v1/organizacion", headers: { origin: "https://otro.example" } });
+    expect(res.statusCode).toBe(204);
+    expect(res.headers["access-control-allow-origin"]).toBe("*");
+  });
+});
+
 describe("GET /v1/publico/:uid (verificador)", () => {
   const UID = `0x${"ab".repeat(32)}`;
   const cadena = { red: "optimism-sepolia", tipo: "Exportacion", uid: UID, fincas: [] } as unknown as CadenaPublica;

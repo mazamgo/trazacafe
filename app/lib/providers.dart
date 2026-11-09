@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/database.dart';
@@ -100,9 +101,11 @@ final mapasServiceProvider = Provider<MapasService>((ref) => MapasService());
 
 final mapasSinSenalProvider = Provider<MapasSinSenal>((ref) => MapasSinSenal());
 
-/// Mapas satelitales (Sentinel-2) ya descargados: se ven sin señal.
+/// Mapas satelitales (Sentinel-2) ya descargados: se ven sin señal. En la web
+/// no hay carpeta de la app ni lector de MBTiles.
 final mapasDescargadosProvider = FutureProvider<List<MapaDescargado>>(
-  (ref) => ref.watch(mapasSinSenalProvider).descargados(),
+  (ref) async =>
+      kIsWeb ? const [] : ref.watch(mapasSinSenalProvider).descargados(),
 );
 
 final datosCelularProvider = Provider<DatosCelular>(
@@ -148,10 +151,47 @@ final fotosProvider = StreamProvider.family<List<Foto>, (String, String)>(
       ref.watch(databaseProvider).observarFotos(entidad.$1, entidad.$2),
 );
 
+/// `false` en el panel web: no hay base local ni sincronización, y lo que el
+/// celular lee de la base (organización y temporadas) se pide a la API.
+final conBaseLocalProvider = Provider<bool>((ref) => !kIsWeb);
+
+/// Organización de la sesión según la API (`GET /v1/organizacion`): nombre,
+/// tipo y cultivos. Solo para el panel web.
+final organizacionWebProvider = FutureProvider<Map<String, dynamic>>((ref) {
+  ref.watch(sesionProvider.select((s) => s.value?.organizacionId));
+  return ref.watch(apiProvider).organizacion();
+});
+
 /// Temporadas de la organización, de la más reciente a la más antigua.
-final temporadasProvider = StreamProvider<List<Temporada>>(
-  (ref) => ref.watch(databaseProvider).observarTemporadas(),
-);
+final temporadasProvider = StreamProvider<List<Temporada>>((ref) {
+  if (ref.watch(conBaseLocalProvider)) {
+    return ref.watch(databaseProvider).observarTemporadas();
+  }
+  ref.watch(sesionProvider.select((s) => s.value?.organizacionId));
+  return Stream.fromFuture(
+    ref
+        .watch(apiProvider)
+        .temporadas()
+        .then((lista) => [for (final t in lista) temporadaDesdeJson(t)]),
+  );
+});
+
+/// Temporada de la API: `inicio` y `fin` (`AAAA-MM-DD`) a medianoche local,
+/// como las guarda la sincronización.
+Temporada temporadaDesdeJson(Map<String, dynamic> t) {
+  DateTime dia(Object? v) {
+    final p = (v as String).split('-').map(int.parse).toList();
+    return DateTime(p[0], p[1], p[2]);
+  }
+
+  return Temporada(
+    id: t['id'] as String,
+    nombre: t['nombre'] as String,
+    inicio: dia(t['inicio']),
+    fin: dia(t['fin']),
+    cultivo: t['cultivo'] as String?,
+  );
+}
 
 /// Temporada de [cultivo] que contiene [fecha]: la propia del cultivo gana
 /// sobre la general. Con [cultivo] `null`, cualquiera que contenga la fecha.
@@ -190,9 +230,16 @@ final temporadaActualDeProvider = Provider.family<Temporada?, String>(
 );
 
 /// Cultivos con los que trabaja la organización (ids de `cultivos.json`).
-final cultivosOrganizacionProvider = StreamProvider<List<String>>(
-  (ref) => ref.watch(databaseProvider).observarCultivosOrganizacion(),
-);
+final cultivosOrganizacionProvider = StreamProvider<List<String>>((ref) {
+  if (ref.watch(conBaseLocalProvider)) {
+    return ref.watch(databaseProvider).observarCultivosOrganizacion();
+  }
+  return Stream.fromFuture(
+    ref
+        .watch(organizacionWebProvider.future)
+        .then((o) => (o['cultivos'] as List).cast<String>()),
+  );
+});
 
 final verificacionesProvider =
     StreamProvider.family<List<Verificacion>, String>(
@@ -218,17 +265,25 @@ final exportacionesProvider = FutureProvider.autoDispose<List<Exportacion>>(
   (ref) => ref.watch(apiProvider).exportaciones(),
 );
 
-/// Comparte archivos del paquete EUDR (PDF, GeoJSON) con otras apps.
+/// Comparte archivos del paquete EUDR (PDF, GeoJSON) con otras apps; en el
+/// panel web, los descarga.
 final compartidorProvider = Provider<Compartidor>(
-  (ref) => CompartidorSistema(),
+  (ref) => kIsWeb ? CompartidorWeb() : CompartidorSistema(),
 );
 
 /// Tipo de la organización según la última sincronización (`null` antes de
-/// la primera): decide si el menú muestra Proveedores o Clientes.
-final tipoOrganizacionProvider = StreamProvider<String?>(
-  (ref) =>
-      ref.watch(databaseProvider).observarAjuste(ClaveAjuste.organizacionTipo),
-);
+/// la primera; en el panel web, según la API): decide si el menú muestra
+/// Proveedores o Clientes.
+final tipoOrganizacionProvider = StreamProvider<String?>((ref) {
+  if (ref.watch(conBaseLocalProvider)) {
+    return ref
+        .watch(databaseProvider)
+        .observarAjuste(ClaveAjuste.organizacionTipo);
+  }
+  return Stream.fromFuture(
+    ref.watch(organizacionWebProvider.future).then((o) => o['tipo'] as String?),
+  );
+});
 
 /// Exportadora: proveedoras y lotes por recibir (requiere señal).
 final proveedoresProvider = FutureProvider.autoDispose(
