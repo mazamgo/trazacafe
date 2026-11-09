@@ -222,6 +222,41 @@ void main() {
     expect(find.textContaining('vendido a Exportadora Norte'), findsOneWidget);
   });
 
+  testWidgets('cooperativa: un lote firmado se vende pero no se corrige; en un contenedor no se vende', (tester) async {
+    await abrir(tester, const LotesScreen(), {
+      'GET /v1/lotes': (200, {
+        'lotes': [
+          {...lote('l1'), 'attestationUid': '0xabc'},
+          {...lote('l2'), 'exportacionCodigo': 'EXP-2026-001'},
+        ],
+      }),
+    });
+    await tester.tap(find.text('CAFE-l1 · 1,000 kg'));
+    await tester.pumpAndSettle();
+    expect(find.text('Vender'), findsOneWidget);
+    expect(find.text('Corregir'), findsNothing);
+
+    await tester.tap(find.text('CAFE-l1 · 1,000 kg'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CAFE-l2 · 1,000 kg'));
+    await tester.pumpAndSettle();
+    expect(find.text('Vender'), findsNothing);
+  });
+
+  testWidgets('cooperativa: la venta de un lote firmado se puede deshacer', (tester) async {
+    await abrir(tester, const LotesScreen(), {
+      'GET /v1/lotes': (200, {
+        'lotes': [
+          {...lote('l1', venta: venta()), 'attestationUid': '0xabc'},
+        ],
+      }),
+    });
+    await tester.tap(find.text('CAFE-l1 · 1,000 kg'));
+    await tester.pumpAndSettle();
+    expect(find.text('Deshacer venta'), findsOneWidget);
+    expect(find.text('Vender'), findsNothing);
+  });
+
   testWidgets('cooperativa: un lote vendido no se corrige; la venta se deshace mientras no esté en un contenedor', (tester) async {
     await abrir(tester, const LotesScreen(), {
       'GET /v1/lotes': (200, {'lotes': [lote('l1', venta: venta()), lote('l2', venta: venta(recibido: true, enContenedor: true))]}),

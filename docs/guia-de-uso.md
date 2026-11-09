@@ -212,6 +212,7 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
 2. Elige el **cliente**, los **kg enviados** (la app propone el peso del lote) y la **fecha de envío**.
 3. La exportadora lo **recibe** y confirma los kg. La tarjeta dice **Vendido a…**, si ya lo recibieron y con cuántos kg.
 
+- **Cuándo:** también se puede vender un lote ya firmado en la blockchain; solo no se puede si ya va en un contenedor o ya se vendió.
 - **Deshacer venta:** mientras la exportadora no lo ponga en un contenedor.
 - Un lote vendido **ya no se corrige ni se deshace** (primero se deshace la venta) y no va en tus contenedores.
 - Si la exportadora recibe otros kg, el lote muestra un **aviso de diferencia**, por ejemplo "Se recibieron 980 kg de 1,000 enviados".
@@ -345,7 +346,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |
 | Celular nuevo o reinstalación | Entra con la misma cuenta y toca **Sincronizar**: se descargan los datos de la organización. Lo que **no** se había sincronizado en el celular anterior se pierde. |
 | "Ese correo no es de un administrador activo" al invitar un proveedor | Pide a la cooperativa el correo con que **su administrador** entra a la app (debe haber entrado al menos una vez). Si la cooperativa no usa TrazaCafé, escríbenos para darla de alta. |
-| No sale **Vender** en un lote | Necesitas un cliente activo (**⋮ → Clientes**), y el lote no debe estar firmado, en un contenedor ni vendido. |
+| No sale **Vender** en un lote | El lote ya va en un contenedor o ya se vendió. Si tocas **Vender** y dice que no hay clientes, necesitas uno activo en **⋮ → Clientes**. |
 | No se puede deshacer la venta | La exportadora ya puso el lote en un contenedor. Habla con ella. |
 | El panel web dice "El panel web es para administradores" | Entraste con una cuenta de técnico. Usa la app, o pide al administrador que te cambie el rol en **Equipo**. |
 | En el panel no se abre la ventana de Google | El navegador bloqueó la ventana emergente: permítela para `trazacafe-dev.web.app` (ícono en la barra de direcciones) y vuelve a tocar **Entrar con Google**. |

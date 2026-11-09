@@ -176,13 +176,14 @@ class LotesScreen extends ConsumerWidget {
     }
   }
 
-  /// Propio, sin firmar, sin contenedor y sin vender: se corrige, se
-  /// deshace o se vende.
-  static bool _libre(Lote l) =>
-      l.proveedor == null &&
-      !l.atestado &&
-      l.exportacionCodigo == null &&
-      l.venta == null;
+  /// Propio, sin firmar, sin contenedor y sin vender: se corrige o se
+  /// deshace.
+  static bool _libre(Lote l) => !l.atestado && _vendible(l);
+
+  /// Propio, sin contenedor y sin vender. Firmado también se vende: la venta
+  /// no cambia lo firmado, y los lotes se firman en menos de una hora.
+  static bool _vendible(Lote l) =>
+      l.proveedor == null && l.exportacionCodigo == null && l.venta == null;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -243,7 +244,7 @@ class LotesScreen extends ConsumerWidget {
                         onDeshacer: _libre(l)
                             ? () => _deshacer(context, ref, l)
                             : null,
-                        onVender: vende && _libre(l)
+                        onVender: vende && _vendible(l)
                             ? () => _vender(context, ref, l)
                             : null,
                         onDeshacerVenta:
@@ -366,8 +367,9 @@ class _TarjetaLote extends StatelessWidget {
               ],
             ),
           ] else if (lote.exportacionCodigo != null)
-            Text('Va en el contenedor ${lote.exportacionCodigo}.')
-          else if (onDeshacerVenta != null)
+            Text('Va en el contenedor ${lote.exportacionCodigo}.'),
+          // Independiente de lo anterior: un lote firmado también se vende.
+          if (onDeshacerVenta != null)
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
@@ -376,20 +378,22 @@ class _TarjetaLote extends StatelessWidget {
                 label: const Text('Deshacer venta'),
               ),
             )
-          else if (onCorregir != null)
+          else if (onCorregir != null || onVender != null)
             OverflowBar(
               alignment: MainAxisAlignment.end,
               children: [
-                TextButton.icon(
-                  onPressed: onDeshacer,
-                  icon: const Icon(Icons.undo),
-                  label: const Text('Deshacer lote'),
-                ),
-                TextButton.icon(
-                  onPressed: onCorregir,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Corregir'),
-                ),
+                if (onDeshacer != null)
+                  TextButton.icon(
+                    onPressed: onDeshacer,
+                    icon: const Icon(Icons.undo),
+                    label: const Text('Deshacer lote'),
+                  ),
+                if (onCorregir != null)
+                  TextButton.icon(
+                    onPressed: onCorregir,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Corregir'),
+                  ),
                 if (onVender != null)
                   FilledButton.tonalIcon(
                     onPressed: onVender,
