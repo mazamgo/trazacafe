@@ -89,9 +89,11 @@ class _NuevoContenedorScreenState extends ConsumerState<NuevoContenedorScreen> {
           });
           final libres = [
             for (final l in todos)
-              // Propios sin vender, y comprados a proveedoras (ya recibidos).
-              if (l.exportacionCodigo == null && !l.vendido) l,
+              // Propios cerrados sin vender, y comprados a proveedoras (ya
+              // recibidos).
+              if (l.exportacionCodigo == null && !l.vendido && !l.abierto) l,
           ];
+          final abiertos = todos.where((l) => l.abierto).length;
           final elegidos = [
             for (final l in libres)
               if (_elegidos.contains(l.id)) l,
@@ -117,6 +119,15 @@ class _NuevoContenedorScreenState extends ConsumerState<NuevoContenedorScreen> {
                   child: Text(
                     'No hay lotes libres. Arma primero los lotes en ⋮ → Lotes, '
                     'o recibe los de tus proveedores en ⋮ → Proveedores.',
+                  ),
+                ),
+              if (abiertos > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    abiertos == 1
+                        ? 'Tienes 1 lote abierto: aparece aquí al cerrarlo en ⋮ → Lotes.'
+                        : 'Tienes $abiertos lotes abiertos: aparecen aquí al cerrarlos en ⋮ → Lotes.',
                   ),
                 ),
               for (final l in libres)

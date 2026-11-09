@@ -5,7 +5,7 @@ import '../data/database.dart';
 import '../domain/cultivos.dart';
 import '../providers.dart';
 import '../services/api_client.dart';
-import 'finca_screen.dart' show fecha;
+import '../widgets/lista_entregas.dart';
 import 'lotes_screen.dart' show kgTexto;
 
 /// Arma un lote con entregas de un cultivo y temporada. Devuelve el [Lote]
@@ -19,9 +19,6 @@ class NuevoLoteScreen extends ConsumerStatefulWidget {
 }
 
 class _NuevoLoteScreenState extends ConsumerState<NuevoLoteScreen> {
-  /// Igual que TOLERANCIA_VOLUMEN de la API (backend/src/lotes.ts).
-  static const _tolerancia = 0.1;
-
   String? _cultivo;
   String? _temporadaId;
   String? _estado;
@@ -245,18 +242,10 @@ class _NuevoLoteScreenState extends ConsumerState<NuevoLoteScreen> {
   }
 
   Widget _entregasYDatos(Cultivo c, List<EntregaDisponible> entregas) {
-    final libres = [
-      for (final e in entregas)
-        if (e.motivo == null) e,
-    ];
-    final excluidas = [
-      for (final e in entregas)
-        if (e.motivo != null) e,
-    ];
     final esperados = _esperados(entregas);
     final kg = double.tryParse(_kg.text.trim().replaceAll(',', '.'));
     final excede =
-        kg != null && esperados > 0 && kg > esperados * (1 + _tolerancia);
+        kg != null && esperados > 0 && kg > esperados * (1 + toleranciaVolumen);
     final nombreEstado = c.nombreEstado(_estado!).toLowerCase();
 
     void cambiar(void Function() f) => setState(() {
@@ -267,66 +256,12 @@ class _NuevoLoteScreenState extends ConsumerState<NuevoLoteScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Entregas disponibles (${libres.length})',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            if (libres.isNotEmpty)
-              TextButton(
-                onPressed: () => cambiar(() {
-                  if (_elegidas.length == libres.length) {
-                    _elegidas.clear();
-                  } else {
-                    _elegidas.addAll(libres.map((e) => e.id));
-                  }
-                }),
-                child: Text(
-                  _elegidas.length == libres.length
-                      ? 'Quitar todas'
-                      : 'Elegir todas',
-                ),
-              ),
-          ],
+        ListaEntregas(
+          cultivo: c,
+          entregas: entregas,
+          elegidas: _elegidas,
+          cambiar: cambiar,
         ),
-        if (libres.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text('No hay entregas libres en esta temporada.'),
-          ),
-        for (final e in libres)
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _elegidas.contains(e.id),
-            onChanged: (v) => cambiar(
-              () => v == true ? _elegidas.add(e.id) : _elegidas.remove(e.id),
-            ),
-            title: Text(
-              '${e.fincaNombre} · ${kgTexto(e.kg)} kg ${c.nombreEstado(e.estado).toLowerCase()}',
-            ),
-            subtitle: Text(
-              '${e.productorNombre} · ${fecha(e.fecha)}'
-              '${e.deforestacion == 'verde' ? '' : ' · satélite: ${e.deforestacion}'}',
-            ),
-          ),
-        if (excluidas.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'No pueden ir en un lote (${excluidas.length})',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          for (final e in excluidas)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              enabled: false,
-              leading: const Icon(Icons.block),
-              title: Text('${e.fincaNombre} · ${kgTexto(e.kg)} kg'),
-              subtitle: Text(e.motivo!),
-            ),
-        ],
         const Divider(height: 24),
         Text(
           _elegidas.isEmpty
@@ -367,7 +302,11 @@ class _NuevoLoteScreenState extends ConsumerState<NuevoLoteScreen> {
             hintText: 'p. ej. lavado, natural, honey',
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const Text(
+          'El lote queda abierto: podrás sumarle entregas y lo cierras cuando esté completo.',
+        ),
+        const SizedBox(height: 12),
         FilledButton(
           onPressed: _elegidas.isEmpty || _guardando ? null : _guardar,
           child: Text(_guardando ? 'Guardando…' : 'Crear lote'),

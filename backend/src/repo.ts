@@ -54,6 +54,8 @@ export interface Lote {
   proveedor: string | null;
   /** Venta a una exportadora (o compra, si `proveedor`), o `null`. */
   venta: VentaLote | null;
+  /** Todavía recibe entregas; no se firma, vende ni va en un contenedor. */
+  abierto: boolean;
   entregas: {
     id: string;
     fincaId: string;
@@ -70,6 +72,19 @@ export type DatosLote = LoteNuevo & { id: string; beneficio: string; kgEsperados
 
 export type ResultadoGuardarLote = "creado" | "codigo_repetido" | "entrega_ocupada";
 export type ResultadoEliminarLote = "eliminado" | "no_encontrado" | "atestado" | "vendido";
+
+/** Lote abierto con lo necesario para evaluarlo de nuevo. */
+export interface LoteAbierto {
+  id: string;
+  codigo: string;
+  cultivo: string;
+  temporadaId: string;
+  estado: string;
+  kg: number;
+  entregas: string[];
+}
+export type ResultadoAgregarEntregas = "agregadas" | "no_encontrado" | "cerrado" | "entrega_ocupada";
+export type ResultadoCerrarLote = "cerrado" | "no_encontrado" | "ya_cerrado";
 
 /** Contenedor de exportación con sus lotes y el resumen para el paquete EUDR. */
 export interface Exportacion {
@@ -254,8 +269,19 @@ export interface Repo {
     organizacionId: string,
     filtro: { ids: string[] } | { cultivo: string; temporadaId: string },
   ): Promise<EntregaCandidata[]>;
-  /** Guarda el lote ya evaluado y encola su attestation. */
+  /** Guarda el lote ya evaluado, abierto: se firma al cerrarlo. */
   guardarLote(organizacionId: string, uid: string, lote: DatosLote): Promise<ResultadoGuardarLote>;
+  /** El lote de la organización si sigue abierto. */
+  loteAbierto(organizacionId: string, loteId: string): Promise<LoteAbierto | "no_encontrado" | "cerrado">;
+  /** Suma entregas ya evaluadas a un lote abierto y deja su historial. */
+  agregarEntregasALote(
+    organizacionId: string,
+    uid: string,
+    loteId: string,
+    datos: { entregas: string[]; kg: number; kgEsperados: number; avisos: Aviso[] },
+  ): Promise<ResultadoAgregarEntregas>;
+  /** Cierra el lote y encola su attestation. */
+  cerrarLote(organizacionId: string, uid: string, loteId: string): Promise<ResultadoCerrarLote>;
   /** Del más reciente al más antiguo. */
   listarLotes(organizacionId: string): Promise<Lote[]>;
   /** Deshace un lote que todavía no está en la blockchain; sus entregas quedan libres. */
@@ -761,7 +787,6 @@ export class PgRepo implements Repo {
         "INSERT INTO lote_entregas (lote_id, entrega_id) SELECT $1, unnest($2::uuid[])",
         [l.id, l.entregas],
       );
-      await client.query("INSERT INTO attestations_pendientes (esquema, entidad_id) VALUES ('Lote', $1)", [l.id]);
       await client.query("COMMIT");
       return "creado";
     } catch (e) {
@@ -775,12 +800,90 @@ export class PgRepo implements Repo {
     }
   }
 
+  async loteAbierto(organizacionId: string, loteId: string): Promise<LoteAbierto | "no_encontrado" | "cerrado"> {
+    const { rows: [l] } = await this.pool.query(
+      `SELECT l.id, l.codigo, l.cultivo, l.temporada_id AS "temporadaId", l.estado, l.kg::float8 AS kg,
+              l.cerrado_en IS NOT NULL AS cerrado,
+              (SELECT coalesce(array_agg(le.entrega_id::text), '{}') FROM lote_entregas le WHERE le.lote_id = l.id) AS entregas
+       FROM lotes l WHERE l.id = $1 AND l.organizacion_id = $2`,
+      [loteId, organizacionId],
+    );
+    if (!l) return "no_encontrado";
+    if (l.cerrado) return "cerrado";
+    const { cerrado: _, ...abierto } = l;
+    return abierto;
+  }
+
+  async agregarEntregasALote(
+    organizacionId: string,
+    uid: string,
+    loteId: string,
+    d: { entregas: string[]; kg: number; kgEsperados: number; avisos: Aviso[] },
+  ): Promise<ResultadoAgregarEntregas> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows: [l] } = await client.query<{ cerrado: boolean; kg: number; entregas: number }>(
+        `SELECT l.cerrado_en IS NOT NULL AS cerrado, l.kg::float8 AS kg,
+                (SELECT count(*)::int FROM lote_entregas le WHERE le.lote_id = l.id) AS entregas
+         FROM lotes l WHERE l.id = $1 AND l.organizacion_id = $2 FOR UPDATE`,
+        [loteId, organizacionId],
+      );
+      if (!l || l.cerrado) {
+        await client.query("ROLLBACK");
+        return l ? "cerrado" : "no_encontrado";
+      }
+      await client.query("INSERT INTO lote_entregas (lote_id, entrega_id) SELECT $1, unnest($2::uuid[])", [loteId, d.entregas]);
+      await client.query("UPDATE lotes SET kg = $2, kg_esperados = $3, avisos = $4 WHERE id = $1", [
+        loteId, d.kg, d.kgEsperados, JSON.stringify(d.avisos),
+      ]);
+      await client.query(
+        `INSERT INTO correcciones (organizacion_id, entidad, entidad_id, accion, antes, despues, motivo, usuario_uid)
+         VALUES ($1, 'lote', $2, 'corregir', $3, $4, 'Se agregaron entregas al lote abierto', $5)`,
+        [organizacionId, loteId, JSON.stringify({ kg: l.kg, entregas: l.entregas }),
+         JSON.stringify({ kg: d.kg, entregas: l.entregas + d.entregas.length }), uid],
+      );
+      await client.query("COMMIT");
+      return "agregadas";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      if ((e as { constraint?: string }).constraint === "lote_entregas_entrega_unica") return "entrega_ocupada";
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async cerrarLote(organizacionId: string, uid: string, loteId: string): Promise<ResultadoCerrarLote> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rowCount } = await client.query(
+        "UPDATE lotes SET cerrado_en = now(), cerrado_por = $3 WHERE id = $1 AND organizacion_id = $2 AND cerrado_en IS NULL",
+        [loteId, organizacionId, uid],
+      );
+      if (rowCount === 0) {
+        await client.query("ROLLBACK");
+        const { rowCount: existe } = await client.query("SELECT 1 FROM lotes WHERE id = $1 AND organizacion_id = $2", [loteId, organizacionId]);
+        return existe ? "ya_cerrado" : "no_encontrado";
+      }
+      await client.query("INSERT INTO attestations_pendientes (esquema, entidad_id) VALUES ('Lote', $1)", [loteId]);
+      await client.query("COMMIT");
+      return "cerrado";
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
   /** Los lotes propios y los comprados a proveedoras (ya recibidos). */
   async listarLotes(organizacionId: string): Promise<Lote[]> {
     const { rows } = await this.pool.query(
       `SELECT l.id, l.codigo, l.cultivo, l.temporada_id AS "temporadaId", t.nombre AS "temporadaNombre", l.estado,
               l.kg::float8 AS kg, l.kg_esperados::float8 AS "kgEsperados", l.beneficio, l.proceso, l.avisos,
-              l.attestation_uid AS "attestationUid", l.creado_en AS "creadoEn",
+              l.attestation_uid AS "attestationUid", l.creado_en AS "creadoEn", l.cerrado_en IS NULL AS abierto,
               (SELECT x.codigo FROM exportacion_lotes el JOIN exportaciones x ON x.id = el.exportacion_id
                 WHERE el.lote_id = l.id AND x.organizacion_id = $1) AS "exportacionCodigo",
               CASE WHEN l.organizacion_id <> $1 THEN po.nombre END AS proveedor,
@@ -865,7 +968,7 @@ export class PgRepo implements Repo {
   async lotesCandidatos(organizacionId: string, ids: string[]): Promise<LoteCandidato[]> {
     const { rows } = await this.pool.query<LoteCandidato>(
       // Propios sin vender, o comprados a una proveedora y ya recibidos.
-      `SELECT l.id, l.codigo, l.cultivo, x.codigo AS "exportacionCodigo"
+      `SELECT l.id, l.codigo, l.cultivo, x.codigo AS "exportacionCodigo", l.cerrado_en IS NULL AS abierto
        FROM lotes l
        LEFT JOIN exportacion_lotes el ON el.lote_id = l.id
        LEFT JOIN exportaciones x ON x.id = el.exportacion_id

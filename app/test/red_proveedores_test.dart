@@ -243,6 +243,78 @@ void main() {
     expect(find.text('Vender'), findsNothing);
   });
 
+  group('lote abierto', () {
+    Map<String, dynamic> abierto() => {...lote('l1'), 'kg': 16, 'kgEsperados': 16, 'estado': 'oro', 'abierto': true};
+    Map<String, dynamic> libre(String id, {String? motivo}) => {
+      'id': id,
+      'fincaNombre': 'La Leonesa',
+      'productorNombre': 'Ana',
+      'kg': 100,
+      'estado': 'uva',
+      'fecha': '2026-11-09T17:00:00.000Z',
+      'deforestacion': 'verde',
+      'motivo': motivo,
+    };
+
+    testWidgets('muestra agregar y cerrar, y no vender', (tester) async {
+      await abrir(tester, const LotesScreen(), {
+        'GET /v1/lotes': (200, {'lotes': [abierto()]}),
+      });
+      await tester.tap(find.text('CAFE-l1 · 16 kg'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Abierto: puede recibir más entregas'), findsOneWidget);
+      expect(find.text('Agregar entregas'), findsOneWidget);
+      expect(find.text('Cerrar lote'), findsOneWidget);
+      expect(find.text('Corregir'), findsOneWidget);
+      expect(find.text('Vender'), findsNothing);
+    });
+
+    testWidgets('agrega una entrega con el peso propuesto y sin las que ya van en él', (tester) async {
+      final api = await abrir(tester, const LotesScreen(), {
+        'GET /v1/lotes': (200, {'lotes': [abierto()]}),
+        'GET /v1/lotes/disponibles': (200, {
+          'entregas': [libre('e2'), libre('e1', motivo: 'Ya está en el lote CAFE-l1')],
+        }),
+        'POST /v1/lotes/l1/entregas': (200, {...abierto(), 'kg': 32}),
+      });
+      await tester.tap(find.text('CAFE-l1 · 16 kg'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar entregas'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Ya está en el lote'), findsNothing);
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pump();
+      expect(find.text('32'), findsOneWidget, reason: '16 kg + 100 kg de uva en oro');
+      await tester.tap(find.text('Agregar al lote'));
+      await tester.pumpAndSettle();
+      final post = api.peticiones.firstWhere((p) => p.method == 'POST');
+      expect(jsonDecode(post.body), {'entregas': ['e2'], 'kg': 32});
+    });
+
+    testWidgets('cerrar pide confirmación', (tester) async {
+      final api = await abrir(tester, const LotesScreen(), {
+        'GET /v1/lotes': (200, {'lotes': [abierto()]}),
+        'POST /v1/lotes/l1/cerrar': (200, lote('l1')),
+      });
+      await tester.tap(find.text('CAFE-l1 · 16 kg'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cerrar lote'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Ya no podrá recibir más entregas'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Cerrar lote').last);
+      await tester.pumpAndSettle();
+      expect(api.peticiones.where((p) => p.method == 'POST').single.url.path, '/v1/lotes/l1/cerrar');
+    });
+
+    testWidgets('no aparece para armar un contenedor', (tester) async {
+      await abrir(tester, const NuevoContenedorScreen(), {
+        'GET /v1/lotes': (200, {'lotes': [abierto()]}),
+      });
+      expect(find.textContaining('CAFE-l1'), findsNothing);
+      expect(find.textContaining('Tienes 1 lote abierto'), findsOneWidget);
+    });
+  });
+
   testWidgets('cooperativa: la venta de un lote firmado se puede deshacer', (tester) async {
     await abrir(tester, const LotesScreen(), {
       'GET /v1/lotes': (200, {

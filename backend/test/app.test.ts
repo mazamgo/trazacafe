@@ -7,6 +7,7 @@ import type { Correcciones, Resultado } from "../src/correcciones.ts";
 import type { Identidad, Rol, Usuario, UsuarioActivo } from "../src/auth.ts";
 import { clasificar, type FuenteSatelital, type Hallazgos } from "../src/deforestacion.ts";
 import type { CambiosExportacion, ExportacionNueva, LoteCandidato } from "../src/exportaciones.ts";
+import type { Aviso } from "../src/lotes.ts";
 import type { EntregaCandidata } from "../src/lotes.ts";
 import { fincaDePaquete, paqueteDePrueba } from "./datos-paquete.ts";
 import {
@@ -89,7 +90,7 @@ class RepoMemoria implements Repo {
   }
   /** Entregas de la organización ORG que la API puede poner en lotes. */
   candidatas: EntregaCandidata[] = [];
-  lotes: (DatosLote & { organizacionId: string; atestado?: boolean })[] = [];
+  lotes: (DatosLote & { organizacionId: string; atestado?: boolean; cerrado?: boolean })[] = [];
   async entregasCandidatas(organizacionId: string, filtro: { ids: string[] } | { cultivo: string; temporadaId: string }) {
     if (organizacionId !== ORG) return [];
     const enLote = (id: string) => this.lotes.find((l) => l.entregas.includes(id))?.codigo ?? null;
@@ -123,8 +124,31 @@ class RepoMemoria implements Repo {
         exportacionCodigo: null,
         proveedor: null,
         venta: null,
+        abierto: !l.cerrado,
         entregas: [],
       }));
+  }
+  async loteAbierto(organizacionId: string, loteId: string) {
+    const l = this.lotes.find((x) => x.id === loteId && x.organizacionId === organizacionId);
+    if (!l) return "no_encontrado" as const;
+    if (l.cerrado) return "cerrado" as const;
+    return { id: l.id, codigo: l.codigo, cultivo: l.cultivo, temporadaId: l.temporadaId, estado: l.estado, kg: l.kg, entregas: [...l.entregas] };
+  }
+  async agregarEntregasALote(
+    _organizacionId: string,
+    _uid: string,
+    loteId: string,
+    d: { entregas: string[]; kg: number; kgEsperados: number; avisos: Aviso[] },
+  ) {
+    if (this.lotes.some((x) => x.entregas.some((e) => d.entregas.includes(e)))) return "entrega_ocupada" as const;
+    const l = this.lotes.find((x) => x.id === loteId)!;
+    l.entregas.push(...d.entregas);
+    Object.assign(l, { kg: d.kg, kgEsperados: d.kgEsperados, avisos: d.avisos });
+    return "agregadas" as const;
+  }
+  async cerrarLote(_organizacionId: string, _uid: string, loteId: string) {
+    this.lotes.find((x) => x.id === loteId)!.cerrado = true;
+    return "cerrado" as const;
   }
   /** Lotes de ORG que pueden ir en contenedores. */
   lotesLibres: LoteCandidato[] = [];
@@ -826,6 +850,80 @@ describe("/v1/lotes", () => {
     codigo: "CAFE-001", cultivo: "cafe", temporadaId: T, estado: "pergamino", kg: 100, entregas, ...p,
   });
 
+  describe("lote abierto", () => {
+    async function conLote() {
+      const c = preparar();
+      const a = candidata();
+      const b = candidata();
+      c.repo.candidatas.push(a, b);
+      const res = await pedir(c.app, "POST", "/v1/lotes", "admin", nuevo([a.id]));
+      return { ...c, a, b, id: res.json().id as string, res };
+    }
+
+    it("un lote nuevo queda abierto", async () => {
+      const { res } = await conLote();
+      expect(res.statusCode).toBe(201);
+      expect(res.json().abierto).toBe(true);
+    });
+
+    it("suma entregas, actualiza el peso y recalcula lo esperado con todas", async () => {
+      const { app, repo, b, id } = await conLote();
+      const res = await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [b.id], kg: 200 });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().kg).toBe(200);
+      expect(repo.lotes[0].entregas).toHaveLength(2);
+      // 500 kg de uva a pergamino, por dos entregas.
+      expect(repo.lotes[0].kgEsperados).toBeCloseTo(200, 0);
+    });
+
+    it("rechaza una entrega que no cumple las reglas y no cambia el lote", async () => {
+      const { app, repo, id } = await conLote();
+      const roja = candidata({ deforestacion: "rojo" });
+      repo.candidatas.push(roja);
+      const res = await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [roja.id], kg: 200 });
+      expect(res.statusCode).toBe(422);
+      expect(res.json().error).toBe("entregas_excluidas");
+      expect(repo.lotes[0].entregas).toHaveLength(1);
+      expect(repo.lotes[0].kg).toBe(100);
+    });
+
+    it("no suma una entrega que ya va en el lote o en otro", async () => {
+      const { app, repo, a, id } = await conLote();
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [a.id], kg: 200 })).statusCode).toBe(409);
+      const otra = candidata({ loteCodigo: "CAFE-999" });
+      repo.candidatas.push(otra);
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [otra.id], kg: 200 })).statusCode).toBe(422);
+    });
+
+    it("al cerrar queda cerrado y ya no recibe entregas", async () => {
+      const { app, repo, b, id } = await conLote();
+      const res = await pedir(app, "POST", `/v1/lotes/${id}/cerrar`, "admin", {});
+      expect(res.statusCode).toBe(200);
+      expect(res.json().abierto).toBe(false);
+      expect(repo.lotes[0].cerrado).toBe(true);
+      const tarde = await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [b.id], kg: 200 });
+      expect(tarde.statusCode).toBe(409);
+      expect(tarde.json().error).toBe("lote_cerrado");
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/cerrar`, "admin", {})).statusCode).toBe(409);
+    });
+
+    it("no se cierra si una finca pasó a rojo mientras estaba abierto", async () => {
+      const { app, repo, a, id } = await conLote();
+      repo.candidatas.find((e) => e.id === a.id)!.deforestacion = "rojo";
+      const res = await pedir(app, "POST", `/v1/lotes/${id}/cerrar`, "admin", {});
+      expect(res.statusCode).toBe(422);
+      expect(repo.lotes[0].cerrado).toBeUndefined();
+    });
+
+    it("es solo para administradores y de la propia organización", async () => {
+      const { app, b, id } = await conLote();
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/cerrar`, "tecnico", {})).statusCode).toBe(403);
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "tecnico", { entregas: [b.id], kg: 200 })).statusCode).toBe(403);
+      expect((await pedir(app, "POST", `/v1/lotes/${crypto.randomUUID()}/cerrar`, "admin", {})).statusCode).toBe(404);
+      expect((await pedir(app, "POST", "/v1/lotes/no-es-uuid/cerrar", "admin", {})).statusCode).toBe(404);
+    });
+  });
+
   it("el administrador arma un lote; se guarda con sus avisos y el beneficio por defecto", async () => {
     const { app, repo } = preparar();
     const e = candidata({ deforestacion: "pendiente" });
@@ -921,9 +1019,9 @@ describe("/v1/exportaciones", () => {
   function preparar() {
     const c = crearApp();
     c.repo.lotesLibres.push(
-      { id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null },
-      { id: L2, codigo: "CAFE-002", cultivo: "cafe", exportacionCodigo: null },
-      { id: L3, codigo: "CACAO-001", cultivo: "cacao", exportacionCodigo: null },
+      { id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null, abierto: false },
+      { id: L2, codigo: "CAFE-002", cultivo: "cafe", exportacionCodigo: null, abierto: false },
+      { id: L3, codigo: "CACAO-001", cultivo: "cacao", exportacionCodigo: null, abierto: false },
     );
     return c;
   }
@@ -980,7 +1078,7 @@ describe("paquete EUDR del contenedor", () => {
   const L1 = "66666666-6666-4666-8666-666666666661";
   async function preparar(p: object = {}) {
     const c = crearApp();
-    c.repo.lotesLibres.push({ id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null });
+    c.repo.lotesLibres.push({ id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null, abierto: false });
     const res = await pedir(c.app, "POST", "/v1/exportaciones", "admin", {
       codigo: "EXP 2026/001", comprador: "Tostador GmbH", destino: "Hamburgo", lotes: [L1], ...p,
     });

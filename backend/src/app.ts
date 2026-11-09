@@ -23,7 +23,7 @@ import {
   type Eliminaciones,
 } from "./eliminacion.ts";
 import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
-import { evaluarLote, loteSchema, motivoExclusion } from "./lotes.ts";
+import { agregarEntregasSchema, evaluarLote, loteSchema, motivoExclusion, type LoteNuevo, type Rechazo } from "./lotes.ts";
 import { geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
 import {
   invitarProveedorSchema,
@@ -34,7 +34,7 @@ import {
   ventaSchema,
   type Proveedores,
 } from "./proveedores.ts";
-import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type Repo } from "./repo.ts";
+import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type LoteAbierto, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
 import { UID_VALIDO, type Verificador } from "./verificador.ts";
 
@@ -643,13 +643,7 @@ export function buildApp({
 
     const candidatas = await repo.entregasCandidatas(admin.organizacionId, { ids: l.entregas });
     const { rechazos, avisos, kgEsperados } = evaluarLote(l, candidatas);
-    if (rechazos.length > 0) {
-      return reply.code(422).send({
-        error: "entregas_excluidas",
-        mensaje: `${rechazos.length} ${rechazos.length === 1 ? "entrega no puede" : "entregas no pueden"} ir en el lote: ${rechazos[0].motivo}.`,
-        rechazos,
-      });
-    }
+    if (rechazos.length > 0) return rechazarEntregas(reply, rechazos);
     const id = crypto.randomUUID();
     const r = await repo.guardarLote(admin.organizacionId, admin.uid, {
       ...l,
@@ -666,6 +660,82 @@ export function buildApp({
     }
     const lote = (await repo.listarLotes(admin.organizacionId)).find((x) => x.id === id);
     return reply.code(201).send(lote);
+  });
+
+  function rechazarEntregas(reply: FastifyReply, rechazos: Rechazo[]) {
+    return reply.code(422).send({
+      error: "entregas_excluidas",
+      mensaje: `${rechazos.length} ${rechazos.length === 1 ? "entrega no puede" : "entregas no pueden"} ir en el lote: ${rechazos[0].motivo}.`,
+      rechazos,
+    });
+  }
+
+  const LOTE_CERRADO = { error: "lote_cerrado", mensaje: "El lote ya está cerrado; no se le pueden sumar entregas." };
+
+  /** Administrador con el lote abierto de la ruta; `null` si ya se respondió. */
+  async function conLoteAbierto(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const admin = await activo(req, reply, true);
+    if (!admin) return null;
+    const lote = z.uuid().safeParse(req.params.id).success
+      ? await repo.loteAbierto(admin.organizacionId, req.params.id)
+      : "no_encontrado";
+    if (lote === "no_encontrado") {
+      reply.code(404).send({ error: "no_encontrado" });
+      return null;
+    }
+    if (lote === "cerrado") {
+      reply.code(409).send(LOTE_CERRADO);
+      return null;
+    }
+    return { admin, lote };
+  }
+
+  /** Evalúa un lote abierto con sus entregas actuales y las [nuevas]. */
+  async function evaluarLoteAbierto(organizacionId: string, l: LoteAbierto, nuevas: string[], kg: number) {
+    const ids = [...l.entregas, ...nuevas];
+    // Las que ya van en este lote cuentan como libres.
+    const candidatas = (await repo.entregasCandidatas(organizacionId, { ids })).map((e) =>
+      e.loteCodigo === l.codigo ? { ...e, loteCodigo: null } : e,
+    );
+    return evaluarLote(
+      { codigo: l.codigo, cultivo: l.cultivo as LoteNuevo["cultivo"], temporadaId: l.temporadaId, estado: l.estado, kg, entregas: ids },
+      candidatas,
+    );
+  }
+
+  /** Suma entregas a un lote abierto, con su peso total nuevo. */
+  app.post<{ Params: { id: string } }>("/v1/lotes/:id/entregas", async (req, reply) => {
+    const abierto = await conLoteAbierto(req, reply);
+    if (!abierto) return;
+    const { admin, lote } = abierto;
+    const datos = agregarEntregasSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const { entregas, kg } = datos.data;
+    const ocupada = { error: "entrega_ocupada", mensaje: "Otra persona acaba de poner una de esas entregas en un lote." };
+    if (entregas.some((id) => lote.entregas.includes(id))) return reply.code(409).send(ocupada);
+    const { rechazos, avisos, kgEsperados } = await evaluarLoteAbierto(admin.organizacionId, lote, entregas, kg);
+    if (rechazos.length > 0) return rechazarEntregas(reply, rechazos);
+    const r = await repo.agregarEntregasALote(admin.organizacionId, admin.uid, lote.id, { entregas, kg, kgEsperados, avisos });
+    if (r === "no_encontrado") return reply.code(404).send({ error: "no_encontrado" });
+    if (r === "cerrado") return reply.code(409).send(LOTE_CERRADO);
+    if (r === "entrega_ocupada") return reply.code(409).send(ocupada);
+    return (await repo.listarLotes(admin.organizacionId)).find((x) => x.id === lote.id);
+  });
+
+  /** Cierra el lote: ya no recibe entregas y se firma en la próxima corrida. */
+  app.post<{ Params: { id: string } }>("/v1/lotes/:id/cerrar", async (req, reply) => {
+    const abierto = await conLoteAbierto(req, reply);
+    if (!abierto) return;
+    const { admin, lote } = abierto;
+    // Una finca pudo pasar a rojo mientras el lote estaba abierto.
+    const { rechazos } = await evaluarLoteAbierto(admin.organizacionId, lote, [], lote.kg);
+    if (rechazos.length > 0) return rechazarEntregas(reply, rechazos);
+    const r = await repo.cerrarLote(admin.organizacionId, admin.uid, lote.id);
+    if (r === "no_encontrado") return reply.code(404).send({ error: "no_encontrado" });
+    if (r === "ya_cerrado") return reply.code(409).send(LOTE_CERRADO);
+    return (await repo.listarLotes(admin.organizacionId)).find((x) => x.id === lote.id);
   });
 
   /** Deshace un lote que aún no está en la blockchain ni en un contenedor. */

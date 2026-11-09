@@ -56,6 +56,8 @@ export interface LoteParaVenta {
   contenedor: string | null;
   /** A quién se vendió, o `null`. */
   vendidoA: string | null;
+  /** Todavía puede recibir entregas: hay que cerrarlo primero. */
+  abierto: boolean;
 }
 
 /** Por qué el lote no se puede vender a ese cliente, o `null`. */
@@ -65,6 +67,7 @@ export function motivoNoVenta(
 ): string | null {
   if (l.contenedor) return `El lote va en el contenedor ${l.contenedor}; no se puede vender`;
   if (l.vendidoA) return `El lote ya se vendió a ${l.vendidoA}`;
+  if (l.abierto) return "Cierra el lote antes de venderlo";
   if (!vinculo || vinculo.estado !== "activo") return "Esa organización no es un cliente activo";
   if (!vinculo.cultivos.includes(l.cultivo)) {
     return `${vinculo.cliente} no trabaja ${cultivoDe(l.cultivo)?.nombre.toLowerCase() ?? l.cultivo}`;
@@ -355,7 +358,7 @@ export class ProveedoresPg implements Proveedores {
   vender(u: UsuarioActivo, loteId: string, v: Venta) {
     return this.tx(async (c) => {
       const { rows: [l] } = await c.query<LoteParaVenta & { kg: number }>(
-        `SELECT l.cultivo, l.kg::float8 AS kg,
+        `SELECT l.cultivo, l.kg::float8 AS kg, l.cerrado_en IS NULL AS abierto,
                 (SELECT x.codigo FROM exportacion_lotes el JOIN exportaciones x ON x.id = el.exportacion_id
                  WHERE el.lote_id = l.id) AS contenedor,
                 (SELECT o.nombre FROM ventas_lotes vl JOIN organizaciones o ON o.id = vl.cliente_id

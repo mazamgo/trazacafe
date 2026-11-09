@@ -30,7 +30,7 @@ const VINCULO = "3f2a0000-0000-4000-8000-000000000001";
 const LOTE = "4b1c0000-0000-4000-8000-000000000002";
 
 describe("reglas de la venta", () => {
-  const lote = { cultivo: "cafe", contenedor: null, vendidoA: null };
+  const lote = { cultivo: "cafe", contenedor: null, vendidoA: null, abierto: false };
   const cliente = { estado: "activo", cliente: "Exportadora Norte", cultivos: ["cafe"] };
 
   it("un lote libre se vende a un cliente activo que trabaja su cultivo", () => {
@@ -42,6 +42,10 @@ describe("reglas de la venta", () => {
     expect(motivoNoVenta({ ...lote, vendidoA: "Otra" }, cliente)).toBe("El lote ya se vendió a Otra");
     expect(motivoNoVenta(lote, { ...cliente, estado: "pendiente" })).toBe("Esa organización no es un cliente activo");
     expect(motivoNoVenta(lote, null)).toBe("Esa organización no es un cliente activo");
+  });
+
+  it("un lote abierto no se vende hasta cerrarlo", () => {
+    expect(motivoNoVenta({ ...lote, abierto: true }, cliente)).toBe("Cierra el lote antes de venderlo");
   });
 
   it("no se vende cacao a quien solo trabaja café", () => {

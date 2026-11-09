@@ -189,8 +189,8 @@ const ESPERA = "(ap.ultimo_intento IS NULL OR ap.ultimo_intento < now() - interv
  * Período de gracia: entregas y visitas se firman a los [DIAS_GRACIA] días
  * de llegar al servidor (cuando entran a la cola), para que el técnico
  * pueda corregir sus errores sin revocar nada. Si antes entran a un lote
- * (o, en las visitas, alguna entrega de su finca), se firman ya: el lote
- * las necesita firmadas. La firma lleva la fecha real de la entrega o visita.
+ * ya cerrado (o, en las visitas, alguna entrega de su finca), se firman ya:
+ * el lote las necesita firmadas. La firma lleva la fecha real de la entrega o visita.
  */
 export const DIAS_GRACIA = 7;
 const GRACIA_VENCIDA = `ap.creado_en < now() - interval '${DIAS_GRACIA} days'`;
@@ -271,7 +271,8 @@ export class ColaPg implements ColaAttestations {
        WHERE ap.esquema = 'Verificacion' AND fv.attestation_uid IS NOT NULL AND ${ESPERA}
          AND (${GRACIA_VENCIDA} OR EXISTS (
                SELECT 1 FROM entregas e JOIN lote_entregas le ON le.entrega_id = e.id
-               WHERE e.finca_id = v.finca_id AND e.anulada_en IS NULL))
+               JOIN lotes l ON l.id = le.lote_id
+               WHERE e.finca_id = v.finca_id AND e.anulada_en IS NULL AND l.cerrado_en IS NOT NULL))
        ORDER BY ap.id LIMIT $1`,
       [limite],
     );
@@ -296,7 +297,8 @@ export class ColaPg implements ColaAttestations {
        JOIN entregas e ON e.id = ap.entidad_id
        JOIN fincas f ON f.id = e.finca_id
        WHERE ap.esquema = 'Entrega' AND f.attestation_uid IS NOT NULL AND ${ESPERA}
-         AND (${GRACIA_VENCIDA} OR EXISTS (SELECT 1 FROM lote_entregas le WHERE le.entrega_id = e.id))
+         AND (${GRACIA_VENCIDA} OR EXISTS (SELECT 1 FROM lote_entregas le JOIN lotes l ON l.id = le.lote_id
+                                           WHERE le.entrega_id = e.id AND l.cerrado_en IS NOT NULL))
        ORDER BY ap.id LIMIT $1`,
       [limite],
     );
