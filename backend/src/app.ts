@@ -34,6 +34,7 @@ import {
   ventaSchema,
   type Proveedores,
 } from "./proveedores.ts";
+import { armarReporte, csvReporte, type Reportes } from "./reportes.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type LoteAbierto, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
 import { UID_VALIDO, type Verificador } from "./verificador.ts";
@@ -85,6 +86,7 @@ export function buildApp({
   verificador = null,
   eliminaciones = null,
   proveedores = null,
+  reportes = null,
   origenesPanel = ORIGENES_PANEL,
 }: {
   repo: Repo;
@@ -104,6 +106,8 @@ export function buildApp({
   eliminaciones?: Eliminaciones | null;
   /** Red de proveedores: vínculos, venta de lotes y observaciones (ProveedoresPg). */
   proveedores?: Proveedores | null;
+  /** Reportes de la temporada para administradores (ReportesPg). */
+  reportes?: Reportes | null;
   /** Sitios desde los que el panel web llama a cualquier ruta `/v1/` (CORS). */
   origenesPanel?: string[];
 }) {
@@ -755,6 +759,40 @@ export function buildApp({
       return reply.code(409).send({ error: "vendido", mensaje: "El lote está vendido; para deshacerlo, primero deshaz la venta." });
     }
     return reply.code(204).send();
+  });
+
+  /** Datos del reporte de la temporada del query; `null` si ya se respondió. */
+  async function datosReporte(req: FastifyRequest<{ Querystring: { temporadaId?: string } }>, reply: FastifyReply) {
+    const admin = await activo(req, reply, true);
+    if (!admin) return null;
+    if (!reportes) {
+      reply.code(503).send({ error: "sin_reportes" });
+      return null;
+    }
+    const temporadaId = req.query.temporadaId ?? "";
+    const datos = z.uuid().safeParse(temporadaId).success ? await reportes.datos(admin.organizacionId, temporadaId) : null;
+    if (!datos) {
+      reply.code(404).send({ error: "no_encontrado", mensaje: "Esa temporada no es de la organización." });
+      return null;
+    }
+    return datos;
+  }
+
+  /** Reporte de la temporada: visitas, estado satelital, alertas, kg y lotes. */
+  app.get<{ Querystring: { temporadaId?: string } }>("/v1/reportes", async (req, reply) => {
+    const datos = await datosReporte(req, reply);
+    if (!datos) return;
+    return armarReporte(datos);
+  });
+
+  /** Una fila por finca de la temporada, para Excel. */
+  app.get<{ Querystring: { temporadaId?: string } }>("/v1/reportes/csv", async (req, reply) => {
+    const datos = await datosReporte(req, reply);
+    if (!datos) return;
+    return reply
+      .header("content-type", "text/csv; charset=utf-8")
+      .header("content-disposition", `attachment; filename="Reporte-${nombreArchivo(datos.temporada.nombre)}.csv"`)
+      .send(csvReporte(datos));
   });
 
   // Red de proveedores (Fase 2b): la exportadora invita y recibe; la

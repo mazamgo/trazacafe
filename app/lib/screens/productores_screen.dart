@@ -16,6 +16,7 @@ import 'nuevo_productor_screen.dart';
 import 'observaciones_screen.dart';
 import 'privacidad_screen.dart';
 import 'proveedores_screen.dart';
+import 'reportes_screen.dart';
 import 'solicitudes_eliminacion_screen.dart';
 import 'productor_screen.dart';
 import 'temporadas_screen.dart';
@@ -90,6 +91,13 @@ class ProductoresScreen extends ConsumerWidget {
                       MaterialPageRoute(builder: (_) => const CultivosScreen()),
                     ),
                     child: const Text('Cultivos'),
+                  ),
+                if (sesion?.esAdmin ?? false)
+                  PopupMenuItem(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ReportesScreen()),
+                    ),
+                    child: const Text('Reportes'),
                   ),
                 if (sesion?.esAdmin ?? false)
                   PopupMenuItem(

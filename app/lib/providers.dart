@@ -300,6 +300,22 @@ final organizacionNombreProvider = StreamProvider<String?>((ref) {
   );
 });
 
+/// Reporte de una temporada (solo administradores; requiere señal).
+final reporteProvider = FutureProvider.autoDispose.family<Reporte, String>(
+  (ref, temporadaId) => ref.watch(apiProvider).reporte(temporadaId),
+);
+
+/// Después de cambiar temporadas o cultivos en la API: el celular los
+/// descarga sincronizando; el panel web, sin base local, los vuelve a pedir.
+Future<void> refrescarOrganizacion(WidgetRef ref) async {
+  if (ref.read(conBaseLocalProvider)) {
+    await ref.read(syncServiceProvider).sincronizar();
+  } else {
+    ref.invalidate(temporadasProvider);
+    ref.invalidate(organizacionWebProvider);
+  }
+}
+
 /// Exportadora: proveedoras y lotes por recibir (requiere señal).
 final proveedoresProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(apiProvider).proveedores(),
