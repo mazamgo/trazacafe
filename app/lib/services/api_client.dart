@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'red_proveedores.dart';
+import 'reportes.dart';
 
 export 'red_proveedores.dart';
+export 'reportes.dart';
 
 /// URL de la API. En el emulador de Android, 10.0.2.2 es el localhost de la
 /// computadora. Para Cloud Run: `flutter run --dart-define=API_URL=https://...`
@@ -617,6 +619,19 @@ class ApiClient {
   );
 
   /// PDF del paquete EUDR para el comprador.
+  /// Reporte de la temporada (solo administradores).
+  Future<Reporte> reporte(String temporadaId) async => Reporte.desdeJson(
+    await _pedir(
+      'GET',
+      '/v1/reportes?temporadaId=${Uri.encodeQueryComponent(temporadaId)}',
+    ),
+  );
+
+  /// El reporte de la temporada en CSV, una fila por finca, para Excel.
+  Future<List<int>> reporteCsv(String temporadaId) => _descargar(
+    '/v1/reportes/csv?temporadaId=${Uri.encodeQueryComponent(temporadaId)}',
+  );
+
   Future<List<int>> pdfExportacion(String id) =>
       _descargar('/v1/exportaciones/${Uri.encodeComponent(id)}/pdf');
 

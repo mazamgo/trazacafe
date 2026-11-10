@@ -294,7 +294,7 @@ Es el argumento de venta del plan Exportador: "tu comprador recibe la prueba lis
 **Avance (9/11/2026), primera parte publicada:** `trazacafe-dev.web.app/panel`, solo para administradores, con Lotes, Contenedores (PDF y GeoJSON se descargan), Proveedores, Clientes, Observaciones y Equipo. Reutiliza las pantallas de la app; lo que el celular lee de la base local se pide a la API. La API abre CORS a los sitios del panel (`ORIGENES_PANEL`) y el mapa usa una key web aparte. Detalle en `infra/README.md` §6b y en la guía §4.9.
 - **Probado el 10/11/2026:** entrar con las dos cuentas, Clientes, Lotes (crear, agregar entregas, cerrar, Vender) y Observaciones con su aviso.
 - **Falta probar:** la descarga del PDF y del GeoJSON, y el mapa con el fondo satelital.
-- **Segunda parte:** reportes (% de fincas verificadas, kg por cultivo y temporada, fincas en amarillo o rojo), alertas satelitales, avance de visitas, y Temporadas y Cultivos en la web.
+- **Segunda parte (publicada el 10/11/2026):** **Reportes** por temporada (% de fincas con visita y en verde, alertas satelitales con mapa y Revisar ahora, avance de visitas por técnico y fincas sin visita, kg por cultivo y estado, lotes) y su CSV para Excel; también en el menú ⋮ del celular. **Temporadas** y **Cultivos** ya se manejan desde la web. Detalle en la guía §4.10 e `infra/README.md` §5.
 
 - **Mismo código Flutter compilado para web,** con login de Google (la key de navegador ya está restringida por dominio).
 - **Pantallas:** lotes, contenedores, paquete EUDR, alertas satelitales, avance de visitas por temporada, equipo y temporadas.

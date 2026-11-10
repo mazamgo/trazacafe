@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trazacafe/providers.dart';
 import 'package:trazacafe/screens/panel_screen.dart';
 import 'package:trazacafe/services/auth_service.dart';
+import 'package:trazacafe/services/compartir_service.dart';
 
 import 'fakes.dart';
 
@@ -24,6 +25,46 @@ Map<String, (int, Object?)> respuestas({String tipo = 'cooperativa'}) => {
   'GET /v1/observaciones': (200, {'observaciones': []}),
   'GET /v1/invitaciones': (200, {'invitaciones': []}),
   'GET /v1/red/avisos': (200, {'invitaciones': [], 'lotesPorRecibir': 0, 'observacionesSinResponder': 0}),
+  'GET /v1/reportes': (200, reporte()),
+  'GET /v1/reportes/csv': (200, null),
+};
+
+class CompartidorFalso implements Compartidor {
+  CompartidorFalso(this.nombres);
+  final List<String> nombres;
+  @override
+  Future<void> compartir({required String nombre, required List<int> bytes, required String tipo, required String asunto}) async =>
+      nombres.add(nombre);
+}
+
+Map<String, dynamic> finca(String nombre, String estado, {bool visita = true}) => {
+  'id': 'f-$nombre',
+  'nombre': nombre,
+  'productorNombre': 'Ana',
+  'comunidad': 'El Cuá',
+  'geometria': {'type': 'Point', 'coordinates': [-85.7, 13.4]},
+  'areaOficialHa': 2.5,
+  'deforestacion': estado,
+  'ultimoChequeo': estado == 'pendiente' ? null : '2026-11-01T12:00:00.000Z',
+  'fuente': estado == 'pendiente' ? null : 'jrc-hansen',
+  'areaAfectadaHa': estado == 'rojo' ? 0.4 : 0,
+  'conVisita': visita,
+};
+
+Map<String, dynamic> reporte({String temporada = '2026/27'}) => {
+  'temporada': {'id': 't1', 'nombre': temporada, 'inicio': '2026-10-01', 'fin': '2027-09-30', 'cultivo': null},
+  'resumen': {
+    'productores': 3, 'fincas': 4, 'areaOficialHa': 10, 'conVisita': 3, 'porcentajeVisita': 75,
+    'verdes': 2, 'porcentajeVerde': 50, 'kgEntregados': 680, 'entregas': 4,
+  },
+  'satelite': {'verde': 2, 'amarillo': 0, 'rojo': 1, 'pendiente': 1},
+  'alertas': [finca('El Roble', 'rojo', visita: false), finca('La Cumbre', 'pendiente')],
+  'sinVisita': [{'id': 'f-El Roble', 'nombre': 'El Roble', 'productorNombre': 'Ana', 'comunidad': 'El Cuá'}],
+  'visitas': [{'email': 'tecnico@coop.org', 'visitas': 3}],
+  'kg': [
+    {'cultivo': 'cafe', 'estado': 'uva', 'kg': 600, 'kgEnLotes': 500, 'kgLibres': 100, 'kgExportables': 96, 'estadoExportable': 'oro', 'entregas': 3},
+  ],
+  'lotes': {'abiertos': 1, 'cerrados': 2, 'vendidos': 1, 'enContenedor': 1, 'kg': 116},
 };
 
 void main() {
@@ -33,6 +74,7 @@ void main() {
     String tipo = 'cooperativa',
     String? seccion,
     Size tamano = const Size(1280, 900),
+    Compartidor? compartidor,
   }) async {
     tester.view
       ..devicePixelRatio = 1
@@ -48,6 +90,7 @@ void main() {
         authServiceProvider.overrideWithValue(auth),
         apiProvider.overrideWithValue(api.cliente(auth)),
         sesionMapaProvider.overrideWith((ref) async => null),
+        if (compartidor != null) compartidorProvider.overrideWithValue(compartidor),
       ],
     );
     addTearDown(contenedor.dispose);
@@ -81,10 +124,13 @@ void main() {
     expect(find.descendant(of: menu, matching: find.text('Clientes')), findsNothing);
   });
 
-  testWidgets('empieza en Lotes y cambia de sección desde el menú', (tester) async {
+  testWidgets('empieza en Reportes y cambia de sección desde el menú', (tester) async {
     final (api, _) = await abrir(tester);
-    expect(api.peticiones.map((r) => r.url.path), contains('/v1/lotes'));
-    await tester.tap(find.descendant(of: find.byType(NavigationRail), matching: find.text('Contenedores')));
+    expect(api.peticiones.map((r) => r.url.path), contains('/v1/reportes'));
+    final menu = find.byType(NavigationRail);
+    expect(find.descendant(of: menu, matching: find.text('Temporadas')), findsOneWidget);
+    expect(find.descendant(of: menu, matching: find.text('Cultivos')), findsOneWidget);
+    await tester.tap(find.descendant(of: menu, matching: find.text('Contenedores')));
     await tester.pumpAndSettle();
     expect(api.peticiones.map((r) => r.url.path), contains('/v1/exportaciones'));
   });
@@ -112,6 +158,42 @@ void main() {
     await tester.pump(avisosCada);
     await tester.pumpAndSettle();
     expect(avisos(), inicio + 2);
+  });
+
+  testWidgets('el reporte muestra el resumen, las alertas y las fincas sin visita', (tester) async {
+    await abrir(tester);
+    expect(find.text('75 %'), findsOneWidget);
+    expect(find.text('Alertas satelitales (2)'), findsOneWidget);
+    expect(find.text('El Roble · Ana'), findsOneWidget);
+    expect(find.textContaining('0.4 ha afectadas'), findsOneWidget);
+    expect(find.text('Revisar ahora'), findsNWidgets(2));
+    await tester.scrollUntilVisible(find.text('Fincas sin visita (1)'), 300);
+    expect(find.text('tecnico@coop.org: 3 visitas'), findsOneWidget);
+    await tester.scrollUntilVisible(find.textContaining('Rinden unos 96 kg de oro'), 300);
+    expect(find.textContaining('En lotes: 500 kg · libres: 100 kg'), findsOneWidget);
+  });
+
+  testWidgets('el CSV del reporte se descarga', (tester) async {
+    final compartidos = <String>[];
+    final (api, _) = await abrir(tester, compartidor: CompartidorFalso(compartidos));
+    await tester.tap(find.byTooltip('Descargar CSV'));
+    await tester.pumpAndSettle();
+    expect(api.peticiones.last.url.path, '/v1/reportes/csv');
+    expect(compartidos, ['Reporte-2026-27.csv']);
+  });
+
+  testWidgets('en la web, guardar los cultivos vuelve a pedir la organización sin sincronizar', (tester) async {
+    final (api, _) = await abrir(tester, seccion: 'cultivos');
+    int organizacion() => api.peticiones.where((r) => r.url.path == '/v1/organizacion').length;
+    final antes = organizacion();
+    api.respuestas['PUT /v1/organizacion/cultivos'] = (200, {'id': 'org-1', 'nombre': 'Coop Sur', 'tipo': 'cooperativa', 'cultivos': ['cafe', 'cacao']});
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Cacao'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Guardar'));
+    await tester.pumpAndSettle();
+    expect(api.peticiones.where((r) => r.method == 'PUT').single.url.path, '/v1/organizacion/cultivos');
+    expect(organizacion(), antes + 1);
+    expect(find.text('Cultivos de la organización guardados.'), findsOneWidget);
   });
 
   testWidgets('organización, cultivos y temporadas salen de la API', (tester) async {

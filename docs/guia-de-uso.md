@@ -307,19 +307,35 @@ Los administradores pueden trabajar desde la computadora en **https://trazacafe-
 
 1. Toca **Entrar con Google** y elige la **misma cuenta** con la que entras a la app. Si el navegador bloquea la ventana de Google, permite las ventanas emergentes de la página.
 2. A la izquierda está el menú (en una pantalla angosta, abajo):
+   - **Reportes**: cómo va la temporada (sección 4.10). Es la primera que se abre;
    - **Lotes**: crear, corregir, vender y el QR del saco (sección 4.4);
    - **Contenedores**: armar, cerrar y bajar el **PDF** y el **GeoJSON para TRACES** (sección 4.5);
    - **Proveedores** (exportadora o beneficio) o **Clientes** (cooperativa): sección 4.7 y 4.8, con el mapa de las fincas de cada proveedor;
-   - **Observaciones** y **Equipo**.
+   - **Observaciones**, **Temporadas** (sección 4.3), **Cultivos** (sección 4.2) y **Equipo**.
 3. Todo funciona igual que en la app, con dos diferencias:
    - los archivos (PDF, GeoJSON, imagen del QR) se **descargan** en la carpeta de descargas, en lugar de abrir el menú de compartir;
    - la dirección cambia con cada sección (por ejemplo `/panel/contenedores`): se puede guardar como favorito.
 4. **Avisos:** arriba salen las invitaciones, los lotes por recibir y las observaciones sin responder, con un botón que lleva a la sección. Se actualizan al volver a la pestaña y cada 3 minutos.
 5. Arriba a la derecha está **Cerrar sesión**. En una computadora compartida, ciérrala al terminar.
 
-**Lo que sigue solo en la app:** productores, fincas, visitas, entregas, fotos, temporadas, cultivos, mapas sin señal y Privacidad y datos. El panel necesita internet y no guarda nada en la computadora.
+**Lo que sigue solo en la app:** productores, fincas, visitas, entregas, fotos, mapas sin señal y Privacidad y datos. El panel necesita internet y no guarda nada en la computadora.
 
 Los técnicos que entran al panel ven un aviso: su trabajo es en el campo, con la app.
+
+### 4.10 Reportes
+En el panel web, **Reportes** (la primera sección); en la app, **⋮ → Reportes**. Necesita señal. Arriba eliges la **temporada**: se abre la vigente.
+
+- **Resumen:** productores, fincas y hectáreas oficiales, **% de fincas con visita** en la temporada, **% en verde** y kg entregados. Cuenta las fincas del cultivo de la temporada, sin las de productores que pidieron borrar sus datos.
+- **Estado satelital:** cuántas fincas hay en verde, amarillo, rojo y sin chequeo.
+- **Alertas satelitales:** las fincas que no están en verde, en un mapa y en una lista, de la más grave a la menos grave:
+  - **Rojo:** pérdida de bosque después de 2020; sus entregas no pueden ir en un lote;
+  - **Amarillo:** algo que revisar (por ejemplo, una alerta reciente);
+  - **Sin chequeo:** todavía no se revisó por satélite.
+
+  Cada una dice la fecha y la fuente del último chequeo, las hectáreas afectadas y si le falta la visita. **Revisar ahora** la vuelve a revisar por satélite.
+- **Avance de visitas:** cuántas fincas ya tienen la visita de verificación, cuántas visitas hizo cada técnico y qué fincas faltan, con su comunidad, para organizar las salidas al campo.
+- **Kg de la temporada:** por cultivo y estado, cuánto se entregó, cuánto rinde en café oro o cacao seco, y cuánto ya va en lotes o sigue libre. Abajo, los lotes abiertos, cerrados, vendidos y en contenedores.
+- **Descargar CSV** (ícono de descarga, arriba): una fila por finca, con productor, comunidad, cultivo, área, estado satelital, último chequeo, visita y kg entregados. Se abre en Excel.
 
 ## 5. Qué ve el comprador
 
