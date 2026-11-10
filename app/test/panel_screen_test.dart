@@ -100,6 +100,19 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
   });
 
+  testWidgets('los avisos se vuelven a pedir al volver a la pestaña y cada pocos minutos', (tester) async {
+    final (api, _) = await abrir(tester);
+    int avisos() => api.peticiones.where((r) => r.url.path == '/v1/red/avisos').length;
+    final inicio = avisos();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(avisos(), inicio + 1);
+    await tester.pump(avisosCada);
+    await tester.pumpAndSettle();
+    expect(avisos(), inicio + 2);
+  });
+
   testWidgets('organización, cultivos y temporadas salen de la API', (tester) async {
     final (_, contenedor) = await abrir(tester);
     contenedor.listen(cultivosOrganizacionProvider, (_, _) {});

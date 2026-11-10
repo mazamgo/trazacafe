@@ -284,7 +284,8 @@ La exportadora que te compra te invita desde su app con el **correo de Google de
 - **Rechazar:** la exportadora ve que la rechazaste.
 - **Terminar el vínculo:** ya no le puedes vender lotes y deja de ver lo nuevo. Los lotes que ya recibió se quedan con ella, porque el EUDR obliga a guardarlos; los enviados sin recibir vuelven a tu lista.
 - **Vender lotes:** desde **⋮ → Lotes → Vender** (sección 4.4).
-- **Observaciones:** la exportadora puede dejarte observaciones sobre una finca o un lote, por ejemplo "revisar el lindero norte". Salen en el aviso de **Productores** y en **⋮ → Clientes →** ícono de observaciones. Tócala y **Responder**.
+- **Observaciones:** la exportadora puede dejarte observaciones sobre una finca o un lote, por ejemplo "revisar el lindero norte". Salen en el aviso de **Productores** (toca **Responder**) y en **⋮ → Clientes →** ícono de observaciones. Tócala y **Responder**.
+- **Cuándo se actualiza el aviso:** al abrir la app, al tocar **Sincronizar**, al volver a la app desde otra y cuando vuelve la señal. En el panel web, además, cada 3 minutos.
 
 ### 4.8 Proveedores (exportadora o beneficio)
 En **⋮ → Proveedores** están las cooperativas que te venden.

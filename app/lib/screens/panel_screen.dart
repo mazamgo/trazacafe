@@ -78,6 +78,9 @@ class _SoloAdministradores extends ConsumerWidget {
   );
 }
 
+/// Cada cuánto el panel vuelve a pedir los avisos de la red.
+const avisosCada = Duration(minutes: 3);
+
 /// Una sección del menú del panel.
 class SeccionPanel {
   const SeccionPanel(this.id, this.titulo, this.icono, this.pantalla);
@@ -163,96 +166,101 @@ class _PanelScreenState extends ConsumerState<PanelScreen> {
     final actual = secciones[i < 0 ? 0 : i];
     final ancho = MediaQuery.sizeOf(context).width >= 720;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          [
-            'TrazaCafé',
-            if (organizacion.value?['nombre'] case final String nombre) nombre,
-          ].join(' · '),
-        ),
-        actions: [
-          if (ancho)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(widget.sesion.email),
-              ),
-            ),
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authServiceProvider).cerrarSesion(),
+    return AvisosAlDia(
+      cada: avisosCada,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            [
+              'TrazaCafé',
+              if (organizacion.value?['nombre'] case final String nombre)
+                nombre,
+            ].join(' · '),
           ),
-        ],
-      ),
-      body: tipo.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (tipo.hasError)
-                  MaterialBanner(
-                    leading: const Icon(Icons.cloud_off),
-                    content: const Text(
-                      'No se pudo leer la organización. Revisa la conexión.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () =>
-                            ref.invalidate(organizacionWebProvider),
-                        child: const Text('Reintentar'),
+          actions: [
+            if (ancho)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(widget.sesion.email),
+                ),
+              ),
+            IconButton(
+              tooltip: 'Cerrar sesión',
+              icon: const Icon(Icons.logout),
+              onPressed: () => ref.read(authServiceProvider).cerrarSesion(),
+            ),
+          ],
+        ),
+        body: tipo.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  if (tipo.hasError)
+                    MaterialBanner(
+                      leading: const Icon(Icons.cloud_off),
+                      content: const Text(
+                        'No se pudo leer la organización. Revisa la conexión.',
                       ),
-                    ],
-                  ),
-                if (red != null && !red.vacio)
-                  BannerRed(avisos: red, abrir: _abrir),
-                Expanded(
-                  child: Row(
-                    children: [
-                      if (ancho) ...[
-                        NavigationRail(
-                          selectedIndex: secciones.indexOf(actual),
-                          labelType: NavigationRailLabelType.all,
-                          onDestinationSelected: (n) => _abrir(secciones[n].id),
-                          destinations: [
-                            for (final s in secciones)
-                              NavigationRailDestination(
-                                icon: Icon(s.icono),
-                                label: Text(s.titulo),
-                              ),
-                          ],
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              ref.invalidate(organizacionWebProvider),
+                          child: const Text('Reintentar'),
                         ),
-                        const VerticalDivider(width: 1),
                       ],
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1000),
-                            child: Navigator(
-                              key: ValueKey(actual.id),
-                              onGenerateRoute: (_) => MaterialPageRoute(
-                                builder: (_) => actual.pantalla,
+                    ),
+                  if (red != null && !red.vacio)
+                    BannerRed(avisos: red, abrir: _abrir),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        if (ancho) ...[
+                          NavigationRail(
+                            selectedIndex: secciones.indexOf(actual),
+                            labelType: NavigationRailLabelType.all,
+                            onDestinationSelected: (n) =>
+                                _abrir(secciones[n].id),
+                            destinations: [
+                              for (final s in secciones)
+                                NavigationRailDestination(
+                                  icon: Icon(s.icono),
+                                  label: Text(s.titulo),
+                                ),
+                            ],
+                          ),
+                          const VerticalDivider(width: 1),
+                        ],
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 1000),
+                              child: Navigator(
+                                key: ValueKey(actual.id),
+                                onGenerateRoute: (_) => MaterialPageRoute(
+                                  builder: (_) => actual.pantalla,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-      bottomNavigationBar: ancho || tipo.isLoading
-          ? null
-          : NavigationBar(
-              selectedIndex: secciones.indexOf(actual),
-              onDestinationSelected: (n) => _abrir(secciones[n].id),
-              destinations: [
-                for (final s in secciones)
-                  NavigationDestination(icon: Icon(s.icono), label: s.titulo),
-              ],
-            ),
+                ],
+              ),
+        bottomNavigationBar: ancho || tipo.isLoading
+            ? null
+            : NavigationBar(
+                selectedIndex: secciones.indexOf(actual),
+                onDestinationSelected: (n) => _abrir(secciones[n].id),
+                destinations: [
+                  for (final s in secciones)
+                    NavigationDestination(icon: Icon(s.icono), label: s.titulo),
+                ],
+              ),
+      ),
     );
   }
 }

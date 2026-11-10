@@ -360,7 +360,12 @@ final autoSyncProvider = Provider<void>((ref) {
   final sync = ref.watch(syncServiceProvider);
   final sub = Connectivity().onConnectivityChanged.listen((estado) {
     if (estado.any((c) => c != ConnectivityResult.none)) {
-      unawaited(sync.sincronizar().then((_) {}, onError: (_) {}));
+      unawaited(
+        sync.sincronizar().then(
+          (_) => ref.invalidate(avisosRedProvider),
+          onError: (_) {},
+        ),
+      );
     }
   });
   ref.onDispose(sub.cancel);
