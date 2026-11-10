@@ -124,6 +124,7 @@ const app = buildApp({
   eliminaciones: new EliminacionesPg(pool),
   proveedores: new ProveedoresPg(pool),
   verificador: new VerificadorPg(pool),
+  ...(process.env.ORIGENES_PANEL ? { origenesPanel: process.env.ORIGENES_PANEL.split(",").map((o) => o.trim()) } : {}),
 });
 
 await app.listen({ host: "0.0.0.0", port: Number(process.env.PORT ?? 8080) });

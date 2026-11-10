@@ -16,7 +16,7 @@ El camino tiene cinco pasos:
 | Quién | Qué hace en la app |
 |---|---|
 | **Técnico** | Registra productores, fincas, visitas de verificación, fotos y entregas. Funciona **sin señal**. |
-| **Administrador** | Todo lo del técnico, más equipo, cultivos, temporadas, lotes y contenedores. Estas tareas **necesitan señal**. |
+| **Administrador** | Todo lo del técnico, más equipo, cultivos, temporadas, lotes y contenedores. Estas tareas **necesitan señal**. Lotes, contenedores, proveedores, clientes y equipo también se manejan desde la computadora, en el **panel web** (sección 4.9). |
 | **Comprador** | No usa la app. Escanea el QR del contenedor y ve el origen en una página web. |
 
 Los productores no entran a la app; son registros que lleva el técnico.
@@ -212,6 +212,7 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
 2. Elige el **cliente**, los **kg enviados** (la app propone el peso del lote) y la **fecha de envío**.
 3. La exportadora lo **recibe** y confirma los kg. La tarjeta dice **Vendido a…**, si ya lo recibieron y con cuántos kg.
 
+- **Cuándo:** también se puede vender un lote ya firmado en la blockchain; solo no se puede si ya va en un contenedor o ya se vendió.
 - **Deshacer venta:** mientras la exportadora no lo ponga en un contenedor.
 - Un lote vendido **ya no se corrige ni se deshace** (primero se deshace la venta) y no va en tus contenedores.
 - Si la exportadora recibe otros kg, el lote muestra un **aviso de diferencia**, por ejemplo "Se recibieron 980 kg de 1,000 enviados".
@@ -292,6 +293,24 @@ En **⋮ → Proveedores** están las cooperativas que te venden.
 
 - **Terminar el vínculo** (ícono de la cadena rota): los lotes ya recibidos se quedan contigo; los enviados sin recibir vuelven a la cooperativa.
 
+### 4.9 Panel web (en la computadora)
+Los administradores pueden trabajar desde la computadora en **https://trazacafe-dev.web.app/panel**, con Chrome, Edge o Firefox.
+
+1. Toca **Entrar con Google** y elige la **misma cuenta** con la que entras a la app. Si el navegador bloquea la ventana de Google, permite las ventanas emergentes de la página.
+2. A la izquierda está el menú (en una pantalla angosta, abajo):
+   - **Lotes**: crear, corregir, vender y el QR del saco (sección 4.4);
+   - **Contenedores**: armar, cerrar y bajar el **PDF** y el **GeoJSON para TRACES** (sección 4.5);
+   - **Proveedores** (exportadora o beneficio) o **Clientes** (cooperativa): sección 4.7 y 4.8, con el mapa de las fincas de cada proveedor;
+   - **Observaciones** y **Equipo**.
+3. Todo funciona igual que en la app, con dos diferencias:
+   - los archivos (PDF, GeoJSON, imagen del QR) se **descargan** en la carpeta de descargas, en lugar de abrir el menú de compartir;
+   - la dirección cambia con cada sección (por ejemplo `/panel/contenedores`): se puede guardar como favorito.
+4. Arriba a la derecha está **Cerrar sesión**. En una computadora compartida, ciérrala al terminar.
+
+**Lo que sigue solo en la app:** productores, fincas, visitas, entregas, fotos, temporadas, cultivos, mapas sin señal y Privacidad y datos. El panel necesita internet y no guarda nada en la computadora.
+
+Los técnicos que entran al panel ven un aviso: su trabajo es en el campo, con la app.
+
 ## 5. Qué ve el comprador
 
 Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Puede ser el QR de un **contenedor** o de un **lote** (saco).
@@ -327,8 +346,10 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |
 | Celular nuevo o reinstalación | Entra con la misma cuenta y toca **Sincronizar**: se descargan los datos de la organización. Lo que **no** se había sincronizado en el celular anterior se pierde. |
 | "Ese correo no es de un administrador activo" al invitar un proveedor | Pide a la cooperativa el correo con que **su administrador** entra a la app (debe haber entrado al menos una vez). Si la cooperativa no usa TrazaCafé, escríbenos para darla de alta. |
-| No sale **Vender** en un lote | Necesitas un cliente activo (**⋮ → Clientes**), y el lote no debe estar firmado, en un contenedor ni vendido. |
+| No sale **Vender** en un lote | El lote ya va en un contenedor o ya se vendió. Si tocas **Vender** y dice que no hay clientes, necesitas uno activo en **⋮ → Clientes**. |
 | No se puede deshacer la venta | La exportadora ya puso el lote en un contenedor. Habla con ella. |
+| El panel web dice "El panel web es para administradores" | Entraste con una cuenta de técnico. Usa la app, o pide al administrador que te cambie el rol en **Equipo**. |
+| En el panel no se abre la ventana de Google | El navegador bloqueó la ventana emergente: permítela para `trazacafe-dev.web.app` (ícono en la barra de direcciones) y vuelve a tocar **Entrar con Google**. |
 | "Datos de otra organización" al entrar | El celular tiene registros **sin enviar** de otra organización (un celular prestado o heredado). Lo mejor: toca **Cerrar sesión** y que la persona anterior entre con su cuenta y toque **Sincronizar** con señal. Después entras tú y el celular se limpia solo. Si esos datos ya no importan, **Borrar esos datos y continuar** los borra para siempre. |
 
 ## 7. Palabras que aparecen en la app

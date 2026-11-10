@@ -1,28 +1,31 @@
 # TrazaCafé: app Flutter
 
-Un solo proyecto Flutter da dos productos:
+Un solo proyecto Flutter da estos productos:
 
 | Producto | Plataforma | Quién lo usa |
 |---|---|---|
 | **App de campo** | Android (APK) | Técnicos y administradores de la cooperativa o exportadora. Funciona sin internet y sincroniza cuando hay señal. |
+| **Panel web** | Web (Firebase Hosting, `/panel`) | Administradores, en la computadora: lotes, contenedores y paquete EUDR, proveedores, clientes, observaciones y equipo. Necesita internet; no tiene base local ni sincroniza. Los técnicos ven un aviso para usar la app. |
 | **Verificador público** | Web (Firebase Hosting, `/v/{uid}`) | El comprador que escanea el QR del contenedor o del lote. Sin cuenta, en español o inglés. |
 | **Eliminación de datos y privacidad** | Web (`/eliminar-datos`, `/privacidad`) | Productores que piden borrar sus datos y personas del equipo que eliminan su cuenta sin la app (requisito de Google Play). |
 
-En la web solo se abren esas páginas (`lib/main.dart`). El manual para las personas que usan la app está en [`docs/guia-de-uso.md`](../docs/guia-de-uso.md); la infraestructura, en [`infra/README.md`](../infra/README.md).
+En la web solo se abren esas páginas (`lib/main.dart`).
+
+**Panel web** (`lib/screens/panel_screen.dart`): reutiliza las pantallas de administrador de la app, que ya trabajan con la API, cada una con su propio `Navigator` dentro del menú. Lo que el celular lee de la base local se pide a la API: con `conBaseLocalProvider` en `false` (en la web), el tipo, los cultivos y las temporadas salen de `GET /v1/organizacion` y `GET /v1/temporadas`. Los archivos (PDF, GeoJSON, QR) se descargan en el navegador (`CompartidorWeb`, con `descarga.dart`) en vez de abrir el menú de compartir. El manual para las personas que usan la app está en [`docs/guia-de-uso.md`](../docs/guia-de-uso.md); la infraestructura, en [`infra/README.md`](../infra/README.md).
 
 ## Estructura
 
 | Carpeta | Contenido |
 |---|---|
-| `lib/screens/` | Pantallas: login, productores, fincas, visitas, entregas, temporadas, equipo, cultivos, lotes, contenedores, red de proveedores (`proveedores_screen.dart` y `revision_proveedor_screen.dart` para la exportadora, `clientes_screen.dart` para la cooperativa, `observaciones_screen.dart` para las dos), privacidad y solicitudes de eliminación, verificador (con sus textos en español e inglés en `verificador_textos.dart`) y las páginas web de eliminación de datos y privacidad |
-| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión; los modelos de la red de proveedores están en `red_proveedores.dart`), sincronización, fincas, fotos, mapas, lugares del buscador y última vista del mapa (`lugares_service.dart`), datos del celular por organización (`datos_celular.dart`), mapas sin señal (`mapas_sin_senal.dart`: lista y descarga; `mbtiles.dart`: lectura de MBTiles con `sqlite3` en Android y una versión vacía en la web, donde no hay `dart:ffi`), correcciones, eliminación de datos (`eliminacion_service.dart`, también las llamadas sin sesión de la página web), compartir archivos, verificador y preferencias (tema e idioma, en `SharedPreferences`) |
+| `lib/screens/` | Pantallas: login, productores, fincas, visitas, entregas, temporadas, equipo, cultivos, lotes, contenedores, red de proveedores (`proveedores_screen.dart` y `revision_proveedor_screen.dart` para la exportadora, `clientes_screen.dart` para la cooperativa, `observaciones_screen.dart` para las dos), privacidad y solicitudes de eliminación, verificador (con sus textos en español e inglés en `verificador_textos.dart`) y las páginas web de eliminación de datos y privacidad, y el panel web (`panel_screen.dart`) |
+| `lib/services/` | `ApiClient` (con un reintento si se corta la conexión; los modelos de la red de proveedores están en `red_proveedores.dart`), sincronización, fincas, fotos, mapas, lugares del buscador y última vista del mapa (`lugares_service.dart`), datos del celular por organización (`datos_celular.dart`), mapas sin señal (`mapas_sin_senal.dart`: lista y descarga; `mbtiles.dart`: lectura de MBTiles con `sqlite3` en Android y una versión vacía en la web, donde no hay `dart:ffi`), correcciones, eliminación de datos (`eliminacion_service.dart`, también las llamadas sin sesión de la página web), compartir archivos (en la web, descarga con `descarga.dart`: `descarga_web.dart` en el navegador y `descarga_nativa.dart` en Android), verificador y preferencias (tema e idioma, en `SharedPreferences`) |
 | `lib/data/` | Base local SQLite con drift (`database.dart`; `database.g.dart` es generado) |
 | `lib/domain/` | Reglas puras: geometría y polígonos, cédula nicaragüense, cultivos (`cultivos_generados.dart` sale de `schemas/cultivos.json`), búsqueda de lugares y lectura de coordenadas (`busqueda_lugar.dart`) |
-| `lib/widgets/` | Formulario de entrega, mapa de Google, capa sin señal (`capa_sin_senal.dart`), mapa de solo lectura con varias fincas (`mapa_fincas.dart`), estado satelital (`estado_satelital.dart`), buscador del mapa (`buscador_mapa.dart`), motivo de corrección, diálogos de envío y recepción de lotes (`dialogo_envio.dart`), error con Reintentar y texto libre (`en_linea.dart`), fotos, diálogo del QR del verificador |
+| `lib/widgets/` | Formulario de entrega, mapa de Google, capa sin señal (`capa_sin_senal.dart`), mapa de solo lectura con varias fincas (`mapa_fincas.dart`), estado satelital (`estado_satelital.dart`), buscador del mapa (`buscador_mapa.dart`), motivo de corrección, diálogos de envío y recepción de lotes (`dialogo_envio.dart`), error con Reintentar y texto libre (`en_linea.dart`), fotos, diálogo del QR del verificador, avisos de la red de proveedores (`avisos_red.dart`, en el inicio del celular y en el panel) |
 | `web/mapas/` | Mapas sin señal (MBTiles de Sentinel-2) e `indice.json`, que se publican con Hosting. **No van al repositorio** (`.gitignore`): se generan con `npm run mapa-sentinel` en `backend/` antes de `flutter build web` |
 | `assets/lugares_ni.json` | Unas 15 000 comunidades, comarcas y pueblos de Nicaragua, de OpenStreetMap (© sus colaboradores, ODbL), con su municipio y departamento. El buscador del mapa los usa sin señal. Lo genera `schemas/scripts/lugares-nicaragua.ts` |
 | `test/` | Pruebas de pantallas, servicios y base local |
-| `web/` | Página base del verificador (`index.html`, íconos) |
+| `web/` | Página base de la web: verificador, panel y páginas públicas (`index.html`, íconos) |
 
 ## Variables de compilación (`--dart-define`)
 
@@ -32,6 +35,7 @@ En la web solo se abren esas páginas (`lib/main.dart`). El manual para las pers
 | `EAS_RED` | Red donde el verificador comprueba las attestations: `optimism-sepolia` u `optimism` | `optimism-sepolia` |
 | `VERIFICADOR_URL` | Página que va en el QR | `https://trazacafe-dev.web.app` |
 | `GOOGLE_MAPS_KEY` | Key de Google Map Tiles (solo Android) | la key restringida del proyecto |
+| `GOOGLE_MAPS_WEB_KEY` | Key de Google Map Tiles del panel web, restringida a los sitios del panel (ver `infra/README.md`) | vacía: el panel muestra las fincas sin el satélite |
 | `ANDROID_CERT_SHA1` | SHA-1 del certificado que firma el APK (Google Map Tiles lo exige) | el certificado de depuración actual |
 | `SOPORTE_EMAIL` | Correo de soporte de GoProduction que muestran las páginas de eliminación de datos y privacidad (vacío = no se muestra) | `mauricio.zambrana.g@gmail.com` |
 
@@ -40,12 +44,16 @@ En la web solo se abren esas páginas (`lib/main.dart`). El manual para las pers
 ```powershell
 flutter pub get
 
-# APK para los celulares del equipo
-flutter build apk --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
-# → build\app\outputs\flutter-apk\app-release.apk
+# APK para los celulares del equipo, apuntando a Cloud Run. Antes, subir la
+# versión en pubspec.yaml (version: X.Y.Z+N; Android usa N para instalar encima).
+powershell -ExecutionPolicy Bypass -File tool\apk.ps1
+# → build\app\outputs\flutter-apk\TrazaCafe-<versión>-<AAAA-MM-DD>.apk
 
-# Verificador y páginas de eliminación de datos y privacidad (después: firebase deploy --only hosting, desde la raíz)
-flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
+# Verificador, panel y páginas de eliminación de datos y privacidad (después: firebase deploy --only hosting, desde la raíz)
+flutter build web --release --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app --dart-define=GOOGLE_MAPS_WEB_KEY=<key web>
+
+# Panel en desarrollo (el puerto 5000 es el autorizado para el login y el CORS de la API)
+flutter run -d chrome --web-port 5000 --dart-define=API_URL=https://trazacafe-api-85528878949.us-east4.run.app
 
 # Pruebas: en Windows, archivo por archivo. flutter_tester.exe a veces se cae
 # (0xC0000005) y deja pruebas en "did not complete": el script repite ese

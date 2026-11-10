@@ -63,6 +63,13 @@ const RUTAS_WEB = [
   "/v1/organizacion/eliminacion",
 ];
 
+/** Sitios del panel web por defecto (los de Hosting y el de desarrollo). */
+export const ORIGENES_PANEL = [
+  "https://trazacafe-dev.web.app",
+  "https://trazacafe-dev.firebaseapp.com",
+  "http://localhost:5000",
+];
+
 /** Valida el token OIDC con el que Cloud Scheduler llama a las tareas. */
 export type VerificarTarea = (token: string) => Promise<boolean>;
 
@@ -78,6 +85,7 @@ export function buildApp({
   verificador = null,
   eliminaciones = null,
   proveedores = null,
+  origenesPanel = ORIGENES_PANEL,
 }: {
   repo: Repo;
   verificarToken: VerificarToken;
@@ -96,6 +104,8 @@ export function buildApp({
   eliminaciones?: Eliminaciones | null;
   /** Red de proveedores: vínculos, venta de lotes y observaciones (ProveedoresPg). */
   proveedores?: Proveedores | null;
+  /** Sitios desde los que el panel web llama a cualquier ruta `/v1/` (CORS). */
+  origenesPanel?: string[];
 }) {
   // trustProxy: solo se confía en el primer salto (el frontal de Cloud Run),
   // que agrega la IP real al final de X-Forwarded-For. Con `true` se tomaría la
@@ -116,14 +126,25 @@ export function buildApp({
     return reply.code(status).send({ error: err.code ?? "solicitud_invalida", mensaje: err.message });
   });
 
+  // CORS. Las páginas públicas llaman a RUTAS_WEB desde cualquier sitio; el
+  // panel web de administradores, a todas las rutas `/v1/`, solo desde
+  // `origenesPanel`. La sesión va en Authorization (no en cookies), así que
+  // CORS no da acceso a nada que el token no permita.
   app.addHook("onRequest", async (req, reply) => {
-    if (RUTAS_WEB.includes(req.url.split("?")[0])) {
+    const ruta = req.url.split("?")[0];
+    const origen = req.headers.origin;
+    if (RUTAS_WEB.includes(ruta)) {
       reply.header("access-control-allow-origin", "*");
-      reply.header("access-control-allow-headers", "authorization, content-type");
-      reply.header("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+    } else if (origen && ruta.startsWith("/v1/") && origenesPanel.includes(origen)) {
+      reply.header("access-control-allow-origin", origen);
+      reply.header("vary", "origin");
+    } else {
+      return;
     }
+    reply.header("access-control-allow-headers", "authorization, content-type");
+    reply.header("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   });
-  for (const ruta of RUTAS_WEB) app.options(ruta, async (_req, reply) => reply.code(204).send());
+  app.options("/v1/*", async (_req, reply) => reply.code(204).send());
 
   async function autenticar(req: FastifyRequest, reply: FastifyReply): Promise<Usuario | null> {
     const token = req.headers.authorization?.replace(/^Bearer /, "");
