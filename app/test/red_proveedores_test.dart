@@ -243,6 +243,13 @@ void main() {
     expect(find.text('Vender'), findsNothing);
   });
 
+  test('el tipo de organización se muestra con su nombre', () {
+    expect(nombreTipoOrganizacion('cooperativa'), 'Cooperativa');
+    expect(nombreTipoOrganizacion('exportadora'), 'Exportadora');
+    expect(nombreTipoOrganizacion('beneficio'), 'Beneficio');
+    expect(nombreTipoOrganizacion('otra'), 'Organización');
+  });
+
   group('lote abierto', () {
     Map<String, dynamic> abierto() => {...lote('l1'), 'kg': 16, 'kgEsperados': 16, 'estado': 'oro', 'abierto': true};
     Map<String, dynamic> libre(String id, {String? motivo}) => {

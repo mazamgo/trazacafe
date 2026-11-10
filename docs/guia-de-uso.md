@@ -27,6 +27,7 @@ Los productores no entran a la app; son registros que lleva el técnico.
 1. Instala el APK que te dio el administrador.
 2. Abre **TrazaCafé** y toca **Entrar con Google**.
 3. Usa **la misma cuenta de Google** con la que te invitó tu organización. Si sale "Tu cuenta no está autorizada", pide al administrador que te invite (sección 4.1).
+4. Debajo de **Productores** aparece tu organización y su tipo, por ejemplo *"Cooperativa Las Flores · Cooperativa"* o *"Exportadora Norte · Exportadora"*. También sale en el menú **⋮**, debajo de tu correo, y en el panel web, arriba. Aparece después de la primera sincronización.
 
 ### Sin señal y Sincronizar
 - **Sin señal:** todo lo que registras se guarda en el celular.

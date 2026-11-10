@@ -175,6 +175,7 @@ class _PanelScreenState extends ConsumerState<PanelScreen> {
               'TrazaCafé',
               if (organizacion.value?['nombre'] case final String nombre)
                 nombre,
+              if (tipo.value case final String t) nombreTipoOrganizacion(t),
             ].join(' · '),
           ),
           actions: [

@@ -12,6 +12,14 @@ const tiposCliente = {'exportadora', 'beneficio'};
 /// Tipos que venden lotes a otras (tienen clientes).
 const tiposProveedora = {'cooperativa', 'beneficio', 'otra'};
 
+/// El tipo de organización como se muestra en pantalla.
+String nombreTipoOrganizacion(String tipo) => switch (tipo) {
+  'cooperativa' => 'Cooperativa',
+  'exportadora' => 'Exportadora',
+  'beneficio' => 'Beneficio',
+  _ => 'Organización',
+};
+
 /// Vínculo entre una proveedora (cooperativa) y su cliente (exportadora).
 class Vinculo {
   Vinculo({
