@@ -75,6 +75,8 @@ export interface LoteCandidato {
   cultivo: string;
   /** Código del contenedor en que ya está, o `null`. */
   exportacionCodigo: string | null;
+  /** Todavía puede recibir entregas: hay que cerrarlo primero. */
+  abierto: boolean;
 }
 
 /**
@@ -92,12 +94,13 @@ export function evaluarExportacion(
     const l = porId.get(id);
     if (!l) rechazos.push({ loteId: id, motivo: "No existe o es de otra organización" });
     else if (l.exportacionCodigo) rechazos.push({ loteId: id, motivo: `${l.codigo} ya está en el contenedor ${l.exportacionCodigo}` });
+    else if (l.abierto) rechazos.push({ loteId: id, motivo: `Cierra el lote ${l.codigo} antes de ponerlo en un contenedor` });
     else cultivos.add(l.cultivo);
   }
   if (cultivos.size > 1) {
     for (const id of pedidos) {
       const l = porId.get(id);
-      if (l && !l.exportacionCodigo) rechazos.push({ loteId: id, motivo: "Un contenedor lleva lotes de un solo cultivo" });
+      if (l && !l.exportacionCodigo && !l.abierto) rechazos.push({ loteId: id, motivo: "Un contenedor lleva lotes de un solo cultivo" });
     }
   }
   return { cultivo: rechazos.length === 0 ? [...cultivos][0] : null, rechazos };

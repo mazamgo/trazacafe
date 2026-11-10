@@ -27,6 +27,17 @@ export const loteSchema = z
 
 export type LoteNuevo = z.infer<typeof loteSchema>;
 
+/** Entregas que se suman a un lote abierto y su peso total nuevo. */
+export const agregarEntregasSchema = z
+  .object({
+    entregas: z.array(z.uuid()).min(1, "Elige al menos una entrega").max(2000),
+    kg: z.number().positive().max(1_000_000),
+  })
+  .refine((a) => new Set(a.entregas).size === a.entregas.length, {
+    path: ["entregas"],
+    message: "Hay entregas repetidas",
+  });
+
 /** Entrega con lo necesario para decidir si puede ir a un lote. */
 export interface EntregaCandidata {
   id: string;

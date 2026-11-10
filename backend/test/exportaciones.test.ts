@@ -50,8 +50,14 @@ describe("exportacionSchema", () => {
 });
 
 describe("evaluarExportacion", () => {
-  const cafe1 = { id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null };
-  const cafe2 = { id: L2, codigo: "CAFE-002", cultivo: "cafe", exportacionCodigo: null };
+  const cafe1 = { id: L1, codigo: "CAFE-001", cultivo: "cafe", exportacionCodigo: null, abierto: false };
+  const cafe2 = { id: L2, codigo: "CAFE-002", cultivo: "cafe", exportacionCodigo: null, abierto: false };
+
+  it("un lote abierto no va en un contenedor", () => {
+    const r = evaluarExportacion([L1], [{ ...cafe1, abierto: true }]);
+    expect(r.cultivo).toBeNull();
+    expect(r.rechazos[0].motivo).toContain("Cierra el lote CAFE-001");
+  });
 
   it("con lotes libres de un mismo cultivo devuelve ese cultivo", () => {
     expect(evaluarExportacion([L1, L2], [cafe1, cafe2])).toEqual({ cultivo: "cafe", rechazos: [] });
@@ -68,7 +74,7 @@ describe("evaluarExportacion", () => {
   });
 
   it("no mezcla café y cacao en un contenedor", () => {
-    const cacao = { id: L3, codigo: "CACAO-001", cultivo: "cacao", exportacionCodigo: null };
+    const cacao = { id: L3, codigo: "CACAO-001", cultivo: "cacao", exportacionCodigo: null, abierto: false };
     const r = evaluarExportacion([L1, L3], [cafe1, cacao]);
     expect(r.cultivo).toBeNull();
     expect(r.rechazos[0].motivo).toContain("un solo cultivo");

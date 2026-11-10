@@ -7,6 +7,7 @@ import '../services/api_client.dart';
 import '../widgets/dialogo_envio.dart';
 import '../widgets/en_linea.dart';
 import '../widgets/qr_verificador.dart';
+import 'agregar_entregas_screen.dart';
 import 'finca_screen.dart' show fecha;
 import 'nuevo_lote_screen.dart';
 
@@ -112,6 +113,51 @@ class LotesScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _agregar(BuildContext context, WidgetRef ref, Lote l) async {
+    final lote = await Navigator.of(context).push<Lote>(
+      MaterialPageRoute(builder: (_) => AgregarEntregasScreen(lote: l)),
+    );
+    if (lote == null || !context.mounted) return;
+    ref.invalidate(lotesProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Lote ${lote.codigo}: ${lote.entregas.length} entregas, ${kgTexto(lote.kg)} kg.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cerrar(BuildContext context, WidgetRef ref, Lote l) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('¿Cerrar el lote ${l.codigo}?'),
+        content: const Text(
+          'Ya no podrá recibir más entregas. En la próxima hora se firma en la '
+          'blockchain y, desde entonces, tampoco se podrá corregir ni deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Cerrar lote'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final hecho = await ejecutarEnLinea(
+      context,
+      () => ref.read(apiProvider).cerrarLote(l.id),
+      'Lote ${l.codigo} cerrado.',
+    );
+    if (hecho) ref.invalidate(lotesProvider);
+  }
+
   /// Vende el lote a una exportadora vinculada (⋮ → Clientes).
   Future<void> _vender(BuildContext context, WidgetRef ref, Lote l) async {
     final mensajero = ScaffoldMessenger.of(context);
@@ -178,12 +224,15 @@ class LotesScreen extends ConsumerWidget {
 
   /// Propio, sin firmar, sin contenedor y sin vender: se corrige o se
   /// deshace.
-  static bool _libre(Lote l) => !l.atestado && _vendible(l);
+  static bool _libre(Lote l) => !l.atestado && _sinCompromiso(l);
 
-  /// Propio, sin contenedor y sin vender. Firmado también se vende: la venta
-  /// no cambia lo firmado, y los lotes se firman en menos de una hora.
-  static bool _vendible(Lote l) =>
+  /// Propio, sin contenedor y sin vender.
+  static bool _sinCompromiso(Lote l) =>
       l.proveedor == null && l.exportacionCodigo == null && l.venta == null;
+
+  /// Cerrado y sin compromiso. Firmado también se vende: la venta no cambia
+  /// lo firmado.
+  static bool _vendible(Lote l) => !l.abierto && _sinCompromiso(l);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -244,6 +293,12 @@ class LotesScreen extends ConsumerWidget {
                         onDeshacer: _libre(l)
                             ? () => _deshacer(context, ref, l)
                             : null,
+                        onAgregar: l.abierto
+                            ? () => _agregar(context, ref, l)
+                            : null,
+                        onCerrar: l.abierto
+                            ? () => _cerrar(context, ref, l)
+                            : null,
                         onVender: vende && _vendible(l)
                             ? () => _vender(context, ref, l)
                             : null,
@@ -270,12 +325,16 @@ class _TarjetaLote extends StatelessWidget {
     required this.lote,
     required this.onDeshacer,
     required this.onCorregir,
+    required this.onAgregar,
+    required this.onCerrar,
     required this.onVender,
     required this.onDeshacerVenta,
   });
 
   final Lote lote;
   final VoidCallback? onDeshacer;
+  final VoidCallback? onAgregar;
+  final VoidCallback? onCerrar;
   final VoidCallback? onVender;
   final VoidCallback? onDeshacerVenta;
 
@@ -308,6 +367,15 @@ class _TarjetaLote extends StatelessWidget {
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (lote.abierto)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Text(
+                'Abierto: puede recibir más entregas. Ciérralo para venderlo o '
+                'ponerlo en un contenedor.',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
           if (lote.proveedor != null) Text('Comprado a ${lote.proveedor}'),
           if (lote.venta case final v?)
             _Venta(venta: v, comprado: lote.proveedor != null),
@@ -393,6 +461,18 @@ class _TarjetaLote extends StatelessWidget {
                     onPressed: onCorregir,
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Corregir'),
+                  ),
+                if (onAgregar != null)
+                  TextButton.icon(
+                    onPressed: onAgregar,
+                    icon: const Icon(Icons.playlist_add),
+                    label: const Text('Agregar entregas'),
+                  ),
+                if (onCerrar != null)
+                  FilledButton.tonalIcon(
+                    onPressed: onCerrar,
+                    icon: const Icon(Icons.lock_outline),
+                    label: const Text('Cerrar lote'),
                   ),
                 if (onVender != null)
                   FilledButton.tonalIcon(

@@ -120,6 +120,7 @@ Es la parte que **paga el cliente**.
 
 **Avance:**
 - **Lotes: hechos** (migración 009, pantalla Lotes para administradores). Detalle de reglas y avisos en `infra/README.md` §4f.
+  - **Lotes abiertos** (migración 016, publicada el 9/11/2026): el lote se crea abierto, recibe más entregas y se firma, vende o va en un contenedor solo después de cerrarlo.
 - Los factores de rendimiento por estado (`cultivos.json`) son aproximados y se validan con el piloto.
 - **Contenedores: hechos** (migración 010, pantalla Contenedores). Detalle en `infra/README.md` §4g.
 - **Paquete EUDR: hecho**: GeoJSON para TRACES, PDF para el comprador y cierre del contenedor (detalle en `infra/README.md` §4h).
@@ -163,7 +164,13 @@ Es la parte que **paga el cliente**.
   - el contenedor cuenta los **kg recibidos** por la exportadora; el lote conserva sus kg firmados y la diferencia queda como aviso;
   - todo va en la app de administradores mientras no exista el panel web.
 - **Publicado el 30/10/2026:** la 015 aplicada en Cloud SQL, la API y Hosting desplegados, el APK generado y una exportadora de prueba creada.
-- **Falta:** probar el recorrido en el Samsung con dos cuentas (cooperativa y exportadora).
+- **Probado el 10/11/2026** en el Samsung y el panel, con dos cuentas: crear un lote, sumarle entregas, cerrarlo y que aparezca **Vender**; dejar una observación desde la exportadora, recibir el aviso en la app y responderla.
+- **Mejoras tras la prueba (9 y 10/11/2026):**
+  - **Vender** y **Deshacer venta** también con el lote ya firmado (antes desaparecían en menos de una hora);
+  - **lotes abiertos** (Fase 2, migración 016);
+  - el aviso de la red (invitaciones, lotes por recibir, observaciones) se actualiza al sincronizar, al volver a la app y, en el panel, cada 3 minutos. Antes solo al abrir la app.
+- **Falta probar:** que la exportadora **reciba** un lote (con diferencia de kg), el **mapa** de la revisión del proveedor y el **contenedor** con lotes de la cooperativa (PDF y, al cerrarlo, GeoJSON).
+- **Para después:** notificaciones en el celular con la app cerrada (Firebase Cloud Messaging), cuando el piloto use la app a diario.
 - **Para después:** el paso 5 (visitas de control de la exportadora), cuando el piloto lo pida.
 
 **Por qué:**
@@ -285,7 +292,8 @@ Es el argumento de venta del plan Exportador: "tu comprador recibe la prueba lis
 
 ## Fase 3 — Panel web para administradores (~3 semanas)
 **Avance (9/11/2026), primera parte publicada:** `trazacafe-dev.web.app/panel`, solo para administradores, con Lotes, Contenedores (PDF y GeoJSON se descargan), Proveedores, Clientes, Observaciones y Equipo. Reutiliza las pantallas de la app; lo que el celular lee de la base local se pide a la API. La API abre CORS a los sitios del panel (`ORIGENES_PANEL`) y el mapa usa una key web aparte. Detalle en `infra/README.md` §6b y en la guía §4.9.
-- **Falta:** probar en el panel la descarga del PDF y el GeoJSON, y la cuenta de la cooperativa (Clientes y Vender).
+- **Probado el 10/11/2026:** entrar con las dos cuentas, Clientes, Lotes (crear, agregar entregas, cerrar, Vender) y Observaciones con su aviso.
+- **Falta probar:** la descarga del PDF y del GeoJSON, y el mapa con el fondo satelital.
 - **Segunda parte:** reportes (% de fincas verificadas, kg por cultivo y temporada, fincas en amarillo o rojo), alertas satelitales, avance de visitas, y Temporadas y Cultivos en la web.
 
 - **Mismo código Flutter compilado para web,** con login de Google (la key de navegador ya está restringida por dominio).

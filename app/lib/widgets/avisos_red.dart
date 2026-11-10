@@ -1,6 +1,49 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers.dart';
 import '../services/api_client.dart';
+
+/// Vuelve a pedir los avisos de la red al volver a la app (o a la pestaña
+/// del navegador) y, con [cada], cada tanto: así aparece una observación o
+/// un lote que llegó con la app abierta.
+class AvisosAlDia extends ConsumerStatefulWidget {
+  const AvisosAlDia({super.key, required this.child, this.cada});
+
+  final Widget child;
+  final Duration? cada;
+
+  @override
+  ConsumerState<AvisosAlDia> createState() => _AvisosAlDiaState();
+}
+
+class _AvisosAlDiaState extends ConsumerState<AvisosAlDia> {
+  late final AppLifecycleListener _ciclo;
+  Timer? _reloj;
+
+  void _refrescar() => ref.invalidate(avisosRedProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    _ciclo = AppLifecycleListener(onResume: _refrescar);
+    if (widget.cada case final cada?) {
+      _reloj = Timer.periodic(cada, (_) => _refrescar());
+    }
+  }
+
+  @override
+  void dispose() {
+    _reloj?.cancel();
+    _ciclo.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 /// Pendientes de la red de proveedores (invitaciones, lotes por recibir y
 /// observaciones sin responder) para el inicio del celular y el panel web.

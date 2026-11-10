@@ -78,9 +78,9 @@ El worker firma en cuatro olas, una transacción por ola, para que cada attestat
 
 - **Período de gracia de 7 días** (`DIAS_GRACIA` en `backend/src/atestador.ts`):
   - **Entregas y visitas** se firman 7 días después de llegar al servidor, para que el técnico pueda corregir sus errores sin revocar nada.
-  - **Antes de los 7 días** se firman si entran a un lote; una visita, si alguna entrega de su finca entró a un lote.
+  - **Antes de los 7 días** se firman si entran a un lote **cerrado** (§4f); una visita, si alguna entrega de su finca entró a un lote cerrado.
   - **Fecha:** la firma lleva la fecha real de la entrega o la visita.
-  - **Sin espera:** fincas, chequeos, lotes y contenedores se firman en la siguiente ejecución.
+  - **Sin espera:** fincas, chequeos, lotes cerrados y contenedores se firman en la siguiente ejecución.
 - **Fallos:** si una ola falla, se reintenta a los 15 minutos. Si falla con `NotFound` porque el nodo del RPC público todavía no ve la ola anterior, se reintenta en el momento (hasta 5 veces, cada 3 s).
 - **Activado en OP Sepolia (20/10/2026):**
   - los 6 esquemas están registrados con la clave KMS (`0xBFC2…CB99`);
@@ -224,7 +224,11 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
   - café: uva 0.16, pergamino 0.8;
   - cacao: baba 0.38, fermentado 0.45.
 - **Deshacer:** un lote que no está en la blockchain, en un contenedor ni vendido (§4l) se puede deshacer, y sus entregas quedan libres. Una finca con entregas en un lote no se puede borrar.
-- Cada lote encola su attestation (`Lote`). El esquema EAS ahora incluye cultivo, temporada y estado.
+- **Lotes abiertos** (migración `016_lotes_abiertos.sql`, aplicada el 9/11/2026, columnas `lotes.cerrado_en` y `cerrado_por`; los lotes anteriores quedaron cerrados):
+  - un lote nuevo queda abierto y `POST /v1/lotes/:id/entregas` `{entregas, kg}` le suma entregas con su peso total, reevaluando todo el lote y dejando historial en `correcciones`;
+  - `POST /v1/lotes/:id/cerrar` vuelve a aplicar las reglas EUDR y responde 422 si alguna entrega ya no cumple (por ejemplo, una finca que pasó a rojo);
+  - un lote abierto no se vende ni va en un contenedor (la API lo rechaza).
+- Cada lote encola su attestation (`Lote`) **al cerrarse**. El esquema EAS ahora incluye cultivo, temporada y estado.
 
 ## 4g. Contenedores (Fase 2)
 
@@ -382,7 +386,7 @@ La exportadora compra lotes a sus cooperativas y arma contenedores con ellos; el
   | `GET /v1/red/avisos` | las dos | invitaciones, lotes por recibir y observaciones sin responder, para el aviso de la app |
 
 - **Reglas:**
-  - **Vender:** el lote es propio, no está en un contenedor ni vendido, el vínculo está activo y el cliente trabaja ese cultivo. Vendido, la cooperativa ya no lo corrige ni lo deshace.
+  - **Vender:** el lote es propio, está cerrado (§4f), no está en un contenedor ni vendido, el vínculo está activo y el cliente trabaja ese cultivo. Vendido, la cooperativa ya no lo corrige ni lo deshace.
   - **Contenedor:** acepta lotes propios **sin vender** y lotes **comprados y recibidos** (`lotesCandidatos`).
   - **Qué ve la exportadora:** solo los lotes que le vendieron y las fincas de esos lotes, nunca el resto de la cooperativa. Los nombres de fincas y productores solo si el vínculo activo tiene `comparte_nombres`; si no, la finca sale como `Finca 3F2A` (las 4 primeras letras de su id) y sin productor, también en el GeoJSON (`ProducerName` se omite) y en el PDF. Lo recibido se sigue viendo al terminar el vínculo, por el EUDR.
   - **Terminar un vínculo:** las ventas `enviado` se borran (el lote vuelve a la cooperativa); las recibidas se quedan con la exportadora.
@@ -395,7 +399,7 @@ Endpoints:
 - Acceso y sincronización: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, versiones de lindero, visitas, entregas, fotos), `GET /v1/datos` (todo lo de la organización, con sus cultivos), `POST /v1/fotos/:id/subida`.
 - Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`, `PUT /v1/fincas/:id/cultivo`.
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
-- Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `DELETE /v1/lotes/:id`.
+- Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `POST /v1/lotes/:id/entregas`, `POST /v1/lotes/:id/cerrar`, `DELETE /v1/lotes/:id`.
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
@@ -513,6 +517,7 @@ La misma publicación de Hosting sirve el panel en `https://trazacafe-dev.web.ap
 - **Qué usa:** las rutas de administrador de la API, sin base local. El tipo, los cultivos y las temporadas salen de `GET /v1/organizacion` y `GET /v1/temporadas` (`app/README.md`).
 - **CORS:** la API responde a los sitios de `ORIGENES_PANEL` (§5). Si el panel se abre desde otro dominio, agregarlo ahí y en las restricciones de la key de navegador de Firebase (§4) y de la key web de mapas (§4c).
 - **Mapa:** key web de Map Tiles (§4c), pasada al compilar con `GOOGLE_MAPS_WEB_KEY`.
+- **Avisos:** el panel pide `GET /v1/red/avisos` al abrirse, al volver a la pestaña y cada 3 minutos (`avisosCada` en `panel_screen.dart`). Es una consulta liviana por administrador conectado.
 - **Revisar después de publicar:**
 
   ```bash

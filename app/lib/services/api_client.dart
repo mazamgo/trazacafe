@@ -196,6 +196,7 @@ class Lote {
     required this.id,
     required this.codigo,
     required this.cultivo,
+    required this.temporadaId,
     required this.temporadaNombre,
     required this.estado,
     required this.kg,
@@ -209,12 +210,14 @@ class Lote {
     this.exportacionCodigo,
     this.proveedor,
     this.venta,
+    this.abierto = false,
   });
 
   factory Lote.desdeJson(Map<String, dynamic> j) => Lote(
     id: j['id'] as String,
     codigo: j['codigo'] as String,
     cultivo: j['cultivo'] as String,
+    temporadaId: j['temporadaId'] as String? ?? '',
     temporadaNombre: j['temporadaNombre'] as String,
     estado: j['estado'] as String,
     kg: (j['kg'] as num).toDouble(),
@@ -231,6 +234,7 @@ class Lote {
     venta: j['venta'] == null
         ? null
         : VentaLote.desdeJson(j['venta'] as Map<String, dynamic>),
+    abierto: j['abierto'] as bool? ?? false,
     creadoEn: DateTime.parse(j['creadoEn'] as String).toLocal(),
     entregas: [
       for (final e in (j['entregas'] as List? ?? const []).cast<Map>())
@@ -247,9 +251,13 @@ class Lote {
   final String id;
   final String codigo;
   final String cultivo;
+  final String temporadaId;
   final String temporadaNombre;
   final String estado;
   final double kg;
+
+  /// Todavía recibe entregas; no se firma, vende ni va en un contenedor.
+  final bool abierto;
 
   /// Lo que deberían rendir sus entregas en [estado].
   final double kgEsperados;
@@ -519,6 +527,27 @@ class ApiClient {
       'beneficio': ?beneficio,
       'proceso': ?proceso,
     }),
+  );
+
+  /// Suma entregas a un lote abierto, con su peso total nuevo.
+  Future<Lote> agregarEntregas(
+    String id, {
+    required List<String> entregas,
+    required double kg,
+  }) async => Lote.desdeJson(
+    await _pedir('POST', '/v1/lotes/${Uri.encodeComponent(id)}/entregas', {
+      'entregas': entregas,
+      'kg': kg,
+    }),
+  );
+
+  /// Cierra el lote: ya no recibe entregas y se firma en la próxima corrida.
+  Future<Lote> cerrarLote(String id) async => Lote.desdeJson(
+    await _pedir(
+      'POST',
+      '/v1/lotes/${Uri.encodeComponent(id)}/cerrar',
+      const <String, dynamic>{},
+    ),
   );
 
   /// Deshace un lote que aún no está en la blockchain.

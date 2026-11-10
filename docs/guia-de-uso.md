@@ -195,7 +195,14 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
    - entrega de otro cultivo o de otra temporada;
    - entrega que ya está en otro lote.
 4. Escribe el **código del lote**, el **peso en la báscula** y, si quieres, el **beneficio** y el **proceso**.
-5. Toca **Crear lote**.
+5. Toca **Crear lote**. El lote queda **abierto**.
+
+**Lote abierto:** puede seguir recibiendo entregas hasta que lo cierres. No hace falta tener todas las entregas para crearlo.
+- **Agregar entregas:** abre el lote, toca **Agregar entregas**, marca las nuevas y escribe el **peso total** en la báscula. La app propone el peso actual más lo que rinden las entregas elegidas. Se aplican las mismas reglas de arriba.
+- **Cerrar lote:** cuando esté completo, toca **Cerrar lote** y confirma. Ya no recibe entregas y en la próxima hora se firma en la blockchain.
+- **Para qué hay que cerrarlo:** un lote abierto no se puede **vender** ni poner en un **contenedor**.
+- **Si una finca pasó a rojo** mientras el lote estaba abierto, la app no deja cerrarlo y dice cuál es.
+- **Quitar una entrega equivocada:** toca **Deshacer lote** y arma el lote de nuevo; las entregas quedan libres.
 
 **Avisos (no impiden crear el lote):**
 - **Volumen:** el lote pesa más de un 10 % por encima de lo que rinden sus entregas. Por ejemplo, 500 kg de uva rinden unos 100 kg de pergamino.
@@ -205,14 +212,14 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
 **Corregir o deshacer:**
 - **Corregir:** peso, código, beneficio y proceso, con motivo si cambia el peso.
 - **Deshacer lote:** sus entregas quedan libres.
-- **Límite:** las dos cosas solo mientras el lote no esté en un contenedor ni firmado en la blockchain.
+- **Límite:** las dos cosas solo mientras el lote no esté en un contenedor ni firmado en la blockchain. Un lote cerrado se firma en la próxima hora.
 
 **Vender el lote a una exportadora** (cooperativas con un cliente, ver 4.7):
-1. Abre el lote y toca **Vender**.
+1. Cierra el lote, ábrelo y toca **Vender**.
 2. Elige el **cliente**, los **kg enviados** (la app propone el peso del lote) y la **fecha de envío**.
 3. La exportadora lo **recibe** y confirma los kg. La tarjeta dice **Vendido a…**, si ya lo recibieron y con cuántos kg.
 
-- **Cuándo:** también se puede vender un lote ya firmado en la blockchain; solo no se puede si ya va en un contenedor o ya se vendió.
+- **Cuándo:** también se puede vender un lote ya firmado en la blockchain. No se puede si sigue abierto, si ya va en un contenedor o si ya se vendió.
 - **Deshacer venta:** mientras la exportadora no lo ponga en un contenedor.
 - Un lote vendido **ya no se corrige ni se deshace** (primero se deshace la venta) y no va en tus contenedores.
 - Si la exportadora recibe otros kg, el lote muestra un **aviso de diferencia**, por ejemplo "Se recibieron 980 kg de 1,000 enviados".
@@ -223,7 +230,7 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
 Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 
 1. **⋮ → Contenedores → Contenedor**.
-2. Elige los **lotes libres** y escribe el **código interno**, el **comprador**, el **destino** y, si ya lo tienes, el **número de contenedor**.
+2. Elige los **lotes libres** (los lotes abiertos aparecen al cerrarlos) y escribe el **código interno**, el **comprador**, el **destino** y, si ya lo tienes, el **número de contenedor**.
 3. Toca **Crear contenedor**.
 
 **Exportadoras:** en los lotes libres también salen los **lotes recibidos** de tus proveedores, con "de Cooperativa X". En el contenedor cuentan los **kg recibidos**. El paquete EUDR junta las fincas de todas las cooperativas: el PDF dice **Exportador** y **Proveedores**, y el QR del contenedor muestra la cadena completa hasta cada finca. Las fincas de una cooperativa que no comparte nombres salen con un código (por ejemplo **Finca 3F2A**) y sin el nombre del productor.
@@ -277,7 +284,8 @@ La exportadora que te compra te invita desde su app con el **correo de Google de
 - **Rechazar:** la exportadora ve que la rechazaste.
 - **Terminar el vínculo:** ya no le puedes vender lotes y deja de ver lo nuevo. Los lotes que ya recibió se quedan con ella, porque el EUDR obliga a guardarlos; los enviados sin recibir vuelven a tu lista.
 - **Vender lotes:** desde **⋮ → Lotes → Vender** (sección 4.4).
-- **Observaciones:** la exportadora puede dejarte observaciones sobre una finca o un lote, por ejemplo "revisar el lindero norte". Salen en el aviso de **Productores** y en **⋮ → Clientes →** ícono de observaciones. Tócala y **Responder**.
+- **Observaciones:** la exportadora puede dejarte observaciones sobre una finca o un lote, por ejemplo "revisar el lindero norte". Salen en el aviso de **Productores** (toca **Responder**) y en **⋮ → Clientes →** ícono de observaciones. Tócala y **Responder**.
+- **Cuándo se actualiza el aviso:** al abrir la app, al tocar **Sincronizar**, al volver a la app desde otra y cuando vuelve la señal. En el panel web, además, cada 3 minutos.
 
 ### 4.8 Proveedores (exportadora o beneficio)
 En **⋮ → Proveedores** están las cooperativas que te venden.
@@ -305,7 +313,8 @@ Los administradores pueden trabajar desde la computadora en **https://trazacafe-
 3. Todo funciona igual que en la app, con dos diferencias:
    - los archivos (PDF, GeoJSON, imagen del QR) se **descargan** en la carpeta de descargas, en lugar de abrir el menú de compartir;
    - la dirección cambia con cada sección (por ejemplo `/panel/contenedores`): se puede guardar como favorito.
-4. Arriba a la derecha está **Cerrar sesión**. En una computadora compartida, ciérrala al terminar.
+4. **Avisos:** arriba salen las invitaciones, los lotes por recibir y las observaciones sin responder, con un botón que lleva a la sección. Se actualizan al volver a la pestaña y cada 3 minutos.
+5. Arriba a la derecha está **Cerrar sesión**. En una computadora compartida, ciérrala al terminar.
 
 **Lo que sigue solo en la app:** productores, fincas, visitas, entregas, fotos, temporadas, cultivos, mapas sin señal y Privacidad y datos. El panel necesita internet y no guarda nada en la computadora.
 
@@ -346,8 +355,9 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | Un productor aparece como "Productor eliminado" | Pidió que borraran sus datos. Sus fincas con entregas exportadas se guardan sin datos personales por el EUDR; no se pueden editar. |
 | Celular nuevo o reinstalación | Entra con la misma cuenta y toca **Sincronizar**: se descargan los datos de la organización. Lo que **no** se había sincronizado en el celular anterior se pierde. |
 | "Ese correo no es de un administrador activo" al invitar un proveedor | Pide a la cooperativa el correo con que **su administrador** entra a la app (debe haber entrado al menos una vez). Si la cooperativa no usa TrazaCafé, escríbenos para darla de alta. |
-| No sale **Vender** en un lote | El lote ya va en un contenedor o ya se vendió. Si tocas **Vender** y dice que no hay clientes, necesitas uno activo en **⋮ → Clientes**. |
+| No sale **Vender** en un lote | El lote sigue abierto (ciérralo primero), ya va en un contenedor o ya se vendió. Si tocas **Vender** y dice que no hay clientes, necesitas uno activo en **⋮ → Clientes**. |
 | No se puede deshacer la venta | La exportadora ya puso el lote en un contenedor. Habla con ella. |
+| No sale el aviso de una observación o de un lote por recibir | Con señal, toca **Sincronizar** o sal de la app y vuelve a entrar. En el panel, cambia de pestaña y vuelve. Solo lo ven los administradores. |
 | El panel web dice "El panel web es para administradores" | Entraste con una cuenta de técnico. Usa la app, o pide al administrador que te cambie el rol en **Equipo**. |
 | En el panel no se abre la ventana de Google | El navegador bloqueó la ventana emergente: permítela para `trazacafe-dev.web.app` (ícono en la barra de direcciones) y vuelve a tocar **Entrar con Google**. |
 | "Datos de otra organización" al entrar | El celular tiene registros **sin enviar** de otra organización (un celular prestado o heredado). Lo mejor: toca **Cerrar sesión** y que la persona anterior entre con su cuenta y toque **Sincronizar** con señal. Después entras tú y el celular se limpia solo. Si esos datos ya no importan, **Borrar esos datos y continuar** los borra para siempre. |
@@ -361,6 +371,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | **Área declarada** | Hectáreas que dice el productor, en fincas de un solo punto. |
 | **Temporada** | Período de cosecha que agrupa entregas y visitas. |
 | **Lote** | Entregas juntas en el beneficio, de un cultivo y una temporada. |
+| **Lote abierto** | Lote que todavía puede recibir entregas. Se firma, se vende o va en un contenedor solo después de cerrarlo. |
 | **DDS** | Declaración de diligencia debida: la presenta en **TRACES** el importador (el "operador") antes de poner el café o cacao en el mercado de la Unión Europea. Lleva la ubicación de las fincas de origen. |
 | **TRACES** | Sistema de la Comisión Europea donde se presentan las DDS. |
 | **Anonimizar** | Quitar los datos personales (nombre, cédula, fotos) y dejar solo lo que el EUDR obliga a guardar, sin que se sepa de quién es. |
