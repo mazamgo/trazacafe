@@ -517,6 +517,7 @@ La misma publicación de Hosting sirve el panel en `https://trazacafe-dev.web.ap
 - **Qué usa:** las rutas de administrador de la API, sin base local. El tipo, los cultivos y las temporadas salen de `GET /v1/organizacion` y `GET /v1/temporadas` (`app/README.md`).
 - **CORS:** la API responde a los sitios de `ORIGENES_PANEL` (§5). Si el panel se abre desde otro dominio, agregarlo ahí y en las restricciones de la key de navegador de Firebase (§4) y de la key web de mapas (§4c).
 - **Mapa:** key web de Map Tiles (§4c), pasada al compilar con `GOOGLE_MAPS_WEB_KEY`.
+- **Avisos:** el panel pide `GET /v1/red/avisos` al abrirse, al volver a la pestaña y cada 3 minutos (`avisosCada` en `panel_screen.dart`). Es una consulta liviana por administrador conectado.
 - **Revisar después de publicar:**
 
   ```bash

@@ -313,7 +313,8 @@ Los administradores pueden trabajar desde la computadora en **https://trazacafe-
 3. Todo funciona igual que en la app, con dos diferencias:
    - los archivos (PDF, GeoJSON, imagen del QR) se **descargan** en la carpeta de descargas, en lugar de abrir el menú de compartir;
    - la dirección cambia con cada sección (por ejemplo `/panel/contenedores`): se puede guardar como favorito.
-4. Arriba a la derecha está **Cerrar sesión**. En una computadora compartida, ciérrala al terminar.
+4. **Avisos:** arriba salen las invitaciones, los lotes por recibir y las observaciones sin responder, con un botón que lleva a la sección. Se actualizan al volver a la pestaña y cada 3 minutos.
+5. Arriba a la derecha está **Cerrar sesión**. En una computadora compartida, ciérrala al terminar.
 
 **Lo que sigue solo en la app:** productores, fincas, visitas, entregas, fotos, temporadas, cultivos, mapas sin señal y Privacidad y datos. El panel necesita internet y no guarda nada en la computadora.
 
@@ -356,6 +357,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | "Ese correo no es de un administrador activo" al invitar un proveedor | Pide a la cooperativa el correo con que **su administrador** entra a la app (debe haber entrado al menos una vez). Si la cooperativa no usa TrazaCafé, escríbenos para darla de alta. |
 | No sale **Vender** en un lote | El lote sigue abierto (ciérralo primero), ya va en un contenedor o ya se vendió. Si tocas **Vender** y dice que no hay clientes, necesitas uno activo en **⋮ → Clientes**. |
 | No se puede deshacer la venta | La exportadora ya puso el lote en un contenedor. Habla con ella. |
+| No sale el aviso de una observación o de un lote por recibir | Con señal, toca **Sincronizar** o sal de la app y vuelve a entrar. En el panel, cambia de pestaña y vuelve. Solo lo ven los administradores. |
 | El panel web dice "El panel web es para administradores" | Entraste con una cuenta de técnico. Usa la app, o pide al administrador que te cambie el rol en **Equipo**. |
 | En el panel no se abre la ventana de Google | El navegador bloqueó la ventana emergente: permítela para `trazacafe-dev.web.app` (ícono en la barra de direcciones) y vuelve a tocar **Entrar con Google**. |
 | "Datos de otra organización" al entrar | El celular tiene registros **sin enviar** de otra organización (un celular prestado o heredado). Lo mejor: toca **Cerrar sesión** y que la persona anterior entre con su cuenta y toque **Sincronizar** con señal. Después entras tú y el celular se limpia solo. Si esos datos ya no importan, **Borrar esos datos y continuar** los borra para siempre. |
