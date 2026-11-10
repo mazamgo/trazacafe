@@ -285,6 +285,21 @@ final tipoOrganizacionProvider = StreamProvider<String?>((ref) {
   );
 });
 
+/// Nombre de la organización según la última sincronización (`null` antes
+/// de la primera; en el panel web, según la API).
+final organizacionNombreProvider = StreamProvider<String?>((ref) {
+  if (ref.watch(conBaseLocalProvider)) {
+    return ref
+        .watch(databaseProvider)
+        .observarAjuste(ClaveAjuste.organizacionNombre);
+  }
+  return Stream.fromFuture(
+    ref
+        .watch(organizacionWebProvider.future)
+        .then((o) => o['nombre'] as String?),
+  );
+});
+
 /// Exportadora: proveedoras y lotes por recibir (requiere señal).
 final proveedoresProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(apiProvider).proveedores(),
