@@ -67,7 +67,7 @@ void main() {
 
   testWidgets('una cooperativa ve Clientes y no Proveedores', (tester) async {
     await abrir(tester);
-    expect(find.text('TrazaCafé · Coop Sur'), findsOneWidget);
+    expect(find.text('TrazaCafé · Coop Sur · Cooperativa'), findsOneWidget);
     final menu = find.byType(NavigationRail);
     expect(find.descendant(of: menu, matching: find.text('Clientes')), findsOneWidget);
     expect(find.descendant(of: menu, matching: find.text('Proveedores')), findsNothing);
@@ -75,6 +75,7 @@ void main() {
 
   testWidgets('una exportadora ve Proveedores y no Clientes', (tester) async {
     await abrir(tester, tipo: 'exportadora');
+    expect(find.text('TrazaCafé · Coop Sur · Exportadora'), findsOneWidget);
     final menu = find.byType(NavigationRail);
     expect(find.descendant(of: menu, matching: find.text('Proveedores')), findsOneWidget);
     expect(find.descendant(of: menu, matching: find.text('Clientes')), findsNothing);

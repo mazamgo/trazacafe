@@ -33,11 +33,32 @@ class ProductoresScreen extends ConsumerWidget {
     // Antes de la primera sincronización, el tipo por defecto de la API.
     final tipo = ref.watch(tipoOrganizacionProvider).value ?? 'cooperativa';
     final red = esAdmin ? ref.watch(avisosRedProvider).value : null;
+    // Con qué organización se entró: cooperativa o exportadora.
+    final organizacion = switch ((
+      ref.watch(organizacionNombreProvider).value,
+      ref.watch(tipoOrganizacionProvider).value,
+    )) {
+      (final String nombre, final String t) =>
+        '$nombre · ${nombreTipoOrganizacion(t)}',
+      _ => null,
+    };
 
     return AvisosAlDia(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Productores'),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Productores'),
+              if (organizacion != null)
+                Text(
+                  organizacion,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
           actions: [
             const BotonSincronizar(),
             PopupMenuButton<void>(
@@ -46,7 +67,8 @@ class ProductoresScreen extends ConsumerWidget {
                   PopupMenuItem(
                     enabled: false,
                     child: Text(
-                      '${sesion.email}\n${sesion.esAdmin ? 'Administrador' : 'Técnico'}',
+                      '${sesion.email}\n${sesion.esAdmin ? 'Administrador' : 'Técnico'}'
+                      '${organizacion != null ? '\n$organizacion' : ''}',
                     ),
                   ),
                 PopupMenuItem(
