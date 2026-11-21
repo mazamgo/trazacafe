@@ -10,11 +10,14 @@ import '../widgets/avisos_red.dart';
 import 'activacion_screen.dart';
 import 'clientes_screen.dart';
 import 'contenedores_screen.dart';
+import 'cultivos_screen.dart';
 import 'equipo_screen.dart';
 import 'login_screen.dart';
 import 'lotes_screen.dart';
 import 'observaciones_screen.dart';
 import 'proveedores_screen.dart';
+import 'reportes_screen.dart';
+import 'temporadas_screen.dart';
 
 /// Panel web para administradores (`/panel`): las pantallas de la app que
 /// trabajan con la API, en la computadora. Login → activación → panel; los
@@ -95,6 +98,12 @@ class SeccionPanel {
 /// lotes (exportadora, beneficio) y Clientes para quien los vende.
 List<SeccionPanel> seccionesPanel(String? tipo) => [
   const SeccionPanel(
+    'reportes',
+    'Reportes',
+    Icons.insights_outlined,
+    ReportesScreen(),
+  ),
+  const SeccionPanel(
     'lotes',
     'Lotes',
     Icons.inventory_2_outlined,
@@ -125,6 +134,18 @@ List<SeccionPanel> seccionesPanel(String? tipo) => [
     'Observaciones',
     Icons.chat_outlined,
     ObservacionesScreen(),
+  ),
+  const SeccionPanel(
+    'temporadas',
+    'Temporadas',
+    Icons.event_outlined,
+    TemporadasScreen(),
+  ),
+  const SeccionPanel(
+    'cultivos',
+    'Cultivos',
+    Icons.eco_outlined,
+    CultivosScreen(),
   ),
   const SeccionPanel('equipo', 'Equipo', Icons.group_outlined, EquipoScreen()),
 ];

@@ -14,6 +14,7 @@ import { EliminacionesPg } from "./eliminacion.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { ProveedoresPg } from "./proveedores.ts";
+import { ReportesPg } from "./reportes.ts";
 import { PgRepo } from "./repo.ts";
 import { VerificadorPg } from "./verificador.ts";
 
@@ -123,6 +124,7 @@ const app = buildApp({
   correcciones: new CorreccionesPg(pool),
   eliminaciones: new EliminacionesPg(pool),
   proveedores: new ProveedoresPg(pool),
+  reportes: new ReportesPg(pool),
   verificador: new VerificadorPg(pool),
   ...(process.env.ORIGENES_PANEL ? { origenesPanel: process.env.ORIGENES_PANEL.split(",").map((o) => o.trim()) } : {}),
 });

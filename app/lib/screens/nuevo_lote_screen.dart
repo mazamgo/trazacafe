@@ -162,6 +162,10 @@ class _NuevoLoteScreenState extends ConsumerState<NuevoLoteScreen> {
     }
     final c = cultivoDe(cultivoId);
     final temporadas = _temporadasDe(cultivoId);
+    // Exportadora o beneficio: sus lotes de cooperativas no se arman aquí.
+    final compra = tiposCliente.contains(
+      ref.watch(tipoOrganizacionProvider).value,
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nuevo lote')),
@@ -173,6 +177,19 @@ class _NuevoLoteScreenState extends ConsumerState<NuevoLoteScreen> {
           24 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
+          if (compra)
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text('Lotes con entregas de productores propios'),
+                subtitle: Text(
+                  'Los lotes que compras a tus cooperativas no se crean aquí: '
+                  'se reciben en Proveedores → Recibir y ya aparecen en Lotes. '
+                  'Aquí solo se arman lotes con entregas de productores que '
+                  'registra tu propio equipo.',
+                ),
+              ),
+            ),
           if (cultivos.length > 1) ...[
             SegmentedButton<String>(
               segments: [
@@ -190,7 +207,8 @@ class _NuevoLoteScreenState extends ConsumerState<NuevoLoteScreen> {
           ],
           if (temporadas.isEmpty)
             const Text(
-              'No hay temporadas para este cultivo. Créala en ⋮ → Temporadas.',
+              'No hay temporadas para este cultivo: créala en Temporadas. '
+              'Sin temporada ni entregas no se puede armar un lote.',
             )
           else
             DropdownButtonFormField<String>(

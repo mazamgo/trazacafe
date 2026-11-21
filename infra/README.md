@@ -403,6 +403,7 @@ Endpoints:
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
+- Reportes (administradores, `backend/src/reportes.ts`): `GET /v1/reportes?temporadaId=` (resumen, estado satelital, alertas, visitas por persona, kg por cultivo y estado, y lotes) y `GET /v1/reportes/csv?temporadaId=` (una fila por finca, con BOM para Excel). Solo lectura; cuentan las fincas del cultivo de la temporada sin las anonimizadas.
 - Eliminación de datos (§4j):
   - administradores: `GET /v1/solicitudes-eliminacion`, `POST /v1/solicitudes-eliminacion/:id/aprobar|rechazar`, `DELETE /v1/productores/:id`, `POST|DELETE /v1/organizacion/eliminacion`;
   - cualquier persona con sesión: `DELETE /v1/cuenta`.
@@ -511,7 +512,7 @@ firebase deploy --only hosting --project trazacafe-dev
 
 ## 6b. Panel web para administradores (Fase 3)
 
-La misma publicación de Hosting sirve el panel en `https://trazacafe-dev.web.app/panel` (y `/panel/lotes`, `/panel/contenedores`, `/panel/proveedores`, `/panel/clientes`, `/panel/observaciones`, `/panel/equipo`).
+La misma publicación de Hosting sirve el panel en `https://trazacafe-dev.web.app/panel` (y `/panel/reportes`, `/panel/lotes`, `/panel/contenedores`, `/panel/proveedores`, `/panel/clientes`, `/panel/observaciones`, `/panel/temporadas`, `/panel/cultivos`, `/panel/equipo`).
 
 - **Quién entra:** administradores, con su cuenta de Google (el mismo login con ventana de Google que la página de eliminación de datos). Un técnico ve un aviso para usar la app.
 - **Qué usa:** las rutas de administrador de la API, sin base local. El tipo, los cultivos y las temporadas salen de `GET /v1/organizacion` y `GET /v1/temporadas` (`app/README.md`).

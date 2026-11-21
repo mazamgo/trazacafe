@@ -26,7 +26,7 @@ class _CultivosScreenState extends ConsumerState<CultivosScreen> {
         for (final c in todosLosCultivos)
           if (elegidos.contains(c.id)) c.id,
       ]);
-      await ref.read(syncServiceProvider).sincronizar();
+      await refrescarOrganizacion(ref);
       mensajero.showSnackBar(
         const SnackBar(content: Text('Cultivos de la organización guardados.')),
       );

@@ -34,7 +34,7 @@ class TemporadasScreen extends ConsumerWidget {
             iso(datos.$3),
             cultivo: datos.$4,
           );
-      await ref.read(syncServiceProvider).sincronizar();
+      await refrescarOrganizacion(ref);
       mensajero.showSnackBar(
         SnackBar(content: Text('Temporada ${datos.$1} creada.')),
       );
@@ -62,7 +62,7 @@ class TemporadasScreen extends ConsumerWidget {
         await api.corregirTemporada(t.id, cambios);
       }
       // Las entregas y visitas se reasignan en el servidor: se descargan.
-      await ref.read(syncServiceProvider).sincronizar();
+      await refrescarOrganizacion(ref);
       mensajero.showSnackBar(
         SnackBar(
           content: Text(
