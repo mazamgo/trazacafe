@@ -23,7 +23,15 @@ import {
   type Eliminaciones,
 } from "./eliminacion.ts";
 import { cambiosExportacionSchema, evaluarExportacion, exportacionSchema } from "./exportaciones.ts";
-import { agregarEntregasSchema, evaluarLote, loteSchema, motivoExclusion, type LoteNuevo, type Rechazo } from "./lotes.ts";
+import {
+  agregarEntregasSchema,
+  evaluarLote,
+  loteSchema,
+  motivoExclusion,
+  quitarEntregaSchema,
+  type LoteNuevo,
+  type Rechazo,
+} from "./lotes.ts";
 import { geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
 import {
   invitarProveedorSchema,
@@ -694,9 +702,8 @@ export function buildApp({
     return { admin, lote };
   }
 
-  /** Evalúa un lote abierto con sus entregas actuales y las [nuevas]. */
-  async function evaluarLoteAbierto(organizacionId: string, l: LoteAbierto, nuevas: string[], kg: number) {
-    const ids = [...l.entregas, ...nuevas];
+  /** Evalúa un lote abierto como quedaría con las entregas [ids]. */
+  async function evaluarLoteAbierto(organizacionId: string, l: LoteAbierto, ids: string[], kg: number) {
     // Las que ya van en este lote cuentan como libres.
     const candidatas = (await repo.entregasCandidatas(organizacionId, { ids })).map((e) =>
       e.loteCodigo === l.codigo ? { ...e, loteCodigo: null } : e,
@@ -719,12 +726,44 @@ export function buildApp({
     const { entregas, kg } = datos.data;
     const ocupada = { error: "entrega_ocupada", mensaje: "Otra persona acaba de poner una de esas entregas en un lote." };
     if (entregas.some((id) => lote.entregas.includes(id))) return reply.code(409).send(ocupada);
-    const { rechazos, avisos, kgEsperados } = await evaluarLoteAbierto(admin.organizacionId, lote, entregas, kg);
+    const { rechazos, avisos, kgEsperados } = await evaluarLoteAbierto(admin.organizacionId, lote, [...lote.entregas, ...entregas], kg);
     if (rechazos.length > 0) return rechazarEntregas(reply, rechazos);
     const r = await repo.agregarEntregasALote(admin.organizacionId, admin.uid, lote.id, { entregas, kg, kgEsperados, avisos });
     if (r === "no_encontrado") return reply.code(404).send({ error: "no_encontrado" });
     if (r === "cerrado") return reply.code(409).send(LOTE_CERRADO);
     if (r === "entrega_ocupada") return reply.code(409).send(ocupada);
+    return (await repo.listarLotes(admin.organizacionId)).find((x) => x.id === lote.id);
+  });
+
+  /**
+   * Saca una entrega de un lote abierto, con el peso total nuevo; la entrega
+   * queda libre. No se quita la última: para eso está Deshacer lote.
+   */
+  app.post<{ Params: { id: string; entregaId: string } }>("/v1/lotes/:id/entregas/:entregaId/quitar", async (req, reply) => {
+    const abierto = await conLoteAbierto(req, reply);
+    if (!abierto) return;
+    const { admin, lote } = abierto;
+    const datos = quitarEntregaSchema.safeParse(req.body);
+    if (!datos.success) {
+      return reply.code(422).send({ error: "Datos inválidos", detalles: datos.error.issues });
+    }
+    const quedan = lote.entregas.filter((id) => id !== req.params.entregaId);
+    if (quedan.length === lote.entregas.length) {
+      return reply.code(404).send({ error: "no_esta", mensaje: "Esa entrega no está en el lote." });
+    }
+    const ultima = { error: "ultima_entrega", mensaje: "Es la única entrega del lote: para liberarla, deshaz el lote." };
+    if (quedan.length === 0) return reply.code(409).send(ultima);
+    // Si otra entrega dejó de cumplir las reglas, se verá al cerrar: quitar siempre se puede.
+    const { avisos, kgEsperados } = await evaluarLoteAbierto(admin.organizacionId, lote, quedan, datos.data.kg);
+    const r = await repo.quitarEntregaDeLote(admin.organizacionId, admin.uid, lote.id, req.params.entregaId, {
+      kg: datos.data.kg,
+      kgEsperados,
+      avisos,
+    });
+    if (r === "no_encontrado") return reply.code(404).send({ error: "no_encontrado" });
+    if (r === "no_esta") return reply.code(404).send({ error: "no_esta", mensaje: "Esa entrega no está en el lote." });
+    if (r === "cerrado") return reply.code(409).send(LOTE_CERRADO);
+    if (r === "ultima") return reply.code(409).send(ultima);
     return (await repo.listarLotes(admin.organizacionId)).find((x) => x.id === lote.id);
   });
 
@@ -734,7 +773,7 @@ export function buildApp({
     if (!abierto) return;
     const { admin, lote } = abierto;
     // Una finca pudo pasar a rojo mientras el lote estaba abierto.
-    const { rechazos } = await evaluarLoteAbierto(admin.organizacionId, lote, [], lote.kg);
+    const { rechazos } = await evaluarLoteAbierto(admin.organizacionId, lote, lote.entregas, lote.kg);
     if (rechazos.length > 0) return rechazarEntregas(reply, rechazos);
     const r = await repo.cerrarLote(admin.organizacionId, admin.uid, lote.id);
     if (r === "no_encontrado") return reply.code(404).send({ error: "no_encontrado" });

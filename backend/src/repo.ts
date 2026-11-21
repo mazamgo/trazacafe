@@ -85,6 +85,7 @@ export interface LoteAbierto {
 }
 export type ResultadoAgregarEntregas = "agregadas" | "no_encontrado" | "cerrado" | "entrega_ocupada";
 export type ResultadoCerrarLote = "cerrado" | "no_encontrado" | "ya_cerrado";
+export type ResultadoQuitarEntrega = "quitada" | "no_encontrado" | "cerrado" | "no_esta" | "ultima";
 
 /** Contenedor de exportación con sus lotes y el resumen para el paquete EUDR. */
 export interface Exportacion {
@@ -282,6 +283,14 @@ export interface Repo {
   ): Promise<ResultadoAgregarEntregas>;
   /** Cierra el lote y encola su attestation. */
   cerrarLote(organizacionId: string, uid: string, loteId: string): Promise<ResultadoCerrarLote>;
+  /** Saca una entrega de un lote abierto (queda libre) y deja su historial. */
+  quitarEntregaDeLote(
+    organizacionId: string,
+    uid: string,
+    loteId: string,
+    entregaId: string,
+    datos: { kg: number; kgEsperados: number; avisos: Aviso[] },
+  ): Promise<ResultadoQuitarEntrega>;
   /** Del más reciente al más antiguo. */
   listarLotes(organizacionId: string): Promise<Lote[]>;
   /** Deshace un lote que todavía no está en la blockchain; sus entregas quedan libres. */
@@ -848,6 +857,49 @@ export class PgRepo implements Repo {
     } catch (e) {
       await client.query("ROLLBACK");
       if ((e as { constraint?: string }).constraint === "lote_entregas_entrega_unica") return "entrega_ocupada";
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async quitarEntregaDeLote(
+    organizacionId: string,
+    uid: string,
+    loteId: string,
+    entregaId: string,
+    d: { kg: number; kgEsperados: number; avisos: Aviso[] },
+  ): Promise<ResultadoQuitarEntrega> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows: [l] } = await client.query<{ cerrado: boolean; kg: number; entregas: number; esta: boolean }>(
+        `SELECT l.cerrado_en IS NOT NULL AS cerrado, l.kg::float8 AS kg,
+                (SELECT count(*)::int FROM lote_entregas le WHERE le.lote_id = l.id) AS entregas,
+                EXISTS (SELECT 1 FROM lote_entregas le WHERE le.lote_id = l.id AND le.entrega_id = $3) AS esta
+         FROM lotes l WHERE l.id = $1 AND l.organizacion_id = $2 FOR UPDATE`,
+        [loteId, organizacionId, entregaId],
+      );
+      const motivo: ResultadoQuitarEntrega | null =
+        !l ? "no_encontrado" : l.cerrado ? "cerrado" : !l.esta ? "no_esta" : l.entregas <= 1 ? "ultima" : null;
+      if (motivo) {
+        await client.query("ROLLBACK");
+        return motivo;
+      }
+      await client.query("DELETE FROM lote_entregas WHERE lote_id = $1 AND entrega_id = $2", [loteId, entregaId]);
+      await client.query("UPDATE lotes SET kg = $2, kg_esperados = $3, avisos = $4 WHERE id = $1", [
+        loteId, d.kg, d.kgEsperados, JSON.stringify(d.avisos),
+      ]);
+      await client.query(
+        `INSERT INTO correcciones (organizacion_id, entidad, entidad_id, accion, antes, despues, motivo, usuario_uid)
+         VALUES ($1, 'lote', $2, 'corregir', $3, $4, 'Se quitó una entrega del lote abierto', $5)`,
+        [organizacionId, loteId, JSON.stringify({ kg: l!.kg, entregas: l!.entregas }),
+         JSON.stringify({ kg: d.kg, entregas: l!.entregas - 1, quitada: entregaId }), uid],
+      );
+      await client.query("COMMIT");
+      return "quitada";
+    } catch (e) {
+      await client.query("ROLLBACK");
       throw e;
     } finally {
       client.release();

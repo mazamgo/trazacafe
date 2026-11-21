@@ -27,6 +27,9 @@ export const loteSchema = z
 
 export type LoteNuevo = z.infer<typeof loteSchema>;
 
+/** Peso total del lote abierto después de quitarle una entrega. */
+export const quitarEntregaSchema = z.object({ kg: z.number().positive().max(1_000_000) });
+
 /** Entregas que se suman a un lote abierto y su peso total nuevo. */
 export const agregarEntregasSchema = z
   .object({

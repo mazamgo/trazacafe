@@ -298,6 +298,38 @@ void main() {
       expect(jsonDecode(post.body), {'entregas': ['e2'], 'kg': 32});
     });
 
+    testWidgets('quita una entrega con el peso propuesto; con una sola no se puede', (tester) async {
+      final dos = {
+        ...abierto(),
+        'kg': 32,
+        'entregas': [
+          {'id': 'e1', 'fincaNombre': 'La Leonesa', 'productorNombre': 'Ana', 'kg': 100, 'estado': 'uva', 'fecha': '2026-11-09T17:00:00.000Z'},
+          {'id': 'e2', 'fincaNombre': 'El Platal', 'productorNombre': 'Ana', 'kg': 100, 'estado': 'uva', 'fecha': '2026-11-10T17:00:00.000Z'},
+        ],
+      };
+      final api = await abrir(tester, const LotesScreen(), {
+        'GET /v1/lotes': (200, {'lotes': [dos, {...abierto(), 'id': 'l2', 'codigo': 'CAFE-l2'}]}),
+        'POST /v1/lotes/l1/entregas/e2/quitar': (200, abierto()),
+      });
+      await tester.tap(find.text('CAFE-l1 · 32 kg'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Quitar del lote'), findsNWidgets(2));
+      await tester.tap(find.byTooltip('Quitar del lote').last);
+      await tester.pumpAndSettle();
+      expect(find.text('16'), findsOneWidget, reason: '32 kg menos 100 kg de uva en oro');
+      await tester.tap(find.widgetWithText(FilledButton, 'Quitar'));
+      await tester.pumpAndSettle();
+      final post = api.peticiones.firstWhere((p) => p.method == 'POST');
+      expect(post.url.path, '/v1/lotes/l1/entregas/e2/quitar');
+      expect(jsonDecode(post.body), {'kg': 16});
+
+      await tester.tap(find.text('CAFE-l1 · 32 kg'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CAFE-l2 · 16 kg'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Quitar del lote'), findsNothing, reason: 'una sola entrega');
+    });
+
     testWidgets('cerrar pide confirmación', (tester) async {
       final api = await abrir(tester, const LotesScreen(), {
         'GET /v1/lotes': (200, {'lotes': [abierto()]}),
