@@ -148,7 +148,7 @@ Es la parte que **paga el cliente**.
 - **Paquete EUDR:**
   - GeoJSON de **todas las fincas de origen** del contenedor en el formato de la DDS de TRACES;
   - PDF con el resumen para el comprador: fincas, áreas oficiales, estado satelital, visitas y attestations;
-  - exportación compatible con Fairtrace y osapiens (CSV o GeoJSON) para cooperativas que ya los usan.
+  - exportación compatible con Fairtrace y osapiens (CSV o GeoJSON) para cooperativas que ya los usan: **hecha el 21/11/2026**, un CSV por contenedor cerrado (una fila por finca, con WKT y centroide). Falta confirmar las columnas con el importador del piloto.
 - **Attestations en la blockchain:**
   - clave secp256k1 en **Cloud KMS** (la clave nunca sale de Google);
   - registrar los esquemas en OP Sepolia y luego en OP Mainnet (`schemas/scripts/register.ts`);

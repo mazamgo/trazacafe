@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { geojsonTraces, motivosNoCierre, pdfPaquete } from "../src/paquete.ts";
+import { centroide, csvPlataformas, geojsonTraces, motivosNoCierre, pdfPaquete, wkt } from "../src/paquete.ts";
 import { fincaDePaquete, paqueteDePrueba } from "./datos-paquete.ts";
 
 describe("geojsonTraces", () => {
@@ -49,5 +49,29 @@ describe("pdfPaquete", () => {
     const grande = await pdfPaquete(paqueteDePrueba({ fincas: muchas }));
     const paginas = grande.toString("latin1").match(/\/Type \/Page\b/g)?.length ?? 0;
     expect(paginas).toBeGreaterThan(1);
+  });
+});
+
+describe("CSV para osapiens y Fairtrace", () => {
+  it("una fila por finca con WKT, centroide, HS y el contenedor", () => {
+    const lineas = csvPlataformas(paqueteDePrueba({ estado: "cerrada", proveedores: ["Coop Sur"] })).trimEnd().split("\r\n");
+    expect(lineas[0].startsWith("\uFEFFplot_id,production_place,producer_name,supplier,country,commodity,hs_code,area_ha,latitude,longitude")).toBe(true);
+    expect(lineas).toHaveLength(3);
+    expect(lineas[1]).toContain('f1,"La Leonesa, San Rafael del Norte",,Cooperativa de Prueba R.L.,NI,Café,0901,4.1923,');
+    expect(lineas[1]).toContain('Polygon,"POLYGON ((-86.1 13.1, -86.09 13.1, -86.09 13.11, -86.1 13.1))",verde,2026-10-20,2026-10-16,,500,EXP-2026-001,CSQU3054383');
+    expect(lineas[2]).toContain(",13.2,-86.2,Point,POINT (-86.2 13.2),");
+  });
+
+  it("los nombres de productores solo si se piden", () => {
+    expect(csvPlataformas(paqueteDePrueba(), { incluirProductor: true }).split("\r\n")[1]).toContain(",Ana Pérez,");
+  });
+
+  it("centroide y WKT de punto, polígono y multipolígono", () => {
+    expect(centroide({ type: "Point", coordinates: [-86, 13] })).toEqual([-86, 13]);
+    const c = centroide({ type: "Polygon", coordinates: [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]] });
+    expect(c).toEqual([1, 1]);
+    expect(wkt({ type: "MultiPolygon", coordinates: [[[[0, 0], [1, 0], [1, 1], [0, 0]]], [[[5, 5], [6, 5], [6, 6], [5, 5]]]] })).toBe(
+      "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 0)), ((5 5, 6 5, 6 6, 5 5)))",
+    );
   });
 });

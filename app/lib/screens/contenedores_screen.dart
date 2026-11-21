@@ -51,23 +51,33 @@ class ContenedoresScreen extends ConsumerWidget {
     }
   }
 
-  /// Descarga el PDF o el GeoJSON del paquete y abre el menú de compartir.
+  /// Descarga el PDF, el GeoJSON (TRACES) o el CSV (plataformas) del paquete
+  /// y abre el menú de compartir.
   Future<void> _compartir(
     BuildContext context,
     WidgetRef ref,
     Exportacion x, {
-    required bool pdf,
+    required _Formato formato,
   }) async {
+    final pdf = formato == _Formato.pdf;
     var conProductores = false;
     if (!pdf) {
       final eleccion = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('GeoJSON para TRACES'),
-          content: const Text(
-            'Lleva la ubicación de cada finca de origen para la declaración de diligencia '
-            'debida. ¿Incluir los nombres de los productores? TRACES no los exige y son '
-            'datos personales.',
+          title: Text(
+            formato == _Formato.geojson
+                ? 'GeoJSON para TRACES'
+                : 'CSV para osapiens o Fairtrace',
+          ),
+          content: Text(
+            formato == _Formato.geojson
+                ? 'Lleva la ubicación de cada finca de origen para la declaración de diligencia '
+                      'debida. ¿Incluir los nombres de los productores? TRACES no los exige y son '
+                      'datos personales.'
+                : 'Una fila por finca de origen, con su lindero, estado satelital, visita y '
+                      'registro en la blockchain, para cargar en la plataforma del importador. '
+                      '¿Incluir los nombres de los productores? Son datos personales.',
           ),
           actions: [
             TextButton(
@@ -88,15 +98,31 @@ class ContenedoresScreen extends ConsumerWidget {
     final archivo = x.codigo.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
     try {
       final api = ref.read(apiProvider);
-      final bytes = pdf
-          ? await api.pdfExportacion(x.id)
-          : await api.geojsonExportacion(x.id, conProductores: conProductores);
+      final bytes = switch (formato) {
+        _Formato.pdf => await api.pdfExportacion(x.id),
+        _Formato.geojson => await api.geojsonExportacion(
+          x.id,
+          conProductores: conProductores,
+        ),
+        _Formato.csv => await api.csvExportacion(
+          x.id,
+          conProductores: conProductores,
+        ),
+      };
       await ref
           .read(compartidorProvider)
           .compartir(
-            nombre: pdf ? 'Paquete-EUDR-$archivo.pdf' : '$archivo.geojson',
+            nombre: switch (formato) {
+              _Formato.pdf => 'Paquete-EUDR-$archivo.pdf',
+              _Formato.geojson => '$archivo.geojson',
+              _Formato.csv => '$archivo-fincas.csv',
+            },
             bytes: bytes,
-            tipo: pdf ? 'application/pdf' : 'application/geo+json',
+            tipo: switch (formato) {
+              _Formato.pdf => 'application/pdf',
+              _Formato.geojson => 'application/geo+json',
+              _Formato.csv => 'text/csv',
+            },
             asunto: 'Paquete EUDR ${x.codigo}',
           );
     } catch (e) {
@@ -256,9 +282,16 @@ class ContenedoresScreen extends ConsumerWidget {
                         onCerrar: x.abierta
                             ? () => _cerrar(context, ref, x)
                             : null,
-                        onPdf: () => _compartir(context, ref, x, pdf: true),
-                        onGeojson: () =>
-                            _compartir(context, ref, x, pdf: false),
+                        onPdf: () =>
+                            _compartir(context, ref, x, formato: _Formato.pdf),
+                        onGeojson: () => _compartir(
+                          context,
+                          ref,
+                          x,
+                          formato: _Formato.geojson,
+                        ),
+                        onCsv: () =>
+                            _compartir(context, ref, x, formato: _Formato.csv),
                         onQr: x.attestationUid == null
                             ? null
                             : () => showDialog<void>(
@@ -292,6 +325,7 @@ class _TarjetaContenedor extends StatelessWidget {
     required this.onCerrar,
     required this.onPdf,
     required this.onGeojson,
+    required this.onCsv,
     required this.onQr,
   });
 
@@ -301,6 +335,7 @@ class _TarjetaContenedor extends StatelessWidget {
   final VoidCallback? onCerrar;
   final VoidCallback onPdf;
   final VoidCallback onGeojson;
+  final VoidCallback onCsv;
 
   /// Solo con el contenedor ya firmado en la blockchain.
   final VoidCallback? onQr;
@@ -374,12 +409,17 @@ class _TarjetaContenedor extends StatelessWidget {
                 icon: const Icon(Icons.map_outlined),
                 label: const Text('GeoJSON (TRACES)'),
               ),
+              TextButton.icon(
+                onPressed: x.abierta ? null : onCsv,
+                icon: const Icon(Icons.table_view_outlined),
+                label: const Text('CSV (osapiens, Fairtrace)'),
+              ),
             ],
           ),
           if (x.abierta)
             Text(
               'El PDF es un borrador para revisarlo con el comprador. El '
-              'GeoJSON para TRACES se descarga al cerrar el contenedor.',
+              'GeoJSON para TRACES y el CSV se descargan al cerrar el contenedor.',
               style: pequeno,
               textAlign: TextAlign.end,
             ),
@@ -549,3 +589,6 @@ class _DialogoDatosState extends State<_DialogoDatos> {
     );
   }
 }
+
+/// Archivos del paquete EUDR que se descargan de un contenedor.
+enum _Formato { pdf, geojson, csv }

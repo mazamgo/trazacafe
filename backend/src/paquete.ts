@@ -1,5 +1,6 @@
 import { cultivo } from "@trazacafe/eudr-eas-schemas";
 import PDFDocument from "pdfkit";
+import { csv } from "./csv.ts";
 import type { FincaDePaquete, Paquete } from "./repo.ts";
 
 /** País de producción (ISO 3166-1 alfa-2). Por ahora solo Nicaragua. */
@@ -27,6 +28,90 @@ export function geojsonTraces(fincas: FincaDePaquete[], { incluirProductor = fal
       },
     })),
   };
+}
+
+type Coordenada = [number, number];
+
+/** Punto representativo: el punto, o el promedio de los vértices del anillo exterior. */
+export function centroide(g: FincaDePaquete["geometria"]): Coordenada | null {
+  const anillo = (r: Coordenada[]) => {
+    // El último vértice repite el primero.
+    const v = r.length > 1 && r[0][0] === r.at(-1)![0] && r[0][1] === r.at(-1)![1] ? r.slice(0, -1) : r;
+    return [v.reduce((s, c) => s + c[0], 0) / v.length, v.reduce((s, c) => s + c[1], 0) / v.length] as Coordenada;
+  };
+  if (g.type === "Point") return g.coordinates as Coordenada;
+  if (g.type === "Polygon") return anillo((g.coordinates as Coordenada[][])[0]);
+  if (g.type === "MultiPolygon") return anillo((g.coordinates as Coordenada[][][])[0][0]);
+  return null;
+}
+
+/** Geometría en WKT (lon lat), como la piden las plataformas de debida diligencia. */
+export function wkt(g: FincaDePaquete["geometria"]): string {
+  const par = (c: Coordenada) => `${c[0]} ${c[1]}`;
+  const anillos = (p: Coordenada[][]) => `(${p.map((r) => `(${r.map(par).join(", ")})`).join(", ")})`;
+  if (g.type === "Point") return `POINT (${par(g.coordinates as Coordenada)})`;
+  if (g.type === "Polygon") return `POLYGON ${anillos(g.coordinates as Coordenada[][])}`;
+  if (g.type === "MultiPolygon") {
+    return `MULTIPOLYGON (${(g.coordinates as Coordenada[][][]).map(anillos).join(", ")})`;
+  }
+  return "";
+}
+
+/**
+ * Fincas de origen del contenedor en CSV, para cargarlas en osapiens,
+ * Fairtrace u otra plataforma de debida diligencia: una fila por finca, con
+ * su geometría (WKT y centroide), estado satelital, visita y attestation.
+ * Encabezados en inglés, como los usan esas plataformas.
+ */
+export function csvPlataformas(p: Paquete, { incluirProductor = false } = {}): string {
+  const c = cultivo(p.exportacion.cultivo);
+  return csv([
+    [
+      "plot_id",
+      "production_place",
+      "producer_name",
+      "supplier",
+      "country",
+      "commodity",
+      "hs_code",
+      "area_ha",
+      "latitude",
+      "longitude",
+      "geometry_type",
+      "geometry_wkt",
+      "deforestation_status",
+      "last_satellite_check",
+      "last_visit",
+      "attestation_uid",
+      "kg_in_shipment",
+      "shipment",
+      "container",
+    ],
+    ...p.fincas.map((f) => {
+      const centro = centroide(f.geometria);
+      return [
+        f.id,
+        f.comunidad ? `${f.nombre}, ${f.comunidad}` : f.nombre,
+        incluirProductor ? f.productorNombre : null,
+        f.proveedor ?? p.organizacion,
+        PAIS_PRODUCCION,
+        c?.nombre ?? p.exportacion.cultivo,
+        c?.codigoHS ?? "",
+        Math.round(f.areaOficialHa * 10000) / 10000,
+        centro ? Math.round(centro[1] * 1e7) / 1e7 : null,
+        centro ? Math.round(centro[0] * 1e7) / 1e7 : null,
+        f.geometria.type,
+        wkt(f.geometria),
+        f.deforestacion,
+        f.ultimoChequeo?.slice(0, 10),
+        f.ultimaVisita?.slice(0, 10),
+        f.attestationUid,
+        Math.round(f.kgEntregados * 100) / 100,
+        p.exportacion.codigo,
+        p.exportacion.contenedor,
+      ];
+    }),
+  ]);
 }
 
 const NOMBRE_SATELITE: Record<string, string> = {

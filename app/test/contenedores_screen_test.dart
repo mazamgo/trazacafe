@@ -128,7 +128,8 @@ void main() {
     await expandir(tester);
     final geojson = tester.widget<TextButton>(find.widgetWithText(TextButton, 'GeoJSON (TRACES)'));
     expect(geojson.onPressed, isNull);
-    expect(find.textContaining('se descarga al cerrar el contenedor'), findsOneWidget);
+    expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'CSV (osapiens, Fairtrace)')).onPressed, isNull);
+    expect(find.textContaining('se descargan al cerrar el contenedor'), findsOneWidget);
   });
 
   testWidgets('cerrado, descarga el PDF y el GeoJSON sin nombres y los comparte', (tester) async {
@@ -136,6 +137,7 @@ void main() {
       'GET /v1/exportaciones': (200, {'exportaciones': [exportacionJson(contenedor: 'CSQU3054383', sinVerde: 0, estado: 'cerrada')]}),
       'GET /v1/exportaciones/x1/pdf': (200, '%PDF-1.3 falso'),
       'GET /v1/exportaciones/x1/geojson': (200, {'type': 'FeatureCollection', 'features': []}),
+      'GET /v1/exportaciones/x1/csv': (200, 'plot_id'),
     });
     await expandir(tester);
     await tester.tap(find.text('PDF'));
@@ -146,10 +148,19 @@ void main() {
     await tester.tap(find.text('Sin nombres'));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('CSV (osapiens, Fairtrace)'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('carga'), findsOneWidget);
+    await tester.tap(find.text('Con nombres'));
+    await tester.pumpAndSettle();
+
     expect(compartidor.compartidos.map((c) => (c.$1, c.$2)), [
       ('Paquete-EUDR-EXP-2026-001.pdf', 'application/pdf'),
       ('EXP-2026-001.geojson', 'application/geo+json'),
+      ('EXP-2026-001-fincas.csv', 'text/csv'),
     ]);
+    final csv = api.peticiones.firstWhere((p) => p.url.path.endsWith('/csv'));
+    expect(csv.url.query, 'productores=1');
     final geo = api.peticiones.firstWhere((p) => p.url.path.endsWith('/geojson'));
     expect(geo.url.query, isEmpty, reason: 'sin nombres de productores');
   });

@@ -1,6 +1,7 @@
 import { convertirKg, cultivo as cultivoDe, estadoValido } from "@trazacafe/eudr-eas-schemas";
 import type pg from "pg";
 import type { EstadoDeforestacion } from "./repo.ts";
+import { csv } from "./csv.ts";
 import { AREA_OFICIAL } from "./repo.ts";
 
 /**
@@ -150,12 +151,6 @@ const ESTADOS: Record<EstadoDeforestacion, string> = {
   pendiente: "Sin chequeo",
 };
 
-/** Un campo de CSV: entre comillas si lleva coma, comillas o salto de línea. */
-function campo(v: string | number | null): string {
-  const s = v === null ? "" : String(v);
-  return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-}
-
 /** Una fila por finca, para Excel: con BOM (tildes) y fin de línea de Windows. */
 export function csvReporte(d: DatosReporte): string {
   const filas = [
@@ -172,7 +167,7 @@ export function csvReporte(d: DatosReporte): string {
       redondear(f.kgEntregados),
     ]),
   ];
-  return `﻿${filas.map((f) => f.map(campo).join(",")).join("\r\n")}\r\n`;
+  return csv(filas);
 }
 
 export interface Reportes {

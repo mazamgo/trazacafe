@@ -635,6 +635,14 @@ class ApiClient {
     '${conProductores ? '?productores=1' : ''}',
   );
 
+  /// Fincas de origen del contenedor cerrado en CSV, para osapiens,
+  /// Fairtrace y otras plataformas de debida diligencia.
+  Future<List<int>> csvExportacion(String id, {bool conProductores = false}) =>
+      _descargar(
+        '/v1/exportaciones/${Uri.encodeComponent(id)}/csv'
+        '${conProductores ? '?productores=1' : ''}',
+      );
+
   /// PDF del paquete EUDR para el comprador.
   /// Reporte de la temporada (solo administradores).
   Future<Reporte> reporte(String temporadaId) async => Reporte.desdeJson(
