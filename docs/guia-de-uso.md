@@ -188,6 +188,8 @@ Reglas:
 ### 4.4 Lotes
 Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del beneficio, por ejemplo café pergamino.
 
+**Exportadoras:** los lotes que compras a tus cooperativas no se arman aquí: se reciben en **Proveedores → Recibir** (sección 4.8) y aparecen solos en **Lotes**. **Nuevo lote** es solo para entregas de productores que registra tu propio equipo; sin temporada ni entregas propias, no sale el botón **Crear lote**.
+
 1. **⋮ → Lotes → Nuevo lote**.
 2. Elige la **temporada** y el **estado** en que queda el lote.
 3. Marca las **entregas disponibles**. Abajo aparecen las que **no pueden ir** y por qué:

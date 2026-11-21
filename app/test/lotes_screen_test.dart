@@ -48,7 +48,8 @@ Map<String, dynamic> disponible(String id, {double kg = 500, String? motivo, Str
 };
 
 void main() {
-  Future<ApiFalsa> abrir(WidgetTester tester, Widget pantalla, Map<String, (int, Object?)> respuestas) async {
+  Future<ApiFalsa> abrir(WidgetTester tester, Widget pantalla, Map<String, (int, Object?)> respuestas,
+      {String tipo = 'cooperativa', bool conTemporadas = true}) async {
     tester.view
       ..devicePixelRatio = 1
       ..physicalSize = const Size(480, 2400);
@@ -60,9 +61,10 @@ void main() {
         authServiceProvider.overrideWithValue(auth),
         apiProvider.overrideWithValue(api.cliente(auth)),
         cultivosOrganizacionProvider.overrideWith((ref) => Stream.value(['cafe'])),
-        tipoOrganizacionProvider.overrideWith((ref) => Stream.value('cooperativa')),
+        tipoOrganizacionProvider.overrideWith((ref) => Stream.value(tipo)),
         temporadasProvider.overrideWith((ref) => Stream.value([
-              Temporada(id: t, nombre: '2026/27', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 9, 30)),
+              if (conTemporadas)
+                Temporada(id: t, nombre: '2026/27', inicio: DateTime(2026, 10, 1), fin: DateTime(2027, 9, 30)),
             ])),
       ],
       child: MaterialApp(home: pantalla),
@@ -70,6 +72,19 @@ void main() {
     await tester.pumpAndSettle();
     return api;
   }
+
+  testWidgets('una exportadora sin temporadas ve por qué no puede armar un lote aquí', (tester) async {
+    await abrir(tester, const NuevoLoteScreen(), {}, tipo: 'exportadora', conTemporadas: false);
+    expect(find.text('Lotes con entregas de productores propios'), findsOneWidget);
+    expect(find.textContaining('Proveedores → Recibir'), findsOneWidget);
+    expect(find.textContaining('No hay temporadas para este cultivo'), findsOneWidget);
+    expect(find.text('Crear lote'), findsNothing);
+  });
+
+  testWidgets('una cooperativa no ve ese aviso', (tester) async {
+    await abrir(tester, const NuevoLoteScreen(), {'GET /v1/lotes/disponibles': (200, {'entregas': []})});
+    expect(find.text('Lotes con entregas de productores propios'), findsNothing);
+  });
 
   testWidgets('la lista muestra cada lote con sus avisos y entregas', (tester) async {
     await abrir(tester, const LotesScreen(), {
