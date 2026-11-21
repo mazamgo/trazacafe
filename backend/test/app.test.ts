@@ -146,6 +146,18 @@ class RepoMemoria implements Repo {
     Object.assign(l, { kg: d.kg, kgEsperados: d.kgEsperados, avisos: d.avisos });
     return "agregadas" as const;
   }
+  async quitarEntregaDeLote(
+    _organizacionId: string,
+    _uid: string,
+    loteId: string,
+    entregaId: string,
+    d: { kg: number; kgEsperados: number; avisos: Aviso[] },
+  ) {
+    const l = this.lotes.find((x) => x.id === loteId)!;
+    l.entregas = l.entregas.filter((e) => e !== entregaId);
+    Object.assign(l, { kg: d.kg, kgEsperados: d.kgEsperados, avisos: d.avisos });
+    return "quitada" as const;
+  }
   async cerrarLote(_organizacionId: string, _uid: string, loteId: string) {
     this.lotes.find((x) => x.id === loteId)!.cerrado = true;
     return "cerrado" as const;
@@ -893,6 +905,30 @@ describe("/v1/lotes", () => {
       const otra = candidata({ loteCodigo: "CAFE-999" });
       repo.candidatas.push(otra);
       expect((await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [otra.id], kg: 200 })).statusCode).toBe(422);
+    });
+
+    it("quita una entrega, la deja libre y recalcula lo esperado", async () => {
+      const { app, repo, a, b, id } = await conLote();
+      await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [b.id], kg: 200 });
+      const res = await pedir(app, "POST", `/v1/lotes/${id}/entregas/${a.id}/quitar`, "admin", { kg: 100 });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().kg).toBe(100);
+      expect(repo.lotes[0].entregas).toEqual([b.id]);
+      expect(repo.lotes[0].kgEsperados).toBeCloseTo(100, 0);
+      const libre = (await pedir(app, "GET", `/v1/lotes/disponibles?cultivo=cafe&temporadaId=${T}`, "admin")).json().entregas.find((e: { id: string }) => e.id === a.id);
+      expect(libre.motivo).toBeNull();
+    });
+
+    it("no quita la última entrega, ni una que no es del lote, ni de un lote cerrado", async () => {
+      const { app, a, b, id } = await conLote();
+      const ultima = await pedir(app, "POST", `/v1/lotes/${id}/entregas/${a.id}/quitar`, "admin", { kg: 50 });
+      expect(ultima.statusCode).toBe(409);
+      expect(ultima.json().error).toBe("ultima_entrega");
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/entregas/${b.id}/quitar`, "admin", { kg: 50 })).statusCode).toBe(404);
+      await pedir(app, "POST", `/v1/lotes/${id}/entregas`, "admin", { entregas: [b.id], kg: 200 });
+      await pedir(app, "POST", `/v1/lotes/${id}/cerrar`, "admin", {});
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/entregas/${a.id}/quitar`, "admin", { kg: 100 })).statusCode).toBe(409);
+      expect((await pedir(app, "POST", `/v1/lotes/${id}/entregas/${a.id}/quitar`, "tecnico", { kg: 100 })).statusCode).toBe(403);
     });
 
     it("al cerrar queda cerrado y ya no recibe entregas", async () => {

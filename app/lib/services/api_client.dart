@@ -138,12 +138,15 @@ class AvisoLote {
 /// Entrega dentro de un lote ya armado.
 class EntregaDeLote {
   EntregaDeLote({
+    this.id = '',
     required this.fincaNombre,
     required this.productorNombre,
     required this.kg,
     required this.estado,
     required this.fecha,
   });
+
+  final String id;
 
   /// Alias ("Finca 3F2A") en un lote comprado si la proveedora no comparte nombres.
   final String fincaNombre;
@@ -241,6 +244,7 @@ class Lote {
     entregas: [
       for (final e in (j['entregas'] as List? ?? const []).cast<Map>())
         EntregaDeLote(
+          id: e['id'] as String? ?? '',
           fincaNombre: e['fincaNombre'] as String,
           productorNombre: e['productorNombre'] as String?,
           kg: (e['kg'] as num).toDouble(),
@@ -541,6 +545,19 @@ class ApiClient {
       'entregas': entregas,
       'kg': kg,
     }),
+  );
+
+  /// Saca una entrega de un lote abierto, con el peso total nuevo.
+  Future<Lote> quitarEntrega(
+    String loteId,
+    String entregaId, {
+    required double kg,
+  }) async => Lote.desdeJson(
+    await _pedir(
+      'POST',
+      '/v1/lotes/${Uri.encodeComponent(loteId)}/entregas/${Uri.encodeComponent(entregaId)}/quitar',
+      {'kg': kg},
+    ),
   );
 
   /// Cierra el lote: ya no recibe entregas y se firma en la próxima corrida.

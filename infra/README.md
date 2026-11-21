@@ -226,6 +226,7 @@ Publicar cambios en las reglas: `firebase deploy --only storage` (desde la raíz
 - **Deshacer:** un lote que no está en la blockchain, en un contenedor ni vendido (§4l) se puede deshacer, y sus entregas quedan libres. Una finca con entregas en un lote no se puede borrar.
 - **Lotes abiertos** (migración `016_lotes_abiertos.sql`, aplicada el 9/11/2026, columnas `lotes.cerrado_en` y `cerrado_por`; los lotes anteriores quedaron cerrados):
   - un lote nuevo queda abierto y `POST /v1/lotes/:id/entregas` `{entregas, kg}` le suma entregas con su peso total, reevaluando todo el lote y dejando historial en `correcciones`;
+  - `POST /v1/lotes/:id/entregas/:entregaId/quitar` `{kg}` saca una entrega (queda libre), con el peso total nuevo y su historial; la última no (409, para eso está deshacer el lote);
   - `POST /v1/lotes/:id/cerrar` vuelve a aplicar las reglas EUDR y responde 422 si alguna entrega ya no cumple (por ejemplo, una finca que pasó a rojo);
   - un lote abierto no se vende ni va en un contenedor (la API lo rechaza).
 - Cada lote encola su attestation (`Lote`) **al cerrarse**. El esquema EAS ahora incluye cultivo, temporada y estado.
@@ -399,7 +400,7 @@ Endpoints:
 - Acceso y sincronización: `POST /v1/activar`, `POST /v1/sync` (productores, fincas, versiones de lindero, visitas, entregas, fotos), `GET /v1/datos` (todo lo de la organización, con sus cultivos), `POST /v1/fotos/:id/subida`.
 - Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`, `PUT /v1/fincas/:id/cultivo`.
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
-- Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `POST /v1/lotes/:id/entregas`, `POST /v1/lotes/:id/cerrar`, `DELETE /v1/lotes/:id`.
+- Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `POST /v1/lotes/:id/entregas`, `POST /v1/lotes/:id/entregas/:entregaId/quitar`, `POST /v1/lotes/:id/cerrar`, `DELETE /v1/lotes/:id`.
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.

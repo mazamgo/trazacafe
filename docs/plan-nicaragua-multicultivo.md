@@ -120,7 +120,7 @@ Es la parte que **paga el cliente**.
 
 **Avance:**
 - **Lotes: hechos** (migración 009, pantalla Lotes para administradores). Detalle de reglas y avisos en `infra/README.md` §4f.
-  - **Lotes abiertos** (migración 016, publicada el 9/11/2026): el lote se crea abierto, recibe más entregas y se firma, vende o va en un contenedor solo después de cerrarlo.
+  - **Lotes abiertos** (migración 016, publicada el 9/11/2026): el lote se crea abierto, recibe más entregas y se firma, vende o va en un contenedor solo después de cerrarlo. Desde el 21/11/2026 también se le puede quitar una entrega mientras está abierto.
 - Los factores de rendimiento por estado (`cultivos.json`) son aproximados y se validan con el piloto.
 - **Contenedores: hechos** (migración 010, pantalla Contenedores). Detalle en `infra/README.md` §4g.
 - **Paquete EUDR: hecho**: GeoJSON para TRACES, PDF para el comprador y cierre del contenedor (detalle en `infra/README.md` §4h).

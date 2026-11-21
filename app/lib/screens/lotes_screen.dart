@@ -128,6 +128,35 @@ class LotesScreen extends ConsumerWidget {
     );
   }
 
+  /// Saca una entrega de un lote abierto: pide el peso total nuevo,
+  /// propuesto como el actual menos lo que rendía la entrega.
+  Future<void> _quitar(
+    BuildContext context,
+    WidgetRef ref,
+    Lote l,
+    EntregaDeLote e,
+  ) async {
+    final c = cultivoDe(l.cultivo);
+    final propuesto = (l.kg - c.convertirKg(e.kg, e.estado, l.estado)).round();
+    final kg = await showDialog<double>(
+      context: context,
+      builder: (_) => _DialogoQuitar(
+        lote: l,
+        entrega:
+            '${e.fincaNombre} · ${kgTexto(e.kg)} kg '
+            '${c.nombreEstado(e.estado).toLowerCase()} · ${fecha(e.fecha)}',
+        kgPropuesto: propuesto > 0 ? propuesto.toDouble() : null,
+      ),
+    );
+    if (kg == null || !context.mounted) return;
+    final hecho = await ejecutarEnLinea(
+      context,
+      () => ref.read(apiProvider).quitarEntrega(l.id, e.id, kg: kg),
+      'Entrega quitada de ${l.codigo}: queda libre.',
+    );
+    if (hecho) ref.invalidate(lotesProvider);
+  }
+
   Future<void> _cerrar(BuildContext context, WidgetRef ref, Lote l) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -296,6 +325,10 @@ class LotesScreen extends ConsumerWidget {
                         onAgregar: l.abierto
                             ? () => _agregar(context, ref, l)
                             : null,
+                        // La última no se quita: para eso está Deshacer lote.
+                        onQuitar: l.abierto && l.entregas.length > 1
+                            ? (e) => _quitar(context, ref, l, e)
+                            : null,
                         onCerrar: l.abierto
                             ? () => _cerrar(context, ref, l)
                             : null,
@@ -326,6 +359,7 @@ class _TarjetaLote extends StatelessWidget {
     required this.onDeshacer,
     required this.onCorregir,
     required this.onAgregar,
+    required this.onQuitar,
     required this.onCerrar,
     required this.onVender,
     required this.onDeshacerVenta,
@@ -334,6 +368,7 @@ class _TarjetaLote extends StatelessWidget {
   final Lote lote;
   final VoidCallback? onDeshacer;
   final VoidCallback? onAgregar;
+  final void Function(EntregaDeLote)? onQuitar;
   final VoidCallback? onCerrar;
   final VoidCallback? onVender;
   final VoidCallback? onDeshacerVenta;
@@ -408,10 +443,23 @@ class _TarjetaLote extends StatelessWidget {
           for (final e in lote.entregas)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '${e.fincaNombre}${e.productorNombre != null ? ' (${e.productorNombre})' : ''} · '
-                '${kgTexto(e.kg)} kg '
-                '${c.nombreEstado(e.estado).toLowerCase()} · ${fecha(e.fecha)}',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${e.fincaNombre}${e.productorNombre != null ? ' (${e.productorNombre})' : ''} · '
+                      '${kgTexto(e.kg)} kg '
+                      '${c.nombreEstado(e.estado).toLowerCase()} · ${fecha(e.fecha)}',
+                    ),
+                  ),
+                  if (onQuitar case final quitar?)
+                    IconButton(
+                      tooltip: 'Quitar del lote',
+                      icon: const Icon(Icons.remove_circle_outline),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => quitar(e),
+                    ),
+                ],
               ),
             ),
           if (lote.atestado) ...[
@@ -657,4 +705,71 @@ class _DialogoLoteState extends State<_DialogoLote> {
       ],
     );
   }
+}
+
+/// Confirma quitar una entrega y pide el peso total nuevo del lote.
+class _DialogoQuitar extends StatefulWidget {
+  const _DialogoQuitar({
+    required this.lote,
+    required this.entrega,
+    required this.kgPropuesto,
+  });
+
+  final Lote lote;
+  final String entrega;
+  final double? kgPropuesto;
+
+  @override
+  State<_DialogoQuitar> createState() => _DialogoQuitarState();
+}
+
+class _DialogoQuitarState extends State<_DialogoQuitar> {
+  late final _kg = TextEditingController(
+    text: widget.kgPropuesto == null
+        ? ''
+        : kgTexto(widget.kgPropuesto!).replaceAll(',', ''),
+  );
+
+  @override
+  void dispose() {
+    _kg.dispose();
+    super.dispose();
+  }
+
+  double? get _valor => double.tryParse(_kg.text.trim().replaceAll(',', '.'));
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text('¿Quitar esta entrega de ${widget.lote.codigo}?'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.entrega),
+        const SizedBox(height: 8),
+        const Text('La entrega queda libre para otro lote.'),
+        TextField(
+          controller: _kg,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Peso total del lote en la báscula',
+            suffixText: 'kg',
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(
+        onPressed: (_valor ?? 0) > 0
+            ? () => Navigator.pop(context, _valor)
+            : null,
+        child: const Text('Quitar'),
+      ),
+    ],
+  );
 }

@@ -205,7 +205,7 @@ Un **lote** junta entregas **de un mismo cultivo y temporada**, como sale del be
 - **Cerrar lote:** cuando esté completo, toca **Cerrar lote** y confirma. Ya no recibe entregas y en la próxima hora se firma en la blockchain.
 - **Para qué hay que cerrarlo:** un lote abierto no se puede **vender** ni poner en un **contenedor**.
 - **Si una finca pasó a rojo** mientras el lote estaba abierto, la app no deja cerrarlo y dice cuál es.
-- **Quitar una entrega equivocada:** toca **Deshacer lote** y arma el lote de nuevo; las entregas quedan libres.
+- **Quitar una entrega equivocada:** en el lote abierto, toca el ícono **Quitar del lote** junto a la entrega y escribe el peso total nuevo (la app propone el actual menos lo que rendía esa entrega). La entrega queda libre. La última no se puede quitar: para eso, **Deshacer lote**.
 
 **Avisos (no impiden crear el lote):**
 - **Volumen:** el lote pesa más de un 10 % por encima de lo que rinden sus entregas. Por ejemplo, 500 kg de uva rinden unos 100 kg de pergamino.
