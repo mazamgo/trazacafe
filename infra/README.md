@@ -401,7 +401,7 @@ Endpoints:
 - Fincas: `DELETE /v1/fincas/:id`, `POST /v1/fincas/:id/chequeo`, `PUT /v1/fincas/:id/cultivo`.
 - Organización y temporadas: `GET /v1/organizacion`, `PUT /v1/organizacion/cultivos`, `GET|POST /v1/temporadas`.
 - Lotes (administradores): `GET|POST /v1/lotes`, `GET /v1/lotes/disponibles?cultivo=&temporadaId=`, `POST /v1/lotes/:id/entregas`, `POST /v1/lotes/:id/entregas/:entregaId/quitar`, `POST /v1/lotes/:id/cerrar`, `DELETE /v1/lotes/:id`.
-- Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf`, `POST /v1/exportaciones/:id/cerrar`.
+- Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf|csv` (el CSV para osapiens y Fairtrace, como el GeoJSON, solo cerrado), `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
 - Reportes (administradores, `backend/src/reportes.ts`): `GET /v1/reportes?temporadaId=` (resumen, estado satelital, alertas, visitas por persona, kg por cultivo y estado, y lotes) y `GET /v1/reportes/csv?temporadaId=` (una fila por finca, con BOM para Excel). Solo lectura; cuentan las fincas del cultivo de la temporada sin las anonimizadas.

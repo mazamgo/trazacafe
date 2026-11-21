@@ -1144,6 +1144,19 @@ describe("paquete EUDR del contenedor", () => {
     expect(con.json().features[0].properties.ProducerName).toBe("Ana Pérez");
   });
 
+  it("el CSV para plataformas solo con el contenedor cerrado", async () => {
+    const { app, id } = await preparar({ contenedor: "CSQU3054383" });
+    expect((await pedir(app, "GET", `/v1/exportaciones/${id}/csv`, "admin")).statusCode).toBe(409);
+    await pedir(app, "POST", `/v1/exportaciones/${id}/cerrar`, "admin");
+    const res = await pedir(app, "GET", `/v1/exportaciones/${id}/csv`, "admin");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/csv");
+    expect(res.headers["content-disposition"]).toContain('filename="EXP_2026_001-fincas.csv"');
+    expect(res.body.split("\r\n")[1]).not.toContain("Ana Pérez");
+    const con = await pedir(app, "GET", `/v1/exportaciones/${id}/csv?productores=1`, "admin");
+    expect(con.body).toContain("Ana Pérez");
+  });
+
   it("descarga el PDF para el comprador", async () => {
     const { app, id } = await preparar();
     const res = await pedir(app, "GET", `/v1/exportaciones/${id}/pdf`, "admin");

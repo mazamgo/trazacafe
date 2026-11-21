@@ -32,7 +32,7 @@ import {
   type LoteNuevo,
   type Rechazo,
 } from "./lotes.ts";
-import { geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
+import { csvPlataformas, geojsonTraces, motivosNoCierre, pdfPaquete } from "./paquete.ts";
 import {
   invitarProveedorSchema,
   observacionSchema,
@@ -1089,6 +1089,28 @@ export function buildApp({
         .header("content-type", "application/geo+json")
         .header("content-disposition", `attachment; filename="${nombreArchivo(r.p.exportacion.codigo)}.geojson"`)
         .send(geojsonTraces(r.p.fincas, { incluirProductor: req.query.productores === "1" }));
+    },
+  );
+
+  /**
+   * Las fincas de origen en CSV para osapiens, Fairtrace y otras plataformas.
+   * Como el GeoJSON de TRACES, solo con el contenedor cerrado.
+   */
+  app.get<{ Params: { id: string }; Querystring: { productores?: string } }>(
+    "/v1/exportaciones/:id/csv",
+    async (req, reply) => {
+      const r = await paquete(req, reply);
+      if (!r) return;
+      if (r.p.exportacion.estado !== "cerrada") {
+        return reply.code(409).send({
+          error: "abierta",
+          mensaje: "El CSV para plataformas se descarga con el contenedor cerrado. Ciérralo primero.",
+        });
+      }
+      return reply
+        .header("content-type", "text/csv; charset=utf-8")
+        .header("content-disposition", `attachment; filename="${nombreArchivo(r.p.exportacion.codigo)}-fincas.csv"`)
+        .send(csvPlataformas(r.p, { incluirProductor: req.query.productores === "1" }));
     },
   );
 

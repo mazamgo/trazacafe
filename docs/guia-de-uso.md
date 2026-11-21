@@ -238,11 +238,12 @@ Un **contenedor** junta lotes **de un mismo cultivo** para un comprador.
 
 **Exportadoras:** en los lotes libres también salen los **lotes recibidos** de tus proveedores, con "de Cooperativa X". En el contenedor cuentan los **kg recibidos**. El paquete EUDR junta las fincas de todas las cooperativas: el PDF dice **Exportador** y **Proveedores**, y el QR del contenedor muestra la cadena completa hasta cada finca. Las fincas de una cooperativa que no comparte nombres salen con un código (por ejemplo **Finca 3F2A**) y sin el nombre del productor.
 
-**Paquete EUDR**, en la tarjeta del contenedor:
+**Paquete EUDR**, en la tarjeta del contenedor (el GeoJSON y el CSV, solo con el contenedor cerrado):
 - **PDF:** resumen para el comprador, con fincas de origen, áreas, chequeos y visitas. Con el contenedor **abierto** es un **borrador**, para revisarlo con el comprador antes de cerrar.
 - **GeoJSON (TRACES):** la ubicación de cada finca de origen. Se manda al **importador** en la Unión Europea, que lo sube a **TRACES** con su **declaración de diligencia debida (DDS)**.
   - **Se descarga solo con el contenedor cerrado**, es decir, con todas sus fincas en verde. Mientras está abierto, el botón está apagado.
   - La app pregunta si incluir los nombres de los productores. TRACES no los exige y son datos personales; lo normal es **Sin nombres**.
+- **CSV (osapiens, Fairtrace):** una fila por finca de origen, con su lindero (en formato WKT y su punto central), área, estado satelital, último chequeo, visita, registro en la blockchain y kg en el contenedor. Es para el importador que usa una plataforma de debida diligencia como osapiens o Fairtrace. Igual que el GeoJSON, solo con el contenedor cerrado, y pregunta si incluir los nombres. Las columnas van en inglés, como las piden esas plataformas.
 
 **Pasos hasta la exportación:**
 
