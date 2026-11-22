@@ -170,7 +170,7 @@ Es la parte que **paga el cliente**.
   - **lotes abiertos** (Fase 2, migración 016);
   - el aviso de la red (invitaciones, lotes por recibir, observaciones) se actualiza al sincronizar, al volver a la app y, en el panel, cada 3 minutos. Antes solo al abrir la app.
 - **Dado por probado el 21/11/2026** (decisión de Mauricio): la exportadora recibe lotes (con el aviso de diferencia de kg), el mapa de la revisión del proveedor y el contenedor con lotes de la cooperativa (PDF y, al cerrarlo, GeoJSON). Se recibieron `CAFE-2026/27-003` y `-004`.
-- **Para después:** notificaciones en el celular con la app cerrada (Firebase Cloud Messaging), cuando el piloto use la app a diario.
+- **Notificaciones push (21/11/2026):** a los administradores, por FCM: invitación, venta, recepción, vínculo terminado, observación y respuesta, y alertas satelitales (amarillo o rojo) del chequeo diario. Migración 017.
 - **Para después:** el paso 5 (visitas de control de la exportadora), cuando el piloto lo pida.
 
 **Por qué:**

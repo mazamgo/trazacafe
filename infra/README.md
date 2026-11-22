@@ -404,6 +404,7 @@ Endpoints:
 - Contenedores (administradores): `GET|POST /v1/exportaciones`, `PATCH|DELETE /v1/exportaciones/:id`, `GET /v1/exportaciones/:id/geojson|pdf|csv` (el CSV para osapiens y Fairtrace, como el GeoJSON, solo cerrado), `POST /v1/exportaciones/:id/cerrar`.
 - Correcciones: `PATCH /v1/entregas/:id`, `POST /v1/entregas/:id/anular`, `PATCH /v1/lotes/:id`, `PATCH /v1/productores/:id`, `PATCH /v1/fincas/:id`, `DELETE /v1/fotos/:id`, `PATCH /v1/verificaciones/:id`, `POST /v1/verificaciones/:id/anular`, `PATCH|DELETE /v1/temporadas/:id`.
 - Equipo: `GET|POST|DELETE /v1/invitaciones`.
+- Avisos push (`backend/src/notificaciones.ts`, migración `017_dispositivos.sql`): `POST /v1/dispositivos` `{token}` (el celular registra su token de FCM al entrar) y `POST /v1/dispositivos/baja` `{token}`. La API avisa por FCM a los **administradores** de la otra organización cuando hay una invitación, una venta, una recepción, un vínculo terminado, una observación o su respuesta, y la tarea diaria del chequeo avisa las fincas que pasan a amarillo o rojo (una notificación por organización). Los tokens que FCM da por inválidos se borran. Un aviso que falla queda en el log y no cambia la respuesta. FCM es gratis y usa el mismo proyecto de Firebase (API `fcm.googleapis.com`, ya activada); la cuenta de la API necesita el rol `roles/firebasecloudmessaging.admin`.
 - Reportes (administradores, `backend/src/reportes.ts`): `GET /v1/reportes?temporadaId=` (resumen, estado satelital, alertas, visitas por persona, kg por cultivo y estado, y lotes) y `GET /v1/reportes/csv?temporadaId=` (una fila por finca, con BOM para Excel). Solo lectura; cuentan las fincas del cultivo de la temporada sin las anonimizadas.
 - Eliminación de datos (§4j):
   - administradores: `GET /v1/solicitudes-eliminacion`, `POST /v1/solicitudes-eliminacion/:id/aprobar|rechazar`, `DELETE /v1/productores/:id`, `POST|DELETE /v1/organizacion/eliminacion`;
@@ -418,7 +419,7 @@ Endpoints:
 | Dato | Valor |
 |---|---|
 | Servicio | `trazacafe-api` en us-east4, de 0 a 2 instancias, 512 MB (sin uso no cobra) |
-| Cuenta de servicio | `trazacafe-api@trazacafe-dev.iam.gserviceaccount.com` con solo `cloudsql.client`, `cloudsql.instanceUser` y `firebaseauth.admin` |
+| Cuenta de servicio | `trazacafe-api@trazacafe-dev.iam.gserviceaccount.com` con solo `cloudsql.client`, `cloudsql.instanceUser`, `firebaseauth.admin` y `firebasecloudmessaging.admin` (avisos push) |
 | Usuario de la base | `trazacafe-api@trazacafe-dev.iam` (IAM, rol `trazacafe_app`: solo datos) |
 | Imágenes | Artifact Registry `us-east4-docker.pkg.dev/trazacafe-dev/trazacafe/backend` |
 | Variables | `INSTANCE_CONNECTION_NAME`, `DB_NAME`, `DB_USER`, `FIREBASE_PROJECT_ID`, `STORAGE_BUCKET`, `TAREAS_AUDIENCE`, `TAREAS_SA`, `KMS_KEY_VERSION`, `EAS_RED`, `SATELITE=gfw`; secreto `GFW_API_KEY` (`gfw-api-key`) |

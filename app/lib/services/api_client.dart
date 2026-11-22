@@ -644,6 +644,13 @@ class ApiClient {
       );
 
   /// PDF del paquete EUDR para el comprador.
+  /// Registra el token de FCM del celular para los avisos push.
+  Future<void> registrarDispositivo(String token) => _pedir(
+    'POST',
+    '/v1/dispositivos',
+    {'token': token, 'plataforma': 'android'},
+  );
+
   /// Reporte de la temporada (solo administradores).
   Future<Reporte> reporte(String temporadaId) async => Reporte.desdeJson(
     await _pedir(

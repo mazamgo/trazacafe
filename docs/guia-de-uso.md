@@ -36,6 +36,13 @@ Los productores no entran a la app; son registros que lleva el técnico.
 - **Celular de otra organización:** cada celular guarda los datos de una sola organización. Si entras en un celular que usó otra organización, la app borra sus datos (si ya estaban enviados) y descarga los de la tuya.
 - **Lo que necesita señal siempre:** corregir algo que ya se envió, los lotes, los contenedores y la revisión satelital.
 
+### Avisos en el celular (administradores)
+La primera vez que entras como administrador, la app pide permiso para **mostrar notificaciones**: tócale **Permitir**. Desde entonces el celular avisa, aunque la app esté cerrada:
+- **Red de proveedores:** una invitación de una exportadora, un lote que te vendieron (por recibir), un lote que te recibieron, un vínculo terminado, una observación nueva o su respuesta.
+- **Alertas satelitales:** cuando una finca de tu organización pasa a **rojo** o **amarillo** en el chequeo diario.
+
+Al tocar el aviso se abre la pantalla que corresponde (Clientes, Proveedores, Observaciones, Lotes o Reportes). Con la app abierta, el aviso sale abajo con el botón **Ver**. Los técnicos no reciben estos avisos. Al **Cerrar sesión**, el celular deja de recibirlos. Si no te llegan, revisa en los ajustes de Android que TrazaCafé tenga permitidas las notificaciones.
+
 ### Tema claro u oscuro
 En **⋮ → Tema** elige **Automático** (el que tenga el celular), **Claro** u **Oscuro**. El oscuro descansa la vista de noche y gasta menos batería en muchas pantallas. El celular recuerda la elección.
 
@@ -289,7 +296,7 @@ La exportadora que te compra te invita desde su app con el **correo de Google de
 - **Terminar el vínculo:** ya no le puedes vender lotes y deja de ver lo nuevo. Los lotes que ya recibió se quedan con ella, porque el EUDR obliga a guardarlos; los enviados sin recibir vuelven a tu lista.
 - **Vender lotes:** desde **⋮ → Lotes → Vender** (sección 4.4).
 - **Observaciones:** la exportadora puede dejarte observaciones sobre una finca o un lote, por ejemplo "revisar el lindero norte". Salen en el aviso de **Productores** (toca **Responder**) y en **⋮ → Clientes →** ícono de observaciones. Tócala y **Responder**.
-- **Cuándo se actualiza el aviso:** al abrir la app, al tocar **Sincronizar**, al volver a la app desde otra y cuando vuelve la señal. En el panel web, además, cada 3 minutos.
+- **Cuándo se actualiza el aviso:** además del aviso push en el celular (sección 2), al abrir la app, al tocar **Sincronizar**, al volver a la app desde otra y cuando vuelve la señal. En el panel web, además, cada 3 minutos.
 
 ### 4.8 Proveedores (exportadora o beneficio)
 En **⋮ → Proveedores** están las cooperativas que te venden.

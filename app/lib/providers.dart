@@ -19,6 +19,7 @@ import 'services/fotos_service.dart';
 import 'services/lugares_service.dart';
 import 'services/mapas_sin_senal.dart';
 import 'services/mapas_service.dart';
+import 'services/mensajeria.dart';
 import 'services/sync_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -299,6 +300,11 @@ final organizacionNombreProvider = StreamProvider<String?>((ref) {
         .then((o) => o['nombre'] as String?),
   );
 });
+
+/// Notificaciones push del celular; `null` en la web (el panel usa sus avisos).
+final mensajeriaProvider = Provider<Mensajeria?>(
+  (ref) => kIsWeb ? null : MensajeriaFirebase(),
+);
 
 /// Reporte de una temporada (solo administradores; requiere señal).
 final reporteProvider = FutureProvider.autoDispose.family<Reporte, String>(

@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getMessaging } from "firebase-admin/messaging";
 import { getStorage } from "firebase-admin/storage";
 import { OAuth2Client } from "google-auth-library";
 import type { Almacen } from "./almacen.ts";
@@ -14,6 +15,7 @@ import { EliminacionesPg } from "./eliminacion.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { ProveedoresPg } from "./proveedores.ts";
+import { NotificacionesPg, type EnviarPush } from "./notificaciones.ts";
 import { ReportesPg } from "./reportes.ts";
 import { PgRepo } from "./repo.ts";
 import { VerificadorPg } from "./verificador.ts";
@@ -113,6 +115,23 @@ const atestador = process.env.KMS_KEY_VERSION
     }
   : null;
 
+// FCM, del mismo proyecto de Firebase: los avisos se muestran como
+// notificación del sistema y llevan la pantalla que se abre al tocarlos.
+const enviarPush: EnviarPush = async (tokens, m) => {
+  const r = await getMessaging().sendEachForMulticast({
+    tokens,
+    notification: { title: m.titulo, body: m.cuerpo },
+    data: { pantalla: m.pantalla },
+    android: { priority: "high" },
+  });
+  return r.responses.flatMap((x, i) =>
+    !x.success &&
+    ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"].includes(x.error?.code ?? "")
+      ? [tokens[i]]
+      : [],
+  );
+};
+
 const app = buildApp({
   repo: new PgRepo(pool),
   verificarToken,
@@ -125,6 +144,7 @@ const app = buildApp({
   eliminaciones: new EliminacionesPg(pool),
   proveedores: new ProveedoresPg(pool),
   reportes: new ReportesPg(pool),
+  notificaciones: new NotificacionesPg(pool, enviarPush),
   verificador: new VerificadorPg(pool),
   ...(process.env.ORIGENES_PANEL ? { origenesPanel: process.env.ORIGENES_PANEL.split(",").map((o) => o.trim()) } : {}),
 });
