@@ -302,6 +302,7 @@ Es el argumento de venta del plan Exportador: "tu comprador recibe la prueba lis
 - **Reportes:** % de fincas verificadas, kg por cultivo y temporada, fincas en amarillo o rojo.
 
 ### Consola del propietario (GoProduction) (~2 semanas, cuando haya el primer cliente que paga)
+**Avance (22/11/2026), hecha en `/consola`:** Organizaciones (crear, tipo, suspender, equipo), Uso y facturación (con estado de cuenta en CSV), Salud (tareas, cola de attestations, saldo de firma, fincas en rojo) y Solicitudes. Migración 020; acceso con `npm run propietario`. **Falta:** la key de GFW desde la consola, los avisos por correo a los propietarios y un sitio aparte de Hosting en producción.
 Hoy GoProduction administra la plataforma a mano:
 - crea organizaciones con `npm run crear-organizacion`;
 - atiende las solicitudes de eliminación sin cooperativa con SQL;

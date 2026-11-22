@@ -14,12 +14,16 @@ class Sesion {
     required this.email,
     this.organizacionId,
     this.rol,
+    this.propietario = false,
   });
 
   final String uid;
   final String email;
   final String? organizacionId;
   final String? rol;
+
+  /// Claim `propietario` (GoProduction): entra a la consola.
+  final bool propietario;
 
   bool get activa => organizacionId != null && rol != null;
   bool get esAdmin => rol == 'admin';
@@ -65,6 +69,7 @@ class FirebaseAuthService implements AuthService {
       final claims = (await u.getIdTokenResult()).claims ?? const {};
       final org = claims['organizacionId'] as String?;
       final rol = claims['rol'] as String?;
+      final propietario = claims['propietario'] == true;
       await prefs.setString(_kUid, u.uid);
       await _guardar(prefs, _kOrg, org);
       await _guardar(prefs, _kRol, rol);
@@ -73,6 +78,7 @@ class FirebaseAuthService implements AuthService {
         email: u.email ?? '',
         organizacionId: org,
         rol: rol,
+        propietario: propietario,
       );
     } on FirebaseAuthException {
       final mismo = prefs.getString(_kUid) == u.uid;

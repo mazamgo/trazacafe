@@ -653,6 +653,16 @@ class ApiClient {
       );
 
   /// PDF del paquete EUDR para el comprador.
+  /// Consola del propietario: respuesta JSON tal cual (herramienta interna).
+  Future<Map<String, dynamic>> consola(
+    String metodo,
+    String ruta, [
+    Object? cuerpo,
+  ]) => _pedir(metodo, ruta, cuerpo);
+
+  /// Consola del propietario: archivos (estado de cuenta en CSV).
+  Future<List<int>> descargarConsola(String ruta) => _descargar(ruta);
+
   /// Portal del importador: vínculos exportadora → importador.
   Future<List<Comprador>> compradores() async => [
     for (final c

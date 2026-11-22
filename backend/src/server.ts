@@ -17,6 +17,7 @@ import { crearPool } from "./db.ts";
 import { ProveedoresPg } from "./proveedores.ts";
 import nodemailer from "nodemailer";
 import { CompradoresPg, type Correo } from "./compradores.ts";
+import { ConsolaPg } from "./consola.ts";
 import { ControlesPg } from "./control.ts";
 import { NotificacionesPg, type EnviarPush } from "./notificaciones.ts";
 import { ReportesPg } from "./reportes.ts";
@@ -38,6 +39,7 @@ const verificarToken: VerificarToken = async (token) => {
       email: d.email,
       organizacionId: typeof d.organizacionId === "string" ? d.organizacionId : undefined,
       rol: d.rol === "admin" || d.rol === "tecnico" ? (d.rol as Rol) : undefined,
+      propietario: d.propietario === true,
     };
   } catch {
     return null;
@@ -45,9 +47,14 @@ const verificarToken: VerificarToken = async (token) => {
 };
 
 const identidad: Identidad = {
-  asignarAcceso: (uid, acceso) => auth.setCustomUserClaims(uid, acceso),
+  // El claim `propietario` (consola de GoProduction) se conserva.
+  asignarAcceso: async (uid, acceso) => {
+    const propietario = (await auth.getUser(uid)).customClaims?.propietario === true;
+    await auth.setCustomUserClaims(uid, propietario ? { ...acceso, propietario } : acceso);
+  },
   quitarAcceso: async (uid) => {
-    await auth.setCustomUserClaims(uid, null);
+    const propietario = (await auth.getUser(uid)).customClaims?.propietario === true;
+    await auth.setCustomUserClaims(uid, propietario ? { propietario } : null);
     await auth.revokeRefreshTokens(uid);
   },
   eliminarUsuario: async (uid) => {
@@ -164,6 +171,10 @@ const app = buildApp({
   controles: new ControlesPg(pool),
   compradores: new CompradoresPg(pool),
   correo,
+  consola: new ConsolaPg(
+    pool,
+    atestador ? { red: atestador.red.nombre, saldo: () => (atestador.red as EasViem).saldo() } : null,
+  ),
   verificador: new VerificadorPg(pool),
   ...(process.env.ORIGENES_PANEL ? { origenesPanel: process.env.ORIGENES_PANEL.split(",").map((o) => o.trim()) } : {}),
 });
