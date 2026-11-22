@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers.dart';
 import '../services/api_client.dart';
 import '../services/preferencias.dart';
+import '../widgets/avisos_push.dart';
 import '../widgets/avisos_red.dart';
 import 'clientes_screen.dart';
 import 'contenedores_screen.dart';
@@ -45,251 +46,265 @@ class ProductoresScreen extends ConsumerWidget {
     };
 
     return AvisosAlDia(
-      child: Scaffold(
-        appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Productores'),
-              if (organizacion != null)
-                Text(
-                  organizacion,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-            ],
-          ),
-          actions: [
-            const BotonSincronizar(),
-            PopupMenuButton<void>(
-              itemBuilder: (_) => [
-                if (sesion != null)
-                  PopupMenuItem(
-                    enabled: false,
-                    child: Text(
-                      '${sesion.email}\n${sesion.esAdmin ? 'Administrador' : 'Técnico'}'
-                      '${organizacion != null ? '\n$organizacion' : ''}',
-                    ),
+      child: AvisosPush(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Productores'),
+                if (organizacion != null)
+                  Text(
+                    organizacion,
+                    style: Theme.of(context).textTheme.bodySmall,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                PopupMenuItem(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TemporadasScreen()),
-                  ),
-                  child: const Text('Temporadas'),
-                ),
-                if (sesion?.esAdmin ?? false)
-                  PopupMenuItem(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const EquipoScreen()),
-                    ),
-                    child: const Text('Equipo'),
-                  ),
-                if (sesion?.esAdmin ?? false)
-                  PopupMenuItem(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const CultivosScreen()),
-                    ),
-                    child: const Text('Cultivos'),
-                  ),
-                if (sesion?.esAdmin ?? false)
-                  PopupMenuItem(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ReportesScreen()),
-                    ),
-                    child: const Text('Reportes'),
-                  ),
-                if (sesion?.esAdmin ?? false)
-                  PopupMenuItem(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const LotesScreen()),
-                    ),
-                    child: const Text('Lotes'),
-                  ),
-                if (sesion?.esAdmin ?? false)
-                  PopupMenuItem(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ContenedoresScreen(),
-                      ),
-                    ),
-                    child: const Text('Contenedores'),
-                  ),
-                if (esAdmin && tiposCliente.contains(tipo))
-                  PopupMenuItem(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ProveedoresScreen(),
-                      ),
-                    ),
-                    child: const Text('Proveedores'),
-                  ),
-                if (esAdmin && tiposProveedora.contains(tipo))
-                  PopupMenuItem(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ClientesScreen()),
-                    ),
-                    child: const Text('Clientes'),
-                  ),
-                PopupMenuItem(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const MapasSinSenalScreen(),
-                    ),
-                  ),
-                  child: const Text('Mapas sin señal'),
-                ),
-                PopupMenuItem(
-                  onTap: () => elegirTema(context),
-                  child: const Text('Tema'),
-                ),
-                PopupMenuItem(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PrivacidadScreen()),
-                  ),
-                  child: const Text('Privacidad y datos'),
-                ),
-                PopupMenuItem(
-                  onTap: () => ref.read(authServiceProvider).cerrarSesion(),
-                  child: const Text('Cerrar sesión'),
-                ),
               ],
             ),
-          ],
-        ),
-        body: Column(
-          children: [
-            if (ref.watch(eliminacionProgramadaProvider).value case final dia?)
-              MaterialBanner(
-                backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                leading: const Icon(Icons.event_busy),
-                content: Text(
-                  'La organización se eliminará el ${fecha(dia)}. '
-                  '${sesion?.esAdmin ?? false ? 'Puedes cancelarlo en Privacidad y datos.' : 'Habla con el administrador si es un error.'}',
-                ),
-                actions: [
-                  if (sesion?.esAdmin ?? false)
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const PrivacidadScreen(),
-                        ),
-                      ),
-                      child: const Text('Ver'),
-                    )
-                  else
-                    const SizedBox.shrink(),
-                ],
-              ),
-            if ((sesion?.esAdmin ?? false) &&
-                (ref.watch(solicitudesPendientesProvider).value ?? 0) > 0)
-              MaterialBanner(
-                leading: const Icon(Icons.mark_email_unread_outlined),
-                content: Text(
-                  '${ref.watch(solicitudesPendientesProvider).value} '
-                  '${ref.watch(solicitudesPendientesProvider).value == 1 ? 'productor pide' : 'productores piden'} '
-                  'que se borren sus datos.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const SolicitudesEliminacionScreen(),
+            actions: [
+              const BotonSincronizar(),
+              PopupMenuButton<void>(
+                itemBuilder: (_) => [
+                  if (sesion != null)
+                    PopupMenuItem(
+                      enabled: false,
+                      child: Text(
+                        '${sesion.email}\n${sesion.esAdmin ? 'Administrador' : 'Técnico'}'
+                        '${organizacion != null ? '\n$organizacion' : ''}',
                       ),
                     ),
-                    child: const Text('Responder'),
-                  ),
-                ],
-              ),
-            if (red != null && !red.vacio)
-              BannerRed(
-                avisos: red,
-                abrir: (seccion) => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => switch (seccion) {
-                      'clientes' => const ClientesScreen(),
-                      'proveedores' => const ProveedoresScreen(),
-                      _ => const ObservacionesScreen(),
-                    },
-                  ),
-                ),
-              ),
-            if (ref.watch(temporadasProvider).hasValue &&
-                ref.watch(temporadaActualProvider) == null)
-              MaterialBanner(
-                leading: const Icon(Icons.event_busy),
-                content: Text(
-                  sesion?.esAdmin ?? false
-                      ? 'No hay temporada de cosecha para hoy. Créala para agrupar entregas y visitas.'
-                      : 'No hay temporada de cosecha para hoy. Pide al administrador que la cree.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).push(
+                  PopupMenuItem(
+                    onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const TemporadasScreen(),
                       ),
                     ),
                     child: const Text('Temporadas'),
                   ),
+                  if (sesion?.esAdmin ?? false)
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const EquipoScreen()),
+                      ),
+                      child: const Text('Equipo'),
+                    ),
+                  if (sesion?.esAdmin ?? false)
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CultivosScreen(),
+                        ),
+                      ),
+                      child: const Text('Cultivos'),
+                    ),
+                  if (sesion?.esAdmin ?? false)
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ReportesScreen(),
+                        ),
+                      ),
+                      child: const Text('Reportes'),
+                    ),
+                  if (sesion?.esAdmin ?? false)
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const LotesScreen()),
+                      ),
+                      child: const Text('Lotes'),
+                    ),
+                  if (sesion?.esAdmin ?? false)
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ContenedoresScreen(),
+                        ),
+                      ),
+                      child: const Text('Contenedores'),
+                    ),
+                  if (esAdmin && tiposCliente.contains(tipo))
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProveedoresScreen(),
+                        ),
+                      ),
+                      child: const Text('Proveedores'),
+                    ),
+                  if (esAdmin && tiposProveedora.contains(tipo))
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ClientesScreen(),
+                        ),
+                      ),
+                      child: const Text('Clientes'),
+                    ),
+                  PopupMenuItem(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const MapasSinSenalScreen(),
+                      ),
+                    ),
+                    child: const Text('Mapas sin señal'),
+                  ),
+                  PopupMenuItem(
+                    onTap: () => elegirTema(context),
+                    child: const Text('Tema'),
+                  ),
+                  PopupMenuItem(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PrivacidadScreen(),
+                      ),
+                    ),
+                    child: const Text('Privacidad y datos'),
+                  ),
+                  PopupMenuItem(
+                    onTap: () => ref.read(authServiceProvider).cerrarSesion(),
+                    child: const Text('Cerrar sesión'),
+                  ),
                 ],
               ),
-            Expanded(
-              child: productores.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
-                data: (lista) => lista.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Aún no hay productores. Toca + para agregar.',
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: lista.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (_, i) {
-                          final x = lista[i];
-                          return ListTile(
-                            leading: Icon(
-                              x.productor.anonimizado
-                                  ? Icons.person_off_outlined
-                                  : Icons.person,
-                            ),
-                            title: Text(x.productor.nombre),
-                            subtitle: Text(
-                              [
-                                if (x.productor.anonimizado)
-                                  'Datos personales eliminados',
-                                if (x.productor.comunidad != null)
-                                  x.productor.comunidad!,
-                                '${x.fincas} ${x.fincas == 1 ? 'finca' : 'fincas'}',
-                              ].join(' · '),
-                            ),
-                            trailing: x.productor.sincronizado
-                                ? null
-                                : const Icon(
-                                    Icons.cloud_upload,
-                                    color: Colors.orange,
-                                  ),
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ProductorScreen(productor: x.productor),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          tooltip: 'Nuevo productor',
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const NuevoProductorScreen()),
+            ],
           ),
-          child: const Icon(Icons.person_add),
+          body: Column(
+            children: [
+              if (ref.watch(eliminacionProgramadaProvider).value
+                  case final dia?)
+                MaterialBanner(
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                  leading: const Icon(Icons.event_busy),
+                  content: Text(
+                    'La organización se eliminará el ${fecha(dia)}. '
+                    '${sesion?.esAdmin ?? false ? 'Puedes cancelarlo en Privacidad y datos.' : 'Habla con el administrador si es un error.'}',
+                  ),
+                  actions: [
+                    if (sesion?.esAdmin ?? false)
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PrivacidadScreen(),
+                          ),
+                        ),
+                        child: const Text('Ver'),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                  ],
+                ),
+              if ((sesion?.esAdmin ?? false) &&
+                  (ref.watch(solicitudesPendientesProvider).value ?? 0) > 0)
+                MaterialBanner(
+                  leading: const Icon(Icons.mark_email_unread_outlined),
+                  content: Text(
+                    '${ref.watch(solicitudesPendientesProvider).value} '
+                    '${ref.watch(solicitudesPendientesProvider).value == 1 ? 'productor pide' : 'productores piden'} '
+                    'que se borren sus datos.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SolicitudesEliminacionScreen(),
+                        ),
+                      ),
+                      child: const Text('Responder'),
+                    ),
+                  ],
+                ),
+              if (red != null && !red.vacio)
+                BannerRed(
+                  avisos: red,
+                  abrir: (seccion) => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => switch (seccion) {
+                        'clientes' => const ClientesScreen(),
+                        'proveedores' => const ProveedoresScreen(),
+                        _ => const ObservacionesScreen(),
+                      },
+                    ),
+                  ),
+                ),
+              if (ref.watch(temporadasProvider).hasValue &&
+                  ref.watch(temporadaActualProvider) == null)
+                MaterialBanner(
+                  leading: const Icon(Icons.event_busy),
+                  content: Text(
+                    sesion?.esAdmin ?? false
+                        ? 'No hay temporada de cosecha para hoy. Créala para agrupar entregas y visitas.'
+                        : 'No hay temporada de cosecha para hoy. Pide al administrador que la cree.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TemporadasScreen(),
+                        ),
+                      ),
+                      child: const Text('Temporadas'),
+                    ),
+                  ],
+                ),
+              Expanded(
+                child: productores.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Error: $e')),
+                  data: (lista) => lista.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Aún no hay productores. Toca + para agregar.',
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: lista.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final x = lista[i];
+                            return ListTile(
+                              leading: Icon(
+                                x.productor.anonimizado
+                                    ? Icons.person_off_outlined
+                                    : Icons.person,
+                              ),
+                              title: Text(x.productor.nombre),
+                              subtitle: Text(
+                                [
+                                  if (x.productor.anonimizado)
+                                    'Datos personales eliminados',
+                                  if (x.productor.comunidad != null)
+                                    x.productor.comunidad!,
+                                  '${x.fincas} ${x.fincas == 1 ? 'finca' : 'fincas'}',
+                                ].join(' · '),
+                              ),
+                              trailing: x.productor.sincronizado
+                                  ? null
+                                  : const Icon(
+                                      Icons.cloud_upload,
+                                      color: Colors.orange,
+                                    ),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ProductorScreen(productor: x.productor),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton(
+            tooltip: 'Nuevo productor',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NuevoProductorScreen()),
+            ),
+            child: const Icon(Icons.person_add),
+          ),
         ),
       ),
     );

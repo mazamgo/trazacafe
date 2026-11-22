@@ -218,6 +218,8 @@ export interface DatosOrganizacion {
 export interface FincaPorRevisar {
   fincaId: string;
   version: number;
+  /** Estado satelital antes de este chequeo (para avisar solo los cambios). */
+  anterior?: EstadoDeforestacion;
   temporadaId: string | null;
   /** Polígono; si la finca es un punto, un círculo de su área declarada. */
   geometria: { type: "Polygon" | "MultiPolygon"; coordinates: unknown };
@@ -1351,7 +1353,7 @@ export class PgRepo implements Repo {
     // La temporada de cada finca depende de su cultivo (TEMPORADA_ACTUAL_DE_F).
     const { rows } = await this.pool.query(
       `SELECT * FROM (
-         SELECT f.id AS "fincaId", f.version_actual AS version, f.creado_en,
+         SELECT f.id AS "fincaId", f.version_actual AS version, f.creado_en, f.deforestacion AS anterior,
                 ${TEMPORADA_ACTUAL_DE_F} AS "temporadaId", ${GEOMETRIA_SATELITE} AS geometria
          FROM fincas f JOIN productores p ON p.id = f.productor_id
        ) x

@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -139,6 +140,12 @@ class FirebaseAuthService implements AuthService {
       prefs.remove(_kOrg),
       prefs.remove(_kRol),
     ]);
+    // El token de avisos push deja de valer: la API lo borra al próximo envío.
+    if (!kIsWeb) {
+      try {
+        await FirebaseMessaging.instance.unregister();
+      } catch (_) {}
+    }
     await _auth.signOut();
     if (_inicializado != null) await _google.signOut();
   }

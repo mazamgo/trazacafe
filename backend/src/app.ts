@@ -42,6 +42,7 @@ import {
   ventaSchema,
   type Proveedores,
 } from "./proveedores.ts";
+import { dispositivoSchema, type Notificaciones } from "./notificaciones.ts";
 import { armarReporte, csvReporte, type Reportes } from "./reportes.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type LoteAbierto, type Repo } from "./repo.ts";
 import { cambioCultivoSchema, cultivosOrganizacionSchema, syncSchema, temporadaSchema } from "./sync.ts";
@@ -95,6 +96,7 @@ export function buildApp({
   eliminaciones = null,
   proveedores = null,
   reportes = null,
+  notificaciones = null,
   origenesPanel = ORIGENES_PANEL,
 }: {
   repo: Repo;
@@ -116,6 +118,8 @@ export function buildApp({
   proveedores?: Proveedores | null;
   /** Reportes de la temporada para administradores (ReportesPg). */
   reportes?: Reportes | null;
+  /** Notificaciones push a los administradores (NotificacionesPg con FCM). */
+  notificaciones?: Notificaciones | null;
   /** Sitios desde los que el panel web llama a cualquier ruta `/v1/` (CORS). */
   origenesPanel?: string[];
 }) {
@@ -181,6 +185,38 @@ export function buildApp({
   }
 
   app.get("/health", async () => ({ ok: true }));
+
+  /** Avisa por push; si falla, queda en el log y la respuesta no cambia. */
+  async function avisar(req: FastifyRequest, f: (n: Notificaciones) => Promise<void>) {
+    if (!notificaciones) return;
+    try {
+      await f(notificaciones);
+    } catch (err) {
+      req.log.error({ err }, "aviso push falló");
+    }
+  }
+
+  /** El celular registra su token de FCM al entrar (y cuando se renueva). */
+  app.post("/v1/dispositivos", async (req, reply) => {
+    const usuario = await activo(req, reply);
+    if (!usuario) return;
+    if (!notificaciones) return reply.code(503).send({ error: "sin_notificaciones" });
+    const d = dispositivoSchema.safeParse(req.body);
+    if (!d.success) return reply.code(422).send({ error: "Datos inválidos", detalles: d.error.issues });
+    await notificaciones.registrar(usuario, d.data.token, d.data.plataforma);
+    return reply.code(204).send();
+  });
+
+  /** Al cerrar sesión: ese celular deja de recibir avisos de la persona. */
+  app.post("/v1/dispositivos/baja", async (req, reply) => {
+    const usuario = await autenticar(req, reply);
+    if (!usuario) return;
+    if (!notificaciones) return reply.code(204).send();
+    const d = dispositivoSchema.safeParse(req.body);
+    if (!d.success) return reply.code(422).send({ error: "Datos inválidos", detalles: d.error.issues });
+    await notificaciones.baja(d.data.token, usuario.uid);
+    return reply.code(204).send();
+  });
 
   /**
    * Verificador público (QR del contenedor o del lote): sin sesión y desde
@@ -481,17 +517,21 @@ export function buildApp({
 
     const fincas = await repo.fincasPorRevisar(FINCAS_POR_TAREA);
     const resultados = { revisadas: 0, verde: 0, amarillo: 0, rojo: 0, errores: 0 };
+    // Las que pasan a amarillo o rojo se avisan, agrupadas por organización.
+    const empeoraron: string[] = [];
     for (const f of fincas) {
       try {
         const c = await revisar(satelite, f);
         await repo.guardarChequeo(c);
         resultados.revisadas++;
         resultados[c.resultado]++;
+        if ((c.resultado === "amarillo" || c.resultado === "rojo") && c.resultado !== f.anterior) empeoraron.push(f.fincaId);
       } catch (e) {
         resultados.errores++;
         req.log.error({ fincaId: f.fincaId, err: e }, "chequeo satelital falló");
       }
     }
+    await avisar(req, (n) => n.alertasSatelitales(empeoraron));
     return resultados;
   });
 
@@ -886,14 +926,18 @@ export function buildApp({
     const d = cuerpo(invitarProveedorSchema, req, reply);
     if (!d) return;
     const r = await x.proveedores.invitar(x.admin, d.email);
-    if (resuelto(r, reply)) return reply.code(201).send(r.valor);
+    if (!resuelto(r, reply)) return;
+    await avisar(req, (n) => n.invitacion(r.valor.id));
+    return reply.code(201).send(r.valor);
   });
 
   /** Cualquiera de las dos termina el vínculo (o cancela la invitación). */
   app.delete<{ Params: { id: string } }>("/v1/proveedores/:id", async (req, reply) => {
     const x = await red(req, reply, req.params.id);
     if (!x) return;
-    if (resuelto(await x.proveedores.terminar(x.admin, req.params.id), reply)) return reply.code(204).send();
+    if (!resuelto(await x.proveedores.terminar(x.admin, req.params.id), reply)) return;
+    await avisar(req, (n) => n.vinculoTerminado(req.params.id, x.admin.organizacionId));
+    return reply.code(204).send();
   });
 
   app.post<{ Params: { loteId: string } }>("/v1/proveedores/lotes/:loteId/recibir", async (req, reply) => {
@@ -902,7 +946,9 @@ export function buildApp({
     const d = cuerpo(recepcionSchema, req, reply);
     if (!d) return;
     const r = await x.proveedores.recibir(x.admin, req.params.loteId, d);
-    if (resuelto(r, reply)) return r.valor;
+    if (!resuelto(r, reply)) return;
+    await avisar(req, (n) => n.loteRecibido(req.params.loteId));
+    return r.valor;
   });
 
   /** Revisión de solo lectura de lo que vendió una proveedora (vínculo activo). */
@@ -944,7 +990,9 @@ export function buildApp({
   app.delete<{ Params: { id: string } }>("/v1/clientes/:id", async (req, reply) => {
     const x = await red(req, reply, req.params.id);
     if (!x) return;
-    if (resuelto(await x.proveedores.terminar(x.admin, req.params.id), reply)) return reply.code(204).send();
+    if (!resuelto(await x.proveedores.terminar(x.admin, req.params.id), reply)) return;
+    await avisar(req, (n) => n.vinculoTerminado(req.params.id, x.admin.organizacionId));
+    return reply.code(204).send();
   });
 
   /** La cooperativa vende un lote a un cliente activo; responde el lote actualizado. */
@@ -954,6 +1002,7 @@ export function buildApp({
     const d = cuerpo(ventaSchema, req, reply);
     if (!d) return;
     if (!resuelto(await x.proveedores.vender(x.admin, req.params.id, d), reply)) return;
+    await avisar(req, (n) => n.loteVendido(req.params.id));
     return (await repo.listarLotes(x.admin.organizacionId)).find((l) => l.id === req.params.id);
   });
 
@@ -976,7 +1025,9 @@ export function buildApp({
     const d = cuerpo(observacionSchema, req, reply);
     if (!d) return;
     const r = await x.proveedores.observar(x.admin, d);
-    if (resuelto(r, reply)) return reply.code(201).send(r.valor);
+    if (!resuelto(r, reply)) return;
+    await avisar(req, (n) => n.observacion(r.valor.id));
+    return reply.code(201).send(r.valor);
   });
 
   app.post<{ Params: { id: string } }>("/v1/observaciones/:id/respuesta", async (req, reply) => {
@@ -984,9 +1035,9 @@ export function buildApp({
     if (!x) return;
     const d = cuerpo(respuestaObservacionSchema, req, reply);
     if (!d) return;
-    if (resuelto(await x.proveedores.responderObservacion(x.admin, req.params.id, d.texto), reply)) {
-      return reply.code(204).send();
-    }
+    if (!resuelto(await x.proveedores.responderObservacion(x.admin, req.params.id, d.texto), reply)) return;
+    await avisar(req, (n) => n.respuesta(req.params.id));
+    return reply.code(204).send();
   });
 
   /** Lo pendiente en la red, para los avisos de la pantalla de inicio. */

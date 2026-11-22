@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Almacen } from "../src/almacen.ts";
 import { buildApp } from "../src/app.ts";
+import type { Notificaciones } from "../src/notificaciones.ts";
 import type { Identidad, Usuario, UsuarioActivo } from "../src/auth.ts";
 import type { Resultado } from "../src/correcciones.ts";
 import { geojsonTraces, pdfPaquete } from "../src/paquete.ts";
@@ -181,7 +182,44 @@ const usuarios: Record<string, Usuario> = {
   tecnico: { uid: "u-tec", email: "tec@exportadora.com", organizacionId: EXPORTADORA, rol: "tecnico" },
 };
 
-function crearApp({ conRed = true } = {}) {
+/** Registra los avisos pedidos; con [fallar], cada aviso lanza un error. */
+class NotificacionesFalsa implements Notificaciones {
+  avisos: unknown[][] = [];
+  fallar = false;
+  private a(...x: unknown[]) {
+    this.avisos.push(x);
+    return this.fallar ? Promise.reject(new Error("FCM caído")) : Promise.resolve();
+  }
+  registrar(u: UsuarioActivo, token: string, plataforma: string) {
+    return this.a("registrar", u.uid, token, plataforma);
+  }
+  baja(token: string, uid: string) {
+    return this.a("baja", token, uid);
+  }
+  invitacion(id: string) {
+    return this.a("invitacion", id);
+  }
+  vinculoTerminado(id: string, por: string) {
+    return this.a("vinculoTerminado", id, por);
+  }
+  loteVendido(id: string) {
+    return this.a("loteVendido", id);
+  }
+  loteRecibido(id: string) {
+    return this.a("loteRecibido", id);
+  }
+  observacion(id: string) {
+    return this.a("observacion", id);
+  }
+  respuesta(id: string) {
+    return this.a("respuesta", id);
+  }
+  alertasSatelitales(ids: string[]) {
+    return this.a("alertasSatelitales", ids);
+  }
+}
+
+function crearApp({ conRed = true, notificaciones = null as Notificaciones | null } = {}) {
   const proveedores = new ProveedoresFalsa();
   const lote = { id: LOTE, codigo: "CAFE-001" } as Lote;
   const repo = { listarLotes: async () => [lote] } as unknown as Repo;
@@ -193,6 +231,7 @@ function crearApp({ conRed = true } = {}) {
     satelite: null,
     verificarTarea: async () => false,
     proveedores: conRed ? proveedores : null,
+    notificaciones,
   });
   return { app, proveedores };
 }
@@ -290,5 +329,56 @@ describe("rutas de la red de proveedores", () => {
     expect(resp.statusCode).toBe(204);
     expect(proveedores.llamadas.at(-1)).toEqual(["responderObservacion", VINCULO, "Ya se corrigió"]);
     expect((await pedir(app, "GET", "/v1/red/avisos")).json()).toMatchObject({ lotesPorRecibir: 2, observacionesSinResponder: 1 });
+  });
+});
+
+describe("avisos push", () => {
+  it("cada cambio en la red avisa a la otra organización", async () => {
+    const n = new NotificacionesFalsa();
+    const { app } = crearApp({ notificaciones: n });
+    expect((await pedir(app, "POST", "/v1/proveedores", "admin", { email: "coop@x.org" })).statusCode).toBe(201);
+    await pedir(app, "POST", `/v1/lotes/${LOTE}/venta`, "admin", { vinculoId: VINCULO, kg: 1000, fecha: "2026-10-20" });
+    await pedir(app, "POST", `/v1/proveedores/lotes/${LOTE}/recibir`, "admin", { kgRecibidos: 990, fecha: "2026-10-21" });
+    await pedir(app, "POST", "/v1/observaciones", "admin", { loteId: LOTE, texto: "Revisar la humedad" });
+    await pedir(app, "POST", `/v1/observaciones/${VINCULO}/respuesta`, "admin", { texto: "Ya se revisó" });
+    await pedir(app, "DELETE", `/v1/proveedores/${VINCULO}`);
+    expect(n.avisos.map((a) => a[0])).toEqual([
+      "invitacion",
+      "loteVendido",
+      "loteRecibido",
+      "observacion",
+      "respuesta",
+      "vinculoTerminado",
+    ]);
+    expect(n.avisos.at(-1)).toEqual(["vinculoTerminado", VINCULO, EXPORTADORA]);
+  });
+
+  it("si el aviso falla, la acción igual sale bien", async () => {
+    const n = new NotificacionesFalsa();
+    n.fallar = true;
+    const { app } = crearApp({ notificaciones: n });
+    expect((await pedir(app, "POST", "/v1/proveedores", "admin", { email: "coop@x.org" })).statusCode).toBe(201);
+  });
+
+  it("si la acción falla, no se avisa", async () => {
+    const n = new NotificacionesFalsa();
+    const { app, proveedores } = crearApp({ notificaciones: n });
+    proveedores.resultado = { ok: false, status: 409, mensaje: "No" };
+    expect((await pedir(app, "POST", "/v1/proveedores", "admin", { email: "coop@x.org" })).statusCode).toBe(409);
+    expect(n.avisos).toEqual([]);
+  });
+
+  it("registra y da de baja el celular de quien tiene sesión", async () => {
+    const n = new NotificacionesFalsa();
+    const { app } = crearApp({ notificaciones: n });
+    const token = "fcm-token-de-prueba-123";
+    expect((await pedir(app, "POST", "/v1/dispositivos", "tecnico", { token })).statusCode).toBe(204);
+    expect((await pedir(app, "POST", "/v1/dispositivos/baja", "tecnico", { token })).statusCode).toBe(204);
+    expect(n.avisos).toEqual([
+      ["registrar", "u-tec", token, "android"],
+      ["baja", token, "u-tec"],
+    ]);
+    expect((await app.inject({ method: "POST", url: "/v1/dispositivos", payload: { token } })).statusCode).toBe(401);
+    expect((await pedir(app, "POST", "/v1/dispositivos", "admin", { token: "x" })).statusCode).toBe(422);
   });
 });
