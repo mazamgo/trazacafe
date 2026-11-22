@@ -7,6 +7,8 @@ export interface Usuario {
   /** Vienen del custom claim; faltan hasta que se activa una invitación. */
   organizacionId?: string;
   rol?: Rol;
+  /** Claim `propietario` (GoProduction): entra a la consola. */
+  propietario?: boolean;
 }
 
 /** Usuario que ya activó su invitación. */

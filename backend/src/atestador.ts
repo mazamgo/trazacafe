@@ -159,6 +159,12 @@ export class EasViem implements RedEAS {
   private readonly publico;
   private readonly billetera;
 
+  /** Saldo de ETH de la dirección que firma (para la consola). */
+  async saldo(): Promise<string> {
+    const wei = await this.publico.getBalance({ address: this.cuenta.address });
+    return (Number(wei) / 1e18).toFixed(6);
+  }
+
   async atestar(solicitudes: Solicitud[]) {
     const { pedido, orden } = agruparPorEsquema(solicitudes);
     const txHash = await reintentarSiNoExiste(() =>

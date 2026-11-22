@@ -8,6 +8,7 @@ import 'firebase_options.dart';
 import 'providers.dart';
 import 'screens/activacion_screen.dart';
 import 'screens/celular_compartido_screen.dart';
+import 'screens/consola_screen.dart';
 import 'screens/eliminar_datos_screen.dart';
 import 'screens/privacidad_publica_screen.dart';
 import 'screens/login_screen.dart';
@@ -61,6 +62,13 @@ class TrazaCafeApp extends ConsumerWidget {
       );
     }
     // Panel web de administradores: /panel y /panel/{sección}.
+    // Consola del propietario (GoProduction): /consola.
+    if (kIsWeb && ruta.pathSegments.firstOrNull == 'consola') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const ConsolaWeb(),
+      );
+    }
     if (kIsWeb && ruta.pathSegments.firstOrNull == 'panel') {
       return MaterialPageRoute(
         settings: settings,

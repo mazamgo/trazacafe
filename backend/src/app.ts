@@ -51,6 +51,14 @@ import {
   type Compradores,
   type Correo,
 } from "./compradores.ts";
+import {
+  cambioOrganizacionSchema,
+  invitacionConsolaSchema,
+  mesSchema,
+  organizacionNuevaSchema,
+  rolSchema,
+  type Consola,
+} from "./consola.ts";
 import { muestreoSchema, permisoVisitasSchema, visitaControlSchema, type Controles } from "./control.ts";
 import { dispositivoSchema, type Notificaciones } from "./notificaciones.ts";
 import { armarReporte, csvReporte, type Reportes } from "./reportes.ts";
@@ -110,6 +118,7 @@ export function buildApp({
   controles = null,
   compradores = null,
   correo = null,
+  consola = null,
   origenesPanel = ORIGENES_PANEL,
 }: {
   repo: Repo;
@@ -139,6 +148,8 @@ export function buildApp({
   compradores?: Compradores | null;
   /** Correo para las alertas del importador; `null` = sin servicio de correo. */
   correo?: Correo | null;
+  /** Consola del propietario y suspensión de organizaciones (ConsolaPg). */
+  consola?: Consola | null;
   /** Sitios desde los que el panel web llama a cualquier ruta `/v1/` (CORS). */
   origenesPanel?: string[];
 }) {
@@ -200,8 +211,66 @@ export function buildApp({
       reply.code(403).send({ error: "solo_admin", mensaje: "Solo un administrador puede hacer esto." });
       return null;
     }
+    // Organización suspendida (falta de pago): ve y descarga lo suyo, pero no
+    // carga datos nuevos. Darse de baja o pedir la eliminación sí se puede.
+    if (req.method !== "GET" && !RUTAS_SIEMPRE.has(req.url.split("?")[0]) && (await suspendida(usuario.organizacionId))) {
+      reply.code(403).send({
+        error: "suspendida",
+        mensaje: "La organización está suspendida: puedes ver y descargar lo tuyo, pero no cargar datos nuevos. Habla con GoProduction.",
+      });
+      return null;
+    }
     return usuario;
   }
+
+  const RUTAS_SIEMPRE = new Set(["/v1/cuenta", "/v1/organizacion/eliminacion", "/v1/dispositivos", "/v1/dispositivos/baja"]);
+  const cacheSuspension = new Map<string, { valor: boolean; hasta: number }>();
+  async function suspendida(organizacionId: string) {
+    if (!consola) return false;
+    const c = cacheSuspension.get(organizacionId);
+    if (c && c.hasta > Date.now()) return c.valor;
+    const valor = await consola.suspendida(organizacionId);
+    cacheSuspension.set(organizacionId, { valor, hasta: Date.now() + 60_000 });
+    return valor;
+  }
+
+  /** Propietario (GoProduction) con la consola disponible; `null` si ya se respondió. */
+  async function propietario(req: FastifyRequest, reply: FastifyReply, ...ids: string[]) {
+    const usuario = await autenticar(req, reply);
+    if (!usuario) return null;
+    if (!usuario.propietario) {
+      reply.code(403).send({ error: "solo_propietario", mensaje: "La consola es solo para GoProduction." });
+      return null;
+    }
+    if (!consola) {
+      reply.code(503).send({ error: "sin_consola" });
+      return null;
+    }
+    if (ids.some((id) => !z.uuid().safeParse(id).success)) {
+      reply.code(404).send({ error: "no_encontrado" });
+      return null;
+    }
+    return { usuario, consola };
+  }
+
+  // Cada corrida de una tarea programada queda registrada para la consola.
+  app.addHook("onSend", async (req, reply, payload) => {
+    if (consola && req.url.startsWith("/v1/tareas/") && reply.statusCode !== 401) {
+      const tarea = req.url.split("?")[0].slice("/v1/tareas/".length);
+      let detalle: unknown = {};
+      try {
+        detalle = typeof payload === "string" ? JSON.parse(payload) : {};
+      } catch {
+        detalle = {};
+      }
+      try {
+        await consola.registrarCorrida(tarea, new Date(Date.now() - reply.elapsedTime), reply.statusCode < 400, detalle);
+      } catch (err) {
+        req.log.error({ err }, "no se pudo registrar la corrida");
+      }
+    }
+    return payload;
+  });
 
   app.get("/health", async () => ({ ok: true }));
 
@@ -1273,6 +1342,110 @@ export function buildApp({
     const x = await portal(req, reply, false);
     if (!x) return;
     return { alertas: await x.compradores.alertas(x.usuario.organizacionId) };
+  });
+
+  // Consola del propietario (GoProduction).
+
+  app.get("/v1/consola/organizaciones", async (req, reply) => {
+    const x = await propietario(req, reply);
+    if (!x) return;
+    return { organizaciones: await x.consola.organizaciones() };
+  });
+
+  app.post("/v1/consola/organizaciones", async (req, reply) => {
+    const x = await propietario(req, reply);
+    if (!x) return;
+    const d = cuerpo(organizacionNuevaSchema, req, reply);
+    if (!d) return;
+    const r = await x.consola.crearOrganizacion(x.usuario, d);
+    if (resuelto(r, reply)) return reply.code(201).send(r.valor);
+  });
+
+  app.patch<{ Params: { id: string } }>("/v1/consola/organizaciones/:id", async (req, reply) => {
+    const x = await propietario(req, reply, req.params.id);
+    if (!x) return;
+    const d = cuerpo(cambioOrganizacionSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.consola.cambiarTipo(x.usuario, req.params.id, d.tipo), reply)) return reply.code(204).send();
+  });
+
+  for (const accion of ["suspender", "reactivar"] as const) {
+    app.post<{ Params: { id: string } }>(`/v1/consola/organizaciones/:id/${accion}`, async (req, reply) => {
+      const x = await propietario(req, reply, req.params.id);
+      if (!x) return;
+      const r = await x.consola.suspender(x.usuario, req.params.id, accion === "suspender");
+      cacheSuspension.delete(req.params.id);
+      if (resuelto(r, reply)) return reply.code(204).send();
+    });
+  }
+
+  app.get<{ Querystring: { mes?: string } }>("/v1/consola/uso", async (req, reply) => {
+    const x = await propietario(req, reply);
+    if (!x) return;
+    const mes = mesSchema.safeParse(req.query.mes);
+    if (!mes.success) return reply.code(422).send({ error: "mes_invalido", mensaje: "El mes va como AAAA-MM." });
+    return { uso: await x.consola.uso(mes.data) };
+  });
+
+  app.get<{ Params: { id: string }; Querystring: { mes?: string } }>(
+    "/v1/consola/organizaciones/:id/estado-de-cuenta",
+    async (req, reply) => {
+      const x = await propietario(req, reply, req.params.id);
+      if (!x) return;
+      const mes = mesSchema.safeParse(req.query.mes);
+      if (!mes.success) return reply.code(422).send({ error: "mes_invalido", mensaje: "El mes va como AAAA-MM." });
+      const contenido = await x.consola.estadoDeCuentaCsv(req.params.id, mes.data);
+      if (contenido === null) return reply.code(404).send({ error: "no_encontrada" });
+      return reply
+        .header("content-type", "text/csv; charset=utf-8")
+        .header("content-disposition", `attachment; filename="estado-de-cuenta-${mes.data}.csv"`)
+        .send(contenido);
+    },
+  );
+
+  app.get("/v1/consola/salud", async (req, reply) => {
+    const x = await propietario(req, reply);
+    if (!x) return;
+    return x.consola.salud();
+  });
+
+  app.get("/v1/consola/solicitudes", async (req, reply) => {
+    const x = await propietario(req, reply);
+    if (!x) return;
+    return { solicitudes: await x.consola.solicitudes() };
+  });
+
+  app.get<{ Params: { id: string } }>("/v1/consola/organizaciones/:id/equipo", async (req, reply) => {
+    const x = await propietario(req, reply, req.params.id);
+    if (!x) return;
+    return { equipo: await x.consola.equipo(req.params.id) };
+  });
+
+  app.post<{ Params: { id: string } }>("/v1/consola/organizaciones/:id/equipo", async (req, reply) => {
+    const x = await propietario(req, reply, req.params.id);
+    if (!x) return;
+    const d = cuerpo(invitacionConsolaSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.consola.invitar(x.usuario, req.params.id, d.email, d.rol), reply)) return reply.code(201).send();
+  });
+
+  app.put<{ Params: { id: string; email: string } }>("/v1/consola/organizaciones/:id/equipo/:email", async (req, reply) => {
+    const x = await propietario(req, reply, req.params.id);
+    if (!x) return;
+    const d = cuerpo(rolSchema, req, reply);
+    if (!d) return;
+    const r = await x.consola.cambiarRol(x.usuario, req.params.id, req.params.email.toLowerCase(), d.rol);
+    if (!resuelto(r, reply)) return;
+    // Quien ya entró recibe el rol nuevo en su próxima sesión.
+    if (r.valor.usuarioUid) await identidad.asignarAcceso(r.valor.usuarioUid, { organizacionId: req.params.id, rol: d.rol });
+    return reply.code(204).send();
+  });
+
+  app.delete<{ Params: { id: string; email: string } }>("/v1/consola/organizaciones/:id/equipo/:email", async (req, reply) => {
+    const x = await propietario(req, reply, req.params.id);
+    if (!x) return;
+    const r = await x.consola.cancelarInvitacion(x.usuario, req.params.id, req.params.email.toLowerCase());
+    if (resuelto(r, reply)) return reply.code(204).send();
   });
 
   /** Lo pendiente en la red, para los avisos de la pantalla de inicio. */
