@@ -28,6 +28,7 @@ class Vinculo {
     required this.organizacion,
     required this.estado,
     required this.comparteNombres,
+    this.permiteVisitas = false,
     required this.invitadoEn,
     required this.lotesEnviados,
     required this.lotesRecibidos,
@@ -39,6 +40,7 @@ class Vinculo {
     organizacion: (j['organizacion'] as Map)['nombre'] as String,
     estado: j['estado'] as String,
     comparteNombres: j['comparteNombres'] as bool,
+    permiteVisitas: j['permiteVisitas'] as bool? ?? false,
     invitadoEn: DateTime.parse(j['invitadoEn'] as String).toLocal(),
     lotesEnviados: j['lotesEnviados'] as int,
     lotesRecibidos: j['lotesRecibidos'] as int,
@@ -57,6 +59,9 @@ class Vinculo {
 
   /// La proveedora comparte los nombres de fincas y productores (Ley 787).
   final bool comparteNombres;
+
+  /// La cooperativa permite visitas de control de la exportadora.
+  final bool permiteVisitas;
   final DateTime invitadoEn;
 
   /// Enviados y todavía no recibidos.

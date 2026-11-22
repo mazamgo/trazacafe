@@ -8,6 +8,7 @@ import '../widgets/estado_satelital.dart';
 import '../widgets/mapa_fincas.dart';
 import 'finca_screen.dart' show fecha;
 import 'lotes_screen.dart' show kgTexto;
+import 'visitas_control_screen.dart';
 
 /// Exportadora: lo que una cooperativa le vendió, de solo lectura. La
 /// exportadora no corrige datos de la cooperativa: deja observaciones.
@@ -111,6 +112,7 @@ class RevisionProveedorScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+              _Muestreo(vinculo),
               const _Titulo('Fincas de origen'),
               for (final f in r.fincas)
                 Card(
@@ -257,4 +259,79 @@ class _Titulo extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(4, 16, 4, 4),
     child: Text(texto, style: Theme.of(context).textTheme.titleSmall),
   );
+}
+
+/// Fincas elegidas para visita de control (si la cooperativa lo permite).
+class _Muestreo extends ConsumerWidget {
+  const _Muestreo(this.vinculo);
+
+  final Vinculo vinculo;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = ref.watch(muestreoProvider(vinculo.id));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _Titulo('Visitas de control'),
+        ...m.when(
+          loading: () => const [LinearProgressIndicator()],
+          error: (e, _) => [Text('No se pudo cargar: $e')],
+          data: (d) => [
+            Text(
+              d.permiteVisitas
+                  ? 'Marca las fincas que deben visitar tus técnicos. Las ven en '
+                        '⋮ → Visitas de control del celular.'
+                  : '${vinculo.organizacion} todavía no permite visitas de control. '
+                        'Se activa en su app, en Clientes.',
+            ),
+            for (final f in d.fincas)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: f.elegida,
+                onChanged: d.permiteVisitas || f.elegida
+                    ? (v) async {
+                        final hecho = await ejecutarEnLinea(
+                          context,
+                          () => ref
+                              .read(apiProvider)
+                              .elegirFinca(vinculo.id, f.id, v == true),
+                          v == true
+                              ? '${f.nombre} quedó para visitar.'
+                              : '${f.nombre} salió de las visitas.',
+                        );
+                        if (hecho) ref.invalidate(muestreoProvider(vinculo.id));
+                      }
+                    : null,
+                title: Text(f.nombre),
+                subtitle: Text(
+                  [
+                    ?f.productorNombre,
+                    ?f.comunidad,
+                    f.temporadaNombre,
+                    if (f.controles > 0)
+                      '${f.controles} ${f.controles == 1 ? 'control' : 'controles'}',
+                  ].join(' · '),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ControlesScreen(
+                      vinculoId: vinculo.id,
+                      titulo: 'Controles en ${vinculo.organizacion}',
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('Ver visitas hechas'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }

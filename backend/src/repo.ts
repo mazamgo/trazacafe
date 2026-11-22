@@ -750,7 +750,8 @@ export class PgRepo implements Repo {
       `SELECT e.id, f.id AS "fincaId", f.nombre AS "fincaNombre", p.nombre AS "productorNombre", f.cultivo,
               e.temporada_id AS "temporadaId", e.kg::float8 AS kg, e.estado, e.fecha, f.deforestacion,
               EXISTS (SELECT 1 FROM verificaciones v
-                      WHERE v.finca_id = f.id AND v.temporada_id = e.temporada_id AND v.anulada_en IS NULL)
+                      WHERE v.finca_id = f.id AND v.temporada_id = e.temporada_id AND v.anulada_en IS NULL
+                        AND v.organizacion_id IS NULL)
                 AS verificada,
               ${AREA_OFICIAL("f")}::float8 AS "areaOficialHa", l.codigo AS "loteCodigo"
        FROM entregas e JOIN fincas f ON f.id = e.finca_id JOIN productores p ON p.id = f.productor_id
@@ -1176,7 +1177,7 @@ export class PgRepo implements Repo {
               ST_AsGeoJSON(f.geom, 8)::json AS geometria, ${AREA_OFICIAL("f")}::float8 AS "areaOficialHa",
               f.version_actual AS version, f.geo_hash AS "geoHash", f.deforestacion,
               (SELECT max(c.fecha) FROM chequeos_deforestacion c WHERE c.finca_id = f.id) AS "ultimoChequeo",
-              (SELECT max(v.fecha) FROM verificaciones v WHERE v.finca_id = f.id) AS "ultimaVisita",
+              (SELECT max(v.fecha) FROM verificaciones v WHERE v.finca_id = f.id AND v.organizacion_id IS NULL) AS "ultimaVisita",
               f.attestation_uid AS "attestationUid", x.kg AS "kgEntregados"
        FROM entregas_x x JOIN fincas f ON f.id = x.finca_id JOIN productores p ON p.id = f.productor_id
        JOIN organizaciones o ON o.id = p.organizacion_id
@@ -1245,7 +1246,7 @@ export class PgRepo implements Repo {
       `SELECT v.id, v.finca_id AS "fincaId", v.temporada_id AS "temporadaId", v.fecha,
               v.lindero_cambio AS "linderoCambio", v.version_finca AS "versionFinca", v.nota
        FROM verificaciones v JOIN fincas f ON f.id = v.finca_id JOIN productores p ON p.id = f.productor_id
-       WHERE p.organizacion_id = $1 AND v.anulada_en IS NULL ORDER BY v.fecha`,
+       WHERE p.organizacion_id = $1 AND v.anulada_en IS NULL AND v.organizacion_id IS NULL ORDER BY v.fecha`,
       [organizacionId],
     );
     const entregas = await this.pool.query(

@@ -101,6 +101,8 @@ export interface Vinculo {
   organizacion: { id: string; nombre: string };
   estado: EstadoVinculo;
   comparteNombres: boolean;
+  /** La cooperativa permite visitas de control de la exportadora. */
+  permiteVisitas: boolean;
   invitadoEn: string;
   respondidoEn: string | null;
   terminadoEn: string | null;
@@ -242,7 +244,7 @@ export class ProveedoresPg implements Proveedores {
       `SELECT vi.id, CASE WHEN vi.cliente_id = $1 THEN 'cliente' ELSE 'proveedora' END AS soy,
               json_build_object('id', o.id, 'nombre', o.nombre) AS organizacion,
               vi.estado, vi.comparte_nombres AS "comparteNombres", vi.invitado_en AS "invitadoEn",
-              vi.respondido_en AS "respondidoEn", vi.terminado_en AS "terminadoEn",
+              vi.respondido_en AS "respondidoEn", vi.terminado_en AS "terminadoEn", vi.permite_visitas AS "permiteVisitas",
               (SELECT count(*) FROM ventas_lotes v WHERE v.vinculo_id = vi.id AND v.estado = 'enviado')::int AS "lotesEnviados",
               (SELECT count(*) FROM ventas_lotes v WHERE v.vinculo_id = vi.id AND v.estado = 'recibido')::int AS "lotesRecibidos"
        FROM vinculos vi
@@ -460,9 +462,9 @@ export class ProveedoresPg implements Proveedores {
               ST_AsGeoJSON(f.geom, 7)::json AS geometria, ${AREA_OFICIAL("f")}::float8 AS "areaOficialHa",
               f.deforestacion,
               (SELECT max(c.fecha) FROM chequeos_deforestacion c WHERE c.finca_id = f.id) AS "ultimoChequeo",
-              (SELECT max(vv.fecha) FROM verificaciones vv WHERE vv.finca_id = f.id AND vv.anulada_en IS NULL) AS "ultimaVisita",
+              (SELECT max(vv.fecha) FROM verificaciones vv WHERE vv.finca_id = f.id AND vv.anulada_en IS NULL AND vv.organizacion_id IS NULL) AS "ultimaVisita",
               EXISTS (SELECT 1 FROM verificaciones vv JOIN fl x ON x.finca_id = vv.finca_id AND x.temporada_id = vv.temporada_id
-                      WHERE vv.finca_id = f.id AND vv.anulada_en IS NULL) AS "conVisita",
+                      WHERE vv.finca_id = f.id AND vv.anulada_en IS NULL AND vv.organizacion_id IS NULL) AS "conVisita",
               f.attestation_uid AS "attestationUid",
               (SELECT array_agg(DISTINCT x.codigo) FROM fl x WHERE x.finca_id = f.id) AS lotes
        FROM fincas f JOIN productores p ON p.id = f.productor_id

@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'red_proveedores.dart';
+import 'control.dart';
 import 'reportes.dart';
 
 export 'red_proveedores.dart';
+export 'control.dart';
 export 'reportes.dart';
 
 /// URL de la API. En el emulador de Android, 10.0.2.2 es el localhost de la
@@ -644,6 +646,62 @@ class ApiClient {
       );
 
   /// PDF del paquete EUDR para el comprador.
+  /// Cooperativa: permite o no las visitas de control de ese cliente.
+  Future<void> permitirVisitas(String vinculoId, bool permite) => _pedir(
+    'PUT',
+    '/v1/clientes/${Uri.encodeComponent(vinculoId)}/visitas',
+    {'permiteVisitas': permite},
+  );
+
+  /// Exportadora: fincas de los lotes recibidos, con las elegidas.
+  Future<({bool permiteVisitas, List<FincaMuestreo> fincas})> muestreo(
+    String vinculoId,
+  ) async {
+    final r = await _pedir(
+      'GET',
+      '/v1/proveedores/${Uri.encodeComponent(vinculoId)}/muestreo',
+    );
+    return (
+      permiteVisitas: r['permiteVisitas'] as bool,
+      fincas: [
+        for (final f in (r['fincas'] as List).cast<Map<String, dynamic>>())
+          FincaMuestreo.desdeJson(f),
+      ],
+    );
+  }
+
+  Future<void> elegirFinca(String vinculoId, String fincaId, bool elegir) =>
+      elegir
+      ? _pedir(
+          'POST',
+          '/v1/proveedores/${Uri.encodeComponent(vinculoId)}/muestreo',
+          {'fincaId': fincaId},
+        )
+      : _pedir(
+          'DELETE',
+          '/v1/proveedores/${Uri.encodeComponent(vinculoId)}/muestreo/${Uri.encodeComponent(fincaId)}',
+        );
+
+  /// Fincas que deben visitar los técnicos de la exportadora (JSON crudo,
+  /// para guardarlo en el celular).
+  Future<List<Map<String, dynamic>>> fincasControl() async =>
+      ((await _pedir('GET', '/v1/control'))['fincas'] as List)
+          .cast<Map<String, dynamic>>();
+
+  Future<void> registrarControl(Map<String, dynamic> visita) =>
+      _pedir('POST', '/v1/control/visitas', visita);
+
+  Future<List<ControlVisita>> controles(String vinculoId) async => [
+    for (final c
+        in ((await _pedir(
+                  'GET',
+                  '/v1/vinculos/${Uri.encodeComponent(vinculoId)}/controles',
+                ))['controles']
+                as List)
+            .cast<Map<String, dynamic>>())
+      ControlVisita.desdeJson(c),
+  ];
+
   /// Registra el token de FCM del celular para los avisos push.
   Future<void> registrarDispositivo(String token) => _pedir(
     'POST',

@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../widgets/en_linea.dart';
 import 'finca_screen.dart' show fecha;
 import 'observaciones_screen.dart';
+import 'visitas_control_screen.dart';
 
 /// Cooperativa (solo administradores; requiere señal): las exportadoras que
 /// la invitaron como proveedora. Al aceptar elige si comparte los nombres de
@@ -198,6 +199,41 @@ class ClientesScreen extends ConsumerWidget {
                             ),
                             value: v.comparteNombres,
                             onChanged: (s) => _nombres(context, ref, v, s),
+                          ),
+                        if (v.activo)
+                          SwitchListTile(
+                            title: const Text('Permitir visitas de control'),
+                            subtitle: const Text(
+                              'Los técnicos de la exportadora pueden visitar las fincas '
+                              'de los lotes que le vendiste que ella elija.',
+                            ),
+                            value: v.permiteVisitas,
+                            onChanged: (s) async {
+                              final hecho = await ejecutarEnLinea(
+                                context,
+                                () => ref
+                                    .read(apiProvider)
+                                    .permitirVisitas(v.id, s),
+                                s
+                                    ? 'Visitas de control permitidas.'
+                                    : 'Visitas de control no permitidas.',
+                              );
+                              if (hecho) ref.invalidate(clientesProvider);
+                            },
+                          ),
+                        if (v.activo || v.permiteVisitas)
+                          ListTile(
+                            leading: const Icon(Icons.fact_check_outlined),
+                            title: const Text('Visitas de control hechas'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ControlesScreen(
+                                  vinculoId: v.id,
+                                  titulo: 'Controles de ${v.organizacion}',
+                                ),
+                              ),
+                            ),
                           ),
                       ],
                     ),

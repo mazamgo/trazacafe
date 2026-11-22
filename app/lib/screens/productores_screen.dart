@@ -18,6 +18,7 @@ import 'observaciones_screen.dart';
 import 'privacidad_screen.dart';
 import 'proveedores_screen.dart';
 import 'reportes_screen.dart';
+import 'visitas_control_screen.dart';
 import 'solicitudes_eliminacion_screen.dart';
 import 'productor_screen.dart';
 import 'temporadas_screen.dart';
@@ -140,6 +141,16 @@ class ProductoresScreen extends ConsumerWidget {
                         ),
                       ),
                       child: const Text('Clientes'),
+                    ),
+                  // Exportadora o beneficio: técnicos y administradores.
+                  if (tiposCliente.contains(tipo))
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const VisitasControlScreen(),
+                        ),
+                      ),
+                      child: const Text('Visitas de control'),
                     ),
                   PopupMenuItem(
                     onTap: () => Navigator.of(context).push(

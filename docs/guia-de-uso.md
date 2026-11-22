@@ -295,6 +295,7 @@ La exportadora que te compra te invita desde su app con el **correo de Google de
 - **Rechazar:** la exportadora ve que la rechazaste.
 - **Terminar el vínculo:** ya no le puedes vender lotes y deja de ver lo nuevo. Los lotes que ya recibió se quedan con ella, porque el EUDR obliga a guardarlos; los enviados sin recibir vuelven a tu lista.
 - **Vender lotes:** desde **⋮ → Lotes → Vender** (sección 4.4).
+- **Visitas de control:** con **Permitir visitas de control** encendido, los técnicos de la exportadora pueden visitar, sin señal, las fincas de los lotes que le vendiste que ella elija. Esas visitas **no reemplazan** tu visita de verificación de la temporada (la que exige un lote). Las ves en **Visitas de control hechas**, con su fecha, si el lindero coincide y la nota. Al apagarlo, la exportadora deja de tener fincas por visitar.
 - **Observaciones:** la exportadora puede dejarte observaciones sobre una finca o un lote, por ejemplo "revisar el lindero norte". Salen en el aviso de **Productores** (toca **Responder**) y en **⋮ → Clientes →** ícono de observaciones. Tócala y **Responder**.
 - **Cuándo se actualiza el aviso:** además del aviso push en el celular (sección 2), al abrir la app, al tocar **Sincronizar**, al volver a la app desde otra y cuando vuelve la señal. En el panel web, además, cada 3 minutos.
 
@@ -311,6 +312,13 @@ En **⋮ → Proveedores** están las cooperativas que te venden.
 5. **Armar el contenedor:** los lotes recibidos aparecen en **⋮ → Contenedores → Contenedor** (sección 4.5).
 
 - **Terminar el vínculo** (ícono de la cadena rota): los lotes ya recibidos se quedan contigo; los enviados sin recibir vuelven a la cooperativa.
+
+**Visitas de control** (exportadora o beneficio), si la cooperativa lo permite:
+1. **Elegir fincas:** en **Proveedores**, toca la cooperativa y baja hasta **Visitas de control**. Marca las fincas que deben visitar tus técnicos (son las de los lotes que te vendió).
+2. **Visitar (técnicos):** en la app, **⋮ → Visitas de control**. La lista se guarda en el celular, así que sirve sin señal. Toca la finca para ver su mapa y **Registrar visita**: indica si el lindero coincide con el del mapa y deja una nota. La visita se envía sola al volver la señal (o con **Enviar**).
+3. **Ver lo hecho:** en la revisión del proveedor, **Ver visitas hechas**. La cooperativa ve las mismas visitas en Clientes.
+
+Las visitas de control quedan firmadas en la blockchain como cualquier visita, pero no cuentan como la visita de verificación de la cooperativa.
 
 ### 4.9 Panel web (en la computadora)
 Los administradores pueden trabajar desde la computadora en **https://trazacafe-dev.web.app/panel**, con Chrome, Edge o Firefox.

@@ -42,6 +42,7 @@ import {
   ventaSchema,
   type Proveedores,
 } from "./proveedores.ts";
+import { muestreoSchema, permisoVisitasSchema, visitaControlSchema, type Controles } from "./control.ts";
 import { dispositivoSchema, type Notificaciones } from "./notificaciones.ts";
 import { armarReporte, csvReporte, type Reportes } from "./reportes.ts";
 import { AccesoDenegado, DatosInvalidos, VersionDesfasada, type LoteAbierto, type Repo } from "./repo.ts";
@@ -97,6 +98,7 @@ export function buildApp({
   proveedores = null,
   reportes = null,
   notificaciones = null,
+  controles = null,
   origenesPanel = ORIGENES_PANEL,
 }: {
   repo: Repo;
@@ -120,6 +122,8 @@ export function buildApp({
   reportes?: Reportes | null;
   /** Notificaciones push a los administradores (NotificacionesPg con FCM). */
   notificaciones?: Notificaciones | null;
+  /** Visitas de control de la exportadora (ControlesPg). */
+  controles?: Controles | null;
   /** Sitios desde los que el panel web llama a cualquier ruta `/v1/` (CORS). */
   origenesPanel?: string[];
 }) {
@@ -1038,6 +1042,83 @@ export function buildApp({
     if (!resuelto(await x.proveedores.responderObservacion(x.admin, req.params.id, d.texto), reply)) return;
     await avisar(req, (n) => n.respuesta(req.params.id));
     return reply.code(204).send();
+  });
+
+  // Visitas de control (Fase 2b, paso 5): la cooperativa da permiso, la
+  // exportadora elige fincas de los lotes recibidos y sus técnicos las visitan.
+
+  /** Usuario con las visitas de control disponibles; `null` si ya se respondió. */
+  async function control(req: FastifyRequest, reply: FastifyReply, soloAdmin: boolean, ...ids: string[]) {
+    const usuario = await activo(req, reply, soloAdmin);
+    if (!usuario) return null;
+    if (!controles) {
+      reply.code(503).send({ error: "sin_controles" });
+      return null;
+    }
+    if (ids.some((id) => !z.uuid().safeParse(id).success)) {
+      reply.code(404).send({ error: "no_encontrado" });
+      return null;
+    }
+    return { usuario, controles };
+  }
+
+  /** Cooperativa: permite o no las visitas de control de ese cliente. */
+  app.put<{ Params: { id: string } }>("/v1/clientes/:id/visitas", async (req, reply) => {
+    const x = await control(req, reply, true, req.params.id);
+    if (!x) return;
+    const d = cuerpo(permisoVisitasSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.controles.permitirVisitas(x.usuario, req.params.id, d.permiteVisitas), reply)) {
+      return reply.code(204).send();
+    }
+  });
+
+  /** Exportadora: fincas de los lotes recibidos, con las elegidas para visitar. */
+  app.get<{ Params: { id: string } }>("/v1/proveedores/:id/muestreo", async (req, reply) => {
+    const x = await control(req, reply, true, req.params.id);
+    if (!x) return;
+    const r = await x.controles.muestreo(x.usuario.organizacionId, req.params.id);
+    if (resuelto(r, reply)) return r.valor;
+  });
+
+  app.post<{ Params: { id: string } }>("/v1/proveedores/:id/muestreo", async (req, reply) => {
+    const x = await control(req, reply, true, req.params.id);
+    if (!x) return;
+    const d = cuerpo(muestreoSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.controles.elegir(x.usuario, req.params.id, d.fincaId, true), reply)) return reply.code(204).send();
+  });
+
+  app.delete<{ Params: { id: string; fincaId: string } }>("/v1/proveedores/:id/muestreo/:fincaId", async (req, reply) => {
+    const x = await control(req, reply, true, req.params.id, req.params.fincaId);
+    if (!x) return;
+    if (resuelto(await x.controles.elegir(x.usuario, req.params.id, req.params.fincaId, false), reply)) {
+      return reply.code(204).send();
+    }
+  });
+
+  /** Técnicos y administradores de la exportadora: fincas por visitar. */
+  app.get("/v1/control", async (req, reply) => {
+    const x = await control(req, reply, false);
+    if (!x) return;
+    return { fincas: await x.controles.pendientes(x.usuario.organizacionId) };
+  });
+
+  /** Registra una visita de control (con id del celular: reenviarla no la duplica). */
+  app.post("/v1/control/visitas", async (req, reply) => {
+    const x = await control(req, reply, false);
+    if (!x) return;
+    const d = cuerpo(visitaControlSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.controles.registrar(x.usuario, d), reply)) return reply.code(204).send();
+  });
+
+  /** Visitas de control de un vínculo: las ven la exportadora y la cooperativa. */
+  app.get<{ Params: { id: string } }>("/v1/vinculos/:id/controles", async (req, reply) => {
+    const x = await control(req, reply, true, req.params.id);
+    if (!x) return;
+    const r = await x.controles.controles(x.usuario.organizacionId, req.params.id);
+    if (resuelto(r, reply)) return { controles: r.valor };
   });
 
   /** Lo pendiente en la red, para los avisos de la pantalla de inicio. */
