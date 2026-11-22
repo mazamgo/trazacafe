@@ -413,7 +413,7 @@ export class CorreccionesPg implements Correcciones {
       `SELECT v.nota, v.fecha, v.creado_por AS "creadoPor", v.lindero_cambio AS "linderoCambio",
               v.anulada_en IS NOT NULL AS anulada, v.attestation_uid IS NOT NULL AS atestada
        FROM verificaciones v JOIN fincas f ON f.id = v.finca_id JOIN productores p ON p.id = f.productor_id
-       WHERE v.id = $1 AND p.organizacion_id = $2 FOR UPDATE OF v`,
+       WHERE v.id = $1 AND p.organizacion_id = $2 AND v.organizacion_id IS NULL FOR UPDATE OF v`,
       [id, u.organizacionId],
     );
     return rows[0] as

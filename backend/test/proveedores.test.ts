@@ -114,6 +114,7 @@ const vinculo = (v: Partial<Vinculo> = {}): Vinculo => ({
   organizacion: { id: COOP, nombre: "Coop Sur" },
   estado: "activo",
   comparteNombres: false,
+  permiteVisitas: false,
   invitadoEn: "2026-10-28T15:00:00.000Z",
   respondidoEn: "2026-10-28T16:00:00.000Z",
   terminadoEn: null,

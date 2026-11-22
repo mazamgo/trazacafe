@@ -306,6 +306,25 @@ final mensajeriaProvider = Provider<Mensajeria?>(
   (ref) => kIsWeb ? null : MensajeriaFirebase(),
 );
 
+/// Visitas de control de la exportadora, guardadas en el celular.
+final controlServiceProvider = Provider<ControlService>(
+  (ref) => ControlService(ref.watch(apiProvider)),
+);
+
+final controlProvider = FutureProvider.autoDispose<EstadoControl>(
+  (ref) => ref.watch(controlServiceProvider).cargar(),
+);
+
+final muestreoProvider = FutureProvider.autoDispose
+    .family<({bool permiteVisitas, List<FincaMuestreo> fincas}), String>(
+      (ref, vinculoId) => ref.watch(apiProvider).muestreo(vinculoId),
+    );
+
+final controlesProvider = FutureProvider.autoDispose
+    .family<List<ControlVisita>, String>(
+      (ref, vinculoId) => ref.watch(apiProvider).controles(vinculoId),
+    );
+
 /// Reporte de una temporada (solo administradores; requiere señal).
 final reporteProvider = FutureProvider.autoDispose.family<Reporte, String>(
   (ref, temporadaId) => ref.watch(apiProvider).reporte(temporadaId),

@@ -15,6 +15,7 @@ import { EliminacionesPg } from "./eliminacion.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { ProveedoresPg } from "./proveedores.ts";
+import { ControlesPg } from "./control.ts";
 import { NotificacionesPg, type EnviarPush } from "./notificaciones.ts";
 import { ReportesPg } from "./reportes.ts";
 import { PgRepo } from "./repo.ts";
@@ -145,6 +146,7 @@ const app = buildApp({
   proveedores: new ProveedoresPg(pool),
   reportes: new ReportesPg(pool),
   notificaciones: new NotificacionesPg(pool, enviarPush),
+  controles: new ControlesPg(pool),
   verificador: new VerificadorPg(pool),
   ...(process.env.ORIGENES_PANEL ? { origenesPanel: process.env.ORIGENES_PANEL.split(",").map((o) => o.trim()) } : {}),
 });

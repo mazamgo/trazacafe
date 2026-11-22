@@ -191,7 +191,8 @@ export class ReportesPg implements Reportes {
                 ST_AsGeoJSON(f.geom, 7)::json AS geometria, ${AREA_OFICIAL("f")}::float8 AS "areaOficialHa",
                 f.deforestacion, c.fecha AS "ultimoChequeo", c.fuente, c.area_afectada_ha::float8 AS "areaAfectadaHa",
                 EXISTS (SELECT 1 FROM verificaciones v
-                        WHERE v.finca_id = f.id AND v.temporada_id = $2 AND v.anulada_en IS NULL) AS "conVisita",
+                        WHERE v.finca_id = f.id AND v.temporada_id = $2 AND v.anulada_en IS NULL
+                          AND v.organizacion_id IS NULL) AS "conVisita",
                 coalesce((SELECT sum(e.kg) FROM entregas e
                           WHERE e.finca_id = f.id AND e.temporada_id = $2 AND e.anulada_en IS NULL), 0)::float8 AS "kgEntregados"
          FROM fincas f JOIN productores p ON p.id = f.productor_id
@@ -223,7 +224,7 @@ export class ReportesPg implements Reportes {
         `SELECT i.email, count(*)::int AS visitas
          FROM verificaciones v JOIN fincas f ON f.id = v.finca_id JOIN productores p ON p.id = f.productor_id
          LEFT JOIN invitaciones i ON i.usuario_uid = v.creado_por AND i.organizacion_id = $1
-         WHERE p.organizacion_id = $1 AND v.temporada_id = $2 AND v.anulada_en IS NULL
+         WHERE p.organizacion_id = $1 AND v.temporada_id = $2 AND v.anulada_en IS NULL AND v.organizacion_id IS NULL
          GROUP BY 1 ORDER BY 2 DESC, 1`,
         [organizacionId, temporadaId],
       ),

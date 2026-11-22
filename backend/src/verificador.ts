@@ -205,6 +205,7 @@ export class VerificadorPg implements Verificador {
                                         'txHash', vat.tx_hash, 'firmadaEn', vat.creado_en)
                FROM verificaciones v LEFT JOIN attestaciones vat ON vat.uid = v.attestation_uid
                WHERE v.finca_id = f.id AND v.attestation_uid IS NOT NULL AND v.anulada_en IS NULL
+                 AND v.organizacion_id IS NULL
                ORDER BY v.fecha DESC LIMIT 1) AS visita
        FROM fincas f
        JOIN LATERAL (SELECT * FROM fincas_versiones v WHERE v.finca_id = f.id AND v.attestation_uid IS NOT NULL
