@@ -42,6 +42,15 @@ import {
   ventaSchema,
   type Proveedores,
 } from "./proveedores.ts";
+import {
+  asignarSchema,
+  correoAlertas,
+  ddsSchema,
+  invitarCompradorSchema,
+  paqueteParaComprador,
+  type Compradores,
+  type Correo,
+} from "./compradores.ts";
 import { muestreoSchema, permisoVisitasSchema, visitaControlSchema, type Controles } from "./control.ts";
 import { dispositivoSchema, type Notificaciones } from "./notificaciones.ts";
 import { armarReporte, csvReporte, type Reportes } from "./reportes.ts";
@@ -99,6 +108,8 @@ export function buildApp({
   reportes = null,
   notificaciones = null,
   controles = null,
+  compradores = null,
+  correo = null,
   origenesPanel = ORIGENES_PANEL,
 }: {
   repo: Repo;
@@ -124,6 +135,10 @@ export function buildApp({
   notificaciones?: Notificaciones | null;
   /** Visitas de control de la exportadora (ControlesPg). */
   controles?: Controles | null;
+  /** Portal del importador (CompradoresPg). */
+  compradores?: Compradores | null;
+  /** Correo para las alertas del importador; `null` = sin servicio de correo. */
+  correo?: Correo | null;
   /** Sitios desde los que el panel web llama a cualquier ruta `/v1/` (CORS). */
   origenesPanel?: string[];
 }) {
@@ -536,6 +551,22 @@ export function buildApp({
       }
     }
     await avisar(req, (n) => n.alertasSatelitales(empeoraron));
+    if (compradores) {
+      try {
+        await compradores.registrarAlertas(empeoraron);
+        // Sin servicio de correo, las alertas quedan en el portal sin avisar.
+        if (correo) {
+          for (const g of await compradores.alertasPorAvisar()) {
+            if (g.correos.length === 0) continue;
+            const m = correoAlertas(g.alertas);
+            await correo(g.correos, m.asunto, m.texto);
+            await compradores.marcarAvisadas(g.alertas.map((a) => a.id));
+          }
+        }
+      } catch (err) {
+        req.log.error({ err }, "alertas del importador fallaron");
+      }
+    }
     return resultados;
   });
 
@@ -1119,6 +1150,129 @@ export function buildApp({
     if (!x) return;
     const r = await x.controles.controles(x.usuario.organizacionId, req.params.id);
     if (resuelto(r, reply)) return { controles: r.valor };
+  });
+
+  // Portal del importador (Fase 2c): la exportadora invita a su comprador y
+  // le asigna contenedores cerrados; el importador ve solo esos.
+
+  /** Usuario con el portal disponible; `null` si ya se respondió. */
+  async function portal(req: FastifyRequest, reply: FastifyReply, soloAdmin: boolean, ...ids: string[]) {
+    const usuario = await activo(req, reply, soloAdmin);
+    if (!usuario) return null;
+    if (!compradores) {
+      reply.code(503).send({ error: "sin_compradores" });
+      return null;
+    }
+    if (ids.some((id) => !z.uuid().safeParse(id).success)) {
+      reply.code(404).send({ error: "no_encontrado" });
+      return null;
+    }
+    return { usuario, compradores };
+  }
+
+  app.get("/v1/compradores", async (req, reply) => {
+    const x = await portal(req, reply, true);
+    if (!x) return;
+    return { compradores: await x.compradores.lista(x.usuario.organizacionId) };
+  });
+
+  app.post("/v1/compradores", async (req, reply) => {
+    const x = await portal(req, reply, true);
+    if (!x) return;
+    const d = cuerpo(invitarCompradorSchema, req, reply);
+    if (!d) return;
+    const r = await x.compradores.invitar(x.usuario, d.email);
+    if (resuelto(r, reply)) return reply.code(201).send(r.valor);
+  });
+
+  for (const accion of ["aceptar", "rechazar"] as const) {
+    app.post<{ Params: { id: string } }>(`/v1/compradores/:id/${accion}`, async (req, reply) => {
+      const x = await portal(req, reply, true, req.params.id);
+      if (!x) return;
+      if (resuelto(await x.compradores.responder(x.usuario, req.params.id, accion === "aceptar"), reply)) {
+        return reply.code(204).send();
+      }
+    });
+  }
+
+  app.delete<{ Params: { id: string } }>("/v1/compradores/:id", async (req, reply) => {
+    const x = await portal(req, reply, true, req.params.id);
+    if (!x) return;
+    if (resuelto(await x.compradores.terminar(x.usuario, req.params.id), reply)) return reply.code(204).send();
+  });
+
+  /** Exportadora: asigna el contenedor cerrado a su comprador (o lo libera). */
+  app.put<{ Params: { id: string } }>("/v1/exportaciones/:id/comprador", async (req, reply) => {
+    const x = await portal(req, reply, true, req.params.id);
+    if (!x) return;
+    const d = cuerpo(asignarSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.compradores.asignar(x.usuario, req.params.id, d.compradorId), reply)) return reply.code(204).send();
+  });
+
+  app.delete<{ Params: { id: string } }>("/v1/exportaciones/:id/comprador", async (req, reply) => {
+    const x = await portal(req, reply, true, req.params.id);
+    if (!x) return;
+    if (resuelto(await x.compradores.asignar(x.usuario, req.params.id, null), reply)) return reply.code(204).send();
+  });
+
+  /** Importador: sus contenedores comprados. */
+  app.get("/v1/comprador/contenedores", async (req, reply) => {
+    const x = await portal(req, reply, false);
+    if (!x) return;
+    return { contenedores: await x.compradores.contenedores(x.usuario.organizacionId) };
+  });
+
+  /** Paquete de un contenedor comprado, sin nombres de productores ni de fincas. */
+  async function paqueteComprado(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const x = await portal(req, reply, false, req.params.id);
+    if (!x) return null;
+    const exportadora = await x.compradores.exportadoraDe(x.usuario.organizacionId, req.params.id);
+    const p = exportadora ? await repo.paqueteExportacion(exportadora, req.params.id) : null;
+    if (!p) {
+      reply.code(404).send({ error: "no_encontrado" });
+      return null;
+    }
+    return paqueteParaComprador(p);
+  }
+
+  app.get<{ Params: { id: string } }>("/v1/comprador/contenedores/:id", async (req, reply) => {
+    const p = await paqueteComprado(req, reply);
+    if (!p) return;
+    return p;
+  });
+
+  app.get<{ Params: { id: string } }>("/v1/comprador/contenedores/:id/geojson", async (req, reply) => {
+    const p = await paqueteComprado(req, reply);
+    if (!p) return;
+    return reply
+      .header("content-type", "application/geo+json")
+      .header("content-disposition", `attachment; filename="${nombreArchivo(p.exportacion.codigo)}.geojson"`)
+      .send(geojsonTraces(p.fincas));
+  });
+
+  app.get<{ Params: { id: string } }>("/v1/comprador/contenedores/:id/pdf", async (req, reply) => {
+    const p = await paqueteComprado(req, reply);
+    if (!p) return;
+    return reply
+      .header("content-type", "application/pdf")
+      .header("content-disposition", `attachment; filename="Paquete-EUDR-${nombreArchivo(p.exportacion.codigo)}.pdf"`)
+      .send(await pdfPaquete(p));
+  });
+
+  /** El importador anota la referencia de su DDS (la ve también la exportadora). */
+  app.put<{ Params: { id: string } }>("/v1/comprador/contenedores/:id/dds", async (req, reply) => {
+    const x = await portal(req, reply, true, req.params.id);
+    if (!x) return;
+    const d = cuerpo(ddsSchema, req, reply);
+    if (!d) return;
+    if (resuelto(await x.compradores.anotarDds(x.usuario, req.params.id, d.ddsRef), reply)) return reply.code(204).send();
+  });
+
+  app.get("/v1/comprador/alertas", async (req, reply) => {
+    const x = await portal(req, reply, false);
+    if (!x) return;
+    return { alertas: await x.compradores.alertas(x.usuario.organizacionId) };
   });
 
   /** Lo pendiente en la red, para los avisos de la pantalla de inicio. */

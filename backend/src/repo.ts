@@ -100,6 +100,8 @@ export interface Exportacion {
   estado: "abierta" | "cerrada";
   attestationUid: string | null;
   creadoEn: string;
+  /** Importador al que se asignó el contenedor (portal del comprador), o `null`. */
+  importador?: string | null;
   kg: number;
   /** Kg con que cuenta cada lote (los recibidos, si se compró); `proveedor` si es de otra organización. */
   lotes: { id: string; codigo: string; kg: number; estado: string; temporadaNombre: string; proveedor: string | null }[];
@@ -1073,6 +1075,8 @@ export class PgRepo implements Repo {
       `SELECT x.id, x.codigo, x.cultivo, x.comprador, x.destino, x.contenedor,
               to_char(x.fecha_embarque, 'YYYY-MM-DD') AS "fechaEmbarque", x.dds_ref AS "ddsRef", x.estado,
               x.attestation_uid AS "attestationUid", x.creado_en AS "creadoEn",
+              (SELECT o.nombre FROM ventas_contenedores vc JOIN organizaciones o ON o.id = vc.importador_id
+               WHERE vc.exportacion_id = x.id) AS importador,
               coalesce((SELECT sum(kg_en_contenedor(el.lote_id))::float8 FROM exportacion_lotes el
                         WHERE el.exportacion_id = x.id), 0) AS kg,
               coalesce((SELECT json_agg(json_build_object(

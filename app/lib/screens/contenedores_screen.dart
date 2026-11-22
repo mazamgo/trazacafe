@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/cultivos.dart';
 import '../providers.dart';
+import '../widgets/en_linea.dart';
 import '../services/api_client.dart';
 import '../widgets/qr_verificador.dart';
 import 'finca_screen.dart' show fecha;
@@ -49,6 +50,61 @@ class ContenedoresScreen extends ConsumerWidget {
     } catch (e) {
       mensajero.showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
     }
+  }
+
+  /// Asigna el contenedor cerrado a un comprador del portal (o lo libera).
+  Future<void> _comprador(
+    BuildContext context,
+    WidgetRef ref,
+    Exportacion x,
+  ) async {
+    final mensajero = ScaffoldMessenger.of(context);
+    final List<Comprador> activos;
+    try {
+      activos = (await ref.read(apiProvider).compradores())
+          .where((c) => c.activo)
+          .toList();
+    } catch (e) {
+      mensajero.showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    if (!context.mounted) return;
+    final elegido = await showDialog<String>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        title: Text('Comprador de ${x.codigo}'),
+        children: [
+          if (activos.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No tienes compradores activos. Invítalos en Compradores.',
+              ),
+            ),
+          for (final a in activos)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, a.id),
+              child: Text(a.organizacion),
+            ),
+          if (x.importador != null)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, ''),
+              child: const Text('Quitar la asignación'),
+            ),
+        ],
+      ),
+    );
+    if (elegido == null || !context.mounted) return;
+    final hecho = await ejecutarEnLinea(
+      context,
+      () => ref
+          .read(apiProvider)
+          .asignarComprador(x.id, elegido.isEmpty ? null : elegido),
+      elegido.isEmpty
+          ? 'Asignación quitada.'
+          : 'Contenedor asignado: el comprador ya lo ve en su panel.',
+    );
+    if (hecho) ref.invalidate(exportacionesProvider);
   }
 
   /// Descarga el PDF, el GeoJSON (TRACES) o el CSV (plataformas) del paquete
@@ -292,6 +348,7 @@ class ContenedoresScreen extends ConsumerWidget {
                         ),
                         onCsv: () =>
                             _compartir(context, ref, x, formato: _Formato.csv),
+                        onComprador: () => _comprador(context, ref, x),
                         onQr: x.attestationUid == null
                             ? null
                             : () => showDialog<void>(
@@ -326,6 +383,7 @@ class _TarjetaContenedor extends StatelessWidget {
     required this.onPdf,
     required this.onGeojson,
     required this.onCsv,
+    required this.onComprador,
     required this.onQr,
   });
 
@@ -336,6 +394,7 @@ class _TarjetaContenedor extends StatelessWidget {
   final VoidCallback onPdf;
   final VoidCallback onGeojson;
   final VoidCallback onCsv;
+  final VoidCallback onComprador;
 
   /// Solo con el contenedor ya firmado en la blockchain.
   final VoidCallback? onQr;
@@ -409,6 +468,16 @@ class _TarjetaContenedor extends StatelessWidget {
                 icon: const Icon(Icons.map_outlined),
                 label: const Text('GeoJSON (TRACES)'),
               ),
+              if (!x.abierta)
+                TextButton.icon(
+                  onPressed: onComprador,
+                  icon: const Icon(Icons.public),
+                  label: Text(
+                    x.importador == null
+                        ? 'Asignar al comprador'
+                        : 'Comprador: ${x.importador}',
+                  ),
+                ),
               TextButton.icon(
                 onPressed: x.abierta ? null : onCsv,
                 icon: const Icon(Icons.table_view_outlined),

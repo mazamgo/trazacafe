@@ -17,6 +17,7 @@ import 'nuevo_productor_screen.dart';
 import 'observaciones_screen.dart';
 import 'privacidad_screen.dart';
 import 'proveedores_screen.dart';
+import 'compradores_screen.dart';
 import 'reportes_screen.dart';
 import 'visitas_control_screen.dart';
 import 'solicitudes_eliminacion_screen.dart';
@@ -35,6 +36,34 @@ class ProductoresScreen extends ConsumerWidget {
     final esAdmin = sesion?.esAdmin ?? false;
     // Antes de la primera sincronización, el tipo por defecto de la API.
     final tipo = ref.watch(tipoOrganizacionProvider).value ?? 'cooperativa';
+    // El importador no trabaja en el campo: todo lo suyo está en el panel web.
+    if (tipo == 'importador') {
+      return Scaffold(
+        appBar: AppBar(title: const Text('TrazaCafé')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.computer, size: 48),
+                const SizedBox(height: 12),
+                const Text(
+                  'Los importadores usan el panel web: '
+                  'https://trazacafe-dev.web.app/panel',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () => ref.read(authServiceProvider).cerrarSesion(),
+                  child: const Text('Cerrar sesión'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final red = esAdmin ? ref.watch(avisosRedProvider).value : null;
     // Con qué organización se entró: cooperativa o exportadora.
     final organizacion = switch ((
@@ -141,6 +170,15 @@ class ProductoresScreen extends ConsumerWidget {
                         ),
                       ),
                       child: const Text('Clientes'),
+                    ),
+                  if (esAdmin && tiposCliente.contains(tipo))
+                    PopupMenuItem(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CompradoresScreen(),
+                        ),
+                      ),
+                      child: const Text('Compradores'),
                     ),
                   // Exportadora o beneficio: técnicos y administradores.
                   if (tiposCliente.contains(tipo))

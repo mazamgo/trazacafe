@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'red_proveedores.dart';
+import 'compradores.dart';
 import 'control.dart';
 import 'reportes.dart';
 
 export 'red_proveedores.dart';
+export 'compradores.dart';
 export 'control.dart';
 export 'reportes.dart';
 
@@ -318,6 +320,7 @@ class Exportacion {
     required this.fincas,
     required this.areaOficialHa,
     required this.fincasSinVerde,
+    this.importador,
   });
 
   factory Exportacion.desdeJson(Map<String, dynamic> j) {
@@ -333,6 +336,7 @@ class Exportacion {
           ? null
           : DateTime.parse(j['fechaEmbarque'] as String),
       ddsRef: j['ddsRef'] as String?,
+      importador: j['importador'] as String?,
       abierta: j['estado'] == 'abierta',
       attestationUid: j['attestationUid'] as String?,
       kg: (j['kg'] as num).toDouble(),
@@ -352,6 +356,9 @@ class Exportacion {
       fincasSinVerde: r['fincasSinVerde'] as int,
     );
   }
+
+  /// Importador al que se asignó (portal del comprador), o `null`.
+  final String? importador;
 
   final String id;
   final String codigo;
@@ -646,6 +653,78 @@ class ApiClient {
       );
 
   /// PDF del paquete EUDR para el comprador.
+  /// Portal del importador: vínculos exportadora → importador.
+  Future<List<Comprador>> compradores() async => [
+    for (final c
+        in ((await _pedir('GET', '/v1/compradores'))['compradores'] as List)
+            .cast<Map<String, dynamic>>())
+      Comprador.desdeJson(c),
+  ];
+
+  Future<void> invitarComprador(String email) =>
+      _pedir('POST', '/v1/compradores', {'email': email});
+
+  Future<void> responderComprador(String id, bool aceptar) => _pedir(
+    'POST',
+    '/v1/compradores/${Uri.encodeComponent(id)}/${aceptar ? 'aceptar' : 'rechazar'}',
+    const <String, dynamic>{},
+  );
+
+  Future<void> terminarComprador(String id) =>
+      _pedir('DELETE', '/v1/compradores/${Uri.encodeComponent(id)}');
+
+  /// Exportadora: asigna el contenedor cerrado a un comprador, o lo libera.
+  Future<void> asignarComprador(String exportacionId, String? compradorId) =>
+      compradorId == null
+      ? _pedir(
+          'DELETE',
+          '/v1/exportaciones/${Uri.encodeComponent(exportacionId)}/comprador',
+        )
+      : _pedir(
+          'PUT',
+          '/v1/exportaciones/${Uri.encodeComponent(exportacionId)}/comprador',
+          {'compradorId': compradorId},
+        );
+
+  Future<List<ContenedorComprado>> contenedoresComprados() async => [
+    for (final c
+        in ((await _pedir('GET', '/v1/comprador/contenedores'))['contenedores']
+                as List)
+            .cast<Map<String, dynamic>>())
+      ContenedorComprado.desdeJson(c),
+  ];
+
+  Future<List<FincaComprada>> fincasCompradas(String id) async => [
+    for (final f
+        in ((await _pedir(
+                  'GET',
+                  '/v1/comprador/contenedores/${Uri.encodeComponent(id)}',
+                ))['fincas']
+                as List)
+            .cast<Map<String, dynamic>>())
+      FincaComprada.desdeJson(f),
+  ];
+
+  Future<List<int>> pdfComprado(String id) =>
+      _descargar('/v1/comprador/contenedores/${Uri.encodeComponent(id)}/pdf');
+
+  Future<List<int>> geojsonComprado(String id) => _descargar(
+    '/v1/comprador/contenedores/${Uri.encodeComponent(id)}/geojson',
+  );
+
+  Future<void> anotarDds(String id, String ddsRef) => _pedir(
+    'PUT',
+    '/v1/comprador/contenedores/${Uri.encodeComponent(id)}/dds',
+    {'ddsRef': ddsRef},
+  );
+
+  Future<List<AlertaComprador>> alertasComprador() async => [
+    for (final a
+        in ((await _pedir('GET', '/v1/comprador/alertas'))['alertas'] as List)
+            .cast<Map<String, dynamic>>())
+      AlertaComprador.desdeJson(a),
+  ];
+
   /// Cooperativa: permite o no las visitas de control de ese cliente.
   Future<void> permitirVisitas(String vinculoId, bool permite) => _pedir(
     'PUT',

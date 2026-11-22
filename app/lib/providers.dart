@@ -306,6 +306,25 @@ final mensajeriaProvider = Provider<Mensajeria?>(
   (ref) => kIsWeb ? null : MensajeriaFirebase(),
 );
 
+/// Portal del importador: compradores (exportadora) o invitaciones (importador).
+final compradoresProvider = FutureProvider.autoDispose<List<Comprador>>(
+  (ref) => ref.watch(apiProvider).compradores(),
+);
+
+final comprasProvider = FutureProvider.autoDispose<List<ContenedorComprado>>(
+  (ref) => ref.watch(apiProvider).contenedoresComprados(),
+);
+
+final fincasCompradasProvider = FutureProvider.autoDispose
+    .family<List<FincaComprada>, String>(
+      (ref, id) => ref.watch(apiProvider).fincasCompradas(id),
+    );
+
+final alertasCompradorProvider =
+    FutureProvider.autoDispose<List<AlertaComprador>>(
+      (ref) => ref.watch(apiProvider).alertasComprador(),
+    );
+
 /// Visitas de control de la exportadora, guardadas en el celular.
 final controlServiceProvider = Provider<ControlService>(
   (ref) => ControlService(ref.watch(apiProvider)),

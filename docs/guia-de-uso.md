@@ -355,6 +355,19 @@ En el panel web, **Reportes** (la primera sección); en la app, **⋮ → Report
 - **Kg de la temporada:** por cultivo y estado, cuánto se entregó, cuánto rinde en café oro o cacao seco, y cuánto ya va en lotes o sigue libre. Abajo, los lotes abiertos, cerrados, vendidos y en contenedores.
 - **Descargar CSV** (ícono de descarga, arriba): una fila por finca, con productor, comunidad, cultivo, área, estado satelital, último chequeo, visita y kg entregados. Se abre en Excel.
 
+### 4.11 Compradores (exportadora) y portal del importador
+El importador de la Unión Europea puede ver sus contenedores en el panel web, con su paquete EUDR y alertas satelitales.
+
+**La exportadora:**
+1. **Invitar:** en **Compradores** (panel web, o ⋮ en la app), **Invitar comprador** con el correo del administrador del importador. El importador debe estar dado de alta en TrazaCafé (lo hace GoProduction) y haber entrado al panel.
+2. **Asignar contenedores:** en **Contenedores**, en un contenedor **cerrado**, toca **Asignar al comprador** y elígelo. El botón luego dice **Comprador: …**. Se puede quitar la asignación mientras el comprador no haya anotado su DDS.
+3. **Terminar el vínculo:** en Compradores. Lo ya asignado se queda con el comprador, porque lo necesita para su DDS y su archivo.
+
+**El importador** (panel web; en el celular solo ve un aviso para usar el panel):
+- **Contenedores:** acepta la invitación de la exportadora y ve solo los contenedores que le asignó: fincas de origen en verde, alertas y DDS. Al tocar uno ve el mapa de las fincas (sin nombres de productores ni de fincas), baja el **PDF** y el **GeoJSON para TRACES**, y **Anotar DDS** guarda la referencia de su declaración. La exportadora la ve en su contenedor.
+- **Alertas:** si una finca de origen de un contenedor comprado pasa a **amarillo** o **rojo** en el chequeo diario, aparece aquí y le llega un **correo** (cuando el servicio de correo esté configurado).
+- Por ahora el portal está en español; la versión en inglés queda pendiente.
+
 ## 5. Qué ve el comprador
 
 Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Puede ser el QR de un **contenedor** o de un **lote** (saco).
@@ -406,6 +419,7 @@ Al escanear el QR se abre una página web, sin instalar nada ni crear cuenta. Pu
 | **Área declarada** | Hectáreas que dice el productor, en fincas de un solo punto. |
 | **Temporada** | Período de cosecha que agrupa entregas y visitas. |
 | **Lote** | Entregas juntas en el beneficio, de un cultivo y una temporada. |
+| **Importador** | Quien pone el café o cacao en el mercado de la Unión Europea y presenta la DDS. En TrazaCafé, la organización que compra contenedores a una exportadora y los ve en el panel web. |
 | **Lote abierto** | Lote que todavía puede recibir entregas. Se firma, se vende o va en un contenedor solo después de cerrarlo. |
 | **DDS** | Declaración de diligencia debida: la presenta en **TRACES** el importador (el "operador") antes de poner el café o cacao en el mercado de la Unión Europea. Lleva la ubicación de las fincas de origen. |
 | **TRACES** | Sistema de la Comisión Europea donde se presentan las DDS. |
