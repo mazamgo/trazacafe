@@ -224,6 +224,7 @@ Es la parte que **paga el cliente**.
 **Prioridad:** si el primer piloto es una **exportadora**, esta fase va antes que el panel completo de la Fase 3 y que la consola del propietario.
 
 ## Fase 2c — Portal del importador (plan Comprador) (~3 semanas, después de la Fase 2b y del primer contenedor real)
+**Avance (22/11/2026), nivel básico + monitoreo hecho:** la exportadora invita a su comprador y le asigna contenedores cerrados; el importador los ve en el panel web (sin nombres de productores), baja PDF y GeoJSON, anota su DDS y ve las alertas satelitales posteriores a la compra (migración 019). **Falta:** configurar el servicio de correo (`CORREO_SMTP_URL`), la versión en inglés, y del plan Comprador de pago: varias exportadoras con filtros, archivo de 5 años congelado, API con token y reportes de riesgo.
 **Por qué:**
 - El importador de la UE es el **operador** del EUDR: presenta la declaración de diligencia debida (DDS) en TRACES, responde ante la autoridad y debe guardar la prueba 5 años.
 - Tiene más motivos y más capacidad de pago que la cooperativa.

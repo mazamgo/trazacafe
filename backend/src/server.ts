@@ -15,6 +15,8 @@ import { EliminacionesPg } from "./eliminacion.ts";
 import { cuentaKms } from "./kms.ts";
 import { crearPool } from "./db.ts";
 import { ProveedoresPg } from "./proveedores.ts";
+import nodemailer from "nodemailer";
+import { CompradoresPg, type Correo } from "./compradores.ts";
 import { ControlesPg } from "./control.ts";
 import { NotificacionesPg, type EnviarPush } from "./notificaciones.ts";
 import { ReportesPg } from "./reportes.ts";
@@ -133,6 +135,19 @@ const enviarPush: EnviarPush = async (tokens, m) => {
   );
 };
 
+// Correo de las alertas del importador: SMTP de un servicio de envío (Brevo,
+// SendGrid, Gmail con contraseña de aplicación). Sin CORREO_SMTP_URL, las
+// alertas se ven en el portal y no se manda correo.
+const correo: Correo | null = process.env.CORREO_SMTP_URL
+  ? (() => {
+      const transporte = nodemailer.createTransport(process.env.CORREO_SMTP_URL);
+      const de = process.env.CORREO_REMITENTE ?? "TrazaCafé <no-responder@trazacafe.app>";
+      return async (para, asunto, texto) => {
+        await transporte.sendMail({ from: de, to: para, subject: asunto, text: texto });
+      };
+    })()
+  : null;
+
 const app = buildApp({
   repo: new PgRepo(pool),
   verificarToken,
@@ -147,6 +162,8 @@ const app = buildApp({
   reportes: new ReportesPg(pool),
   notificaciones: new NotificacionesPg(pool, enviarPush),
   controles: new ControlesPg(pool),
+  compradores: new CompradoresPg(pool),
+  correo,
   verificador: new VerificadorPg(pool),
   ...(process.env.ORIGENES_PANEL ? { origenesPanel: process.env.ORIGENES_PANEL.split(",").map((o) => o.trim()) } : {}),
 });

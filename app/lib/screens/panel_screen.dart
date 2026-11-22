@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../widgets/avisos_red.dart';
 import 'activacion_screen.dart';
 import 'clientes_screen.dart';
+import 'compradores_screen.dart';
 import 'contenedores_screen.dart';
 import 'cultivos_screen.dart';
 import 'equipo_screen.dart';
@@ -96,59 +97,87 @@ class SeccionPanel {
 
 /// Secciones según el tipo de organización: Proveedores para quien compra
 /// lotes (exportadora, beneficio) y Clientes para quien los vende.
-List<SeccionPanel> seccionesPanel(String? tipo) => [
-  const SeccionPanel(
-    'reportes',
-    'Reportes',
-    Icons.insights_outlined,
-    ReportesScreen(),
-  ),
-  const SeccionPanel(
-    'lotes',
-    'Lotes',
-    Icons.inventory_2_outlined,
-    LotesScreen(),
-  ),
-  const SeccionPanel(
-    'contenedores',
-    'Contenedores',
-    Icons.local_shipping_outlined,
-    ContenedoresScreen(),
-  ),
-  if (tiposCliente.contains(tipo))
-    const SeccionPanel(
-      'proveedores',
-      'Proveedores',
-      Icons.storefront_outlined,
-      ProveedoresScreen(),
-    ),
-  if (tiposProveedora.contains(tipo))
-    const SeccionPanel(
-      'clientes',
-      'Clientes',
-      Icons.handshake_outlined,
-      ClientesScreen(),
-    ),
-  const SeccionPanel(
-    'observaciones',
-    'Observaciones',
-    Icons.chat_outlined,
-    ObservacionesScreen(),
-  ),
-  const SeccionPanel(
-    'temporadas',
-    'Temporadas',
-    Icons.event_outlined,
-    TemporadasScreen(),
-  ),
-  const SeccionPanel(
-    'cultivos',
-    'Cultivos',
-    Icons.eco_outlined,
-    CultivosScreen(),
-  ),
-  const SeccionPanel('equipo', 'Equipo', Icons.group_outlined, EquipoScreen()),
-];
+List<SeccionPanel> seccionesPanel(String? tipo) => tipo == 'importador'
+    ? const [
+        SeccionPanel(
+          'compras',
+          'Contenedores',
+          Icons.local_shipping_outlined,
+          ComprasScreen(),
+        ),
+        SeccionPanel(
+          'alertas',
+          'Alertas',
+          Icons.warning_amber_outlined,
+          AlertasCompradorScreen(),
+        ),
+        SeccionPanel('equipo', 'Equipo', Icons.group_outlined, EquipoScreen()),
+      ]
+    : [
+        const SeccionPanel(
+          'reportes',
+          'Reportes',
+          Icons.insights_outlined,
+          ReportesScreen(),
+        ),
+        const SeccionPanel(
+          'lotes',
+          'Lotes',
+          Icons.inventory_2_outlined,
+          LotesScreen(),
+        ),
+        const SeccionPanel(
+          'contenedores',
+          'Contenedores',
+          Icons.local_shipping_outlined,
+          ContenedoresScreen(),
+        ),
+        if (tiposCliente.contains(tipo))
+          const SeccionPanel(
+            'proveedores',
+            'Proveedores',
+            Icons.storefront_outlined,
+            ProveedoresScreen(),
+          ),
+        if (tiposCliente.contains(tipo))
+          const SeccionPanel(
+            'compradores',
+            'Compradores',
+            Icons.public,
+            CompradoresScreen(),
+          ),
+        if (tiposProveedora.contains(tipo))
+          const SeccionPanel(
+            'clientes',
+            'Clientes',
+            Icons.handshake_outlined,
+            ClientesScreen(),
+          ),
+        const SeccionPanel(
+          'observaciones',
+          'Observaciones',
+          Icons.chat_outlined,
+          ObservacionesScreen(),
+        ),
+        const SeccionPanel(
+          'temporadas',
+          'Temporadas',
+          Icons.event_outlined,
+          TemporadasScreen(),
+        ),
+        const SeccionPanel(
+          'cultivos',
+          'Cultivos',
+          Icons.eco_outlined,
+          CultivosScreen(),
+        ),
+        const SeccionPanel(
+          'equipo',
+          'Equipo',
+          Icons.group_outlined,
+          EquipoScreen(),
+        ),
+      ];
 
 /// Menú a la izquierda (abajo en pantallas angostas) y la sección elegida
 /// con su propio `Navigator`, para que lo que abre (revisión de un proveedor,

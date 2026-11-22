@@ -13,7 +13,7 @@ import { parseArgs } from "node:util";
 import { ID_CULTIVOS } from "@trazacafe/eudr-eas-schemas";
 import { crearPool } from "../src/db.ts";
 
-const TIPOS = ["cooperativa", "exportadora", "beneficio", "otra"];
+const TIPOS = ["cooperativa", "exportadora", "beneficio", "otra", "importador"];
 
 const { values } = parseArgs({
   options: {
@@ -24,7 +24,7 @@ const { values } = parseArgs({
   },
 });
 if (!values.nombre || !values.admin) {
-  console.error('Uso: npm run crear-organizacion -- --nombre "<nombre>" --admin <correo de Google> [--tipo cooperativa|exportadora|beneficio|otra]');
+  console.error('Uso: npm run crear-organizacion -- --nombre "<nombre>" --admin <correo de Google> [--tipo cooperativa|exportadora|beneficio|otra|importador]');
   process.exit(1);
 }
 if (!TIPOS.includes(values.tipo!)) {

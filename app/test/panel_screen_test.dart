@@ -27,6 +27,25 @@ Map<String, (int, Object?)> respuestas({String tipo = 'cooperativa'}) => {
   'GET /v1/red/avisos': (200, {'invitaciones': [], 'lotesPorRecibir': 0, 'observacionesSinResponder': 0}),
   'GET /v1/reportes': (200, reporte()),
   'GET /v1/reportes/csv': (200, null),
+  'GET /v1/compradores': (200, {
+    'compradores': [
+      {'id': 'c1', 'soy': 'importador', 'organizacion': {'id': 'e1', 'nombre': 'Exportadora Norte'}, 'estado': 'pendiente', 'invitadoEn': '2026-11-20T00:00:00.000Z', 'contenedores': 0},
+    ],
+  }),
+  'GET /v1/comprador/contenedores': (200, {
+    'contenedores': [
+      {
+        'id': 'x1', 'codigo': 'EXP-2026-001', 'contenedor': 'TCFU1000013', 'exportadora': 'Exportadora Norte', 'cultivo': 'cafe',
+        'destino': 'Hamburgo', 'fechaEmbarque': null, 'kg': 19, 'attestationUid': null, 'ddsRef': null,
+        'vendidoEn': '2026-11-20T00:00:00.000Z', 'fincas': 1, 'fincasVerdes': 0, 'alertas': 1,
+      },
+    ],
+  }),
+  'GET /v1/comprador/alertas': (200, {
+    'alertas': [
+      {'id': 1, 'contenedor': 'TCFU1000013', 'codigo': 'EXP-2026-001', 'finca': 'Finca C5C1', 'resultado': 'rojo', 'detectadaEn': '2026-11-21T00:00:00.000Z'},
+    ],
+  }),
 };
 
 class CompartidorFalso implements Compartidor {
@@ -116,8 +135,27 @@ void main() {
     expect(find.descendant(of: menu, matching: find.text('Proveedores')), findsNothing);
   });
 
+  testWidgets('un importador ve solo sus contenedores, alertas y equipo', (tester) async {
+    final (api, _) = await abrir(tester, tipo: 'importador');
+    final menu = find.byType(NavigationRail);
+    expect(find.descendant(of: menu, matching: find.text('Contenedores')), findsOneWidget);
+    expect(find.descendant(of: menu, matching: find.text('Alertas')), findsOneWidget);
+    expect(find.descendant(of: menu, matching: find.text('Lotes')), findsNothing);
+    expect(find.text('Exportadora Norte te invitó como comprador'), findsOneWidget);
+    expect(find.text('TCFU1000013 · 19 kg'), findsOneWidget);
+    expect(find.textContaining('0 de 1 fincas en verde · 1 alerta'), findsOneWidget);
+    api.respuestas['POST /v1/compradores/c1/aceptar'] = (204, null);
+    await tester.tap(find.text('Aceptar'));
+    await tester.pumpAndSettle();
+    expect(api.peticiones.any((p) => p.method == 'POST' && p.url.path == '/v1/compradores/c1/aceptar'), isTrue);
+    await tester.tap(find.descendant(of: menu, matching: find.text('Alertas')));
+    await tester.pumpAndSettle();
+    expect(find.text('Finca C5C1 · rojo'), findsOneWidget);
+  });
+
   testWidgets('una exportadora ve Proveedores y no Clientes', (tester) async {
     await abrir(tester, tipo: 'exportadora');
+    expect(find.descendant(of: find.byType(NavigationRail), matching: find.text('Compradores')), findsOneWidget);
     expect(find.text('TrazaCafé · Coop Sur · Exportadora'), findsOneWidget);
     final menu = find.byType(NavigationRail);
     expect(find.descendant(of: menu, matching: find.text('Proveedores')), findsOneWidget);
